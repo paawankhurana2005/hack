@@ -1,0 +1,16 @@
+{
+  "name": "reloop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ReLoop — an AI layer that gives returned/unused products a second life.",
+  "scripts": {
+    "dev:web": "pnpm --filter @reloop/web dev",
+    "dev:api": "pnpm --filter @reloop/api dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}

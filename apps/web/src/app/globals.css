@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens as CSS variables — mirror of src/lib/tokens.ts. */
+:root {
+  --navy-900: #131a22;
+  --navy-800: #232f3e;
+  --navy-700: #2f3b4c;
+  --navy-600: #3a4a5e;
+  --orange-500: #ff9900;
+  --orange-600: #ec7211;
+  --text-primary: #ffffff;
+  --text-muted: #c7d0da;
+}
+
+body {
+  background-color: var(--navy-900);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
