@@ -8,11 +8,21 @@ export interface SubmittedReturn {
   priceCents: number;
   reason: ReturnReason;
   photoCount: number;
+  photoUrls?: string[];
   gradingResult: ReturnGradingResult | null;
   routingDecision: ReturnRoutingDecision | null;
   submittedAt: string;
   agentArrivesAt: string;
-  status: 'awaiting_pickup' | 'in_transit' | 'processed';
+  status:
+    | 'awaiting_pickup'
+    | 'in_transit'
+    | 'processed'
+    | 'pending_seller_approval'
+    | 'seller_approved'
+    | 'deal_completed';
+  sellerApprovedAt?: string;
+  dealCompletedAt?: string;
+  ecoCreditsAwarded?: number;
 }
 
 const STORAGE_KEY = 'reloop_returns_v1';
@@ -29,7 +39,8 @@ export const SEEDED_RETURNS: SubmittedReturn[] = [
     photoCount: 3,
     submittedAt: new Date(Date.now() - 5 * 3600000).toISOString(),
     agentArrivesAt: new Date(Date.now() - 2 * 3600000).toISOString(),
-    status: 'in_transit',
+    status: 'pending_seller_approval',
+    photoUrls: ['/demo/smartphone.jpg'],
     gradingResult: {
       grade: 'A',
       confidence: 0.92,
@@ -127,8 +138,12 @@ export function getSubmittedReturns(): SubmittedReturn[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const saved: SubmittedReturn[] = raw ? (JSON.parse(raw) as SubmittedReturn[]) : [];
+    // User-submitted returns
     const userReturns = saved.filter((r) => !SEEDED_IDS.has(r.returnId));
-    return [...userReturns, ...SEEDED_RETURNS];
+    // Seeded returns: allow localStorage overrides (e.g. seller approved, deal completed)
+    const savedById = new Map(saved.map((r) => [r.returnId, r]));
+    const seededWithOverrides = SEEDED_RETURNS.map((r) => savedById.get(r.returnId) ?? r);
+    return [...userReturns, ...seededWithOverrides];
   } catch {
     return SEEDED_RETURNS;
   }
@@ -157,4 +172,31 @@ export function saveReturn(r: SubmittedReturn): void {
 
 export function generateReturnId(): string {
   return `RET-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
+export function approveReturn(returnId: string): SubmittedReturn | null {
+  const all = getSubmittedReturns();
+  const target = all.find((r) => r.returnId === returnId);
+  if (!target) return null;
+  const updated: SubmittedReturn = {
+    ...target,
+    status: 'seller_approved',
+    sellerApprovedAt: new Date().toISOString(),
+  };
+  saveReturn(updated);
+  return updated;
+}
+
+export function completeDeal(returnId: string, ecoCredits: number): SubmittedReturn | null {
+  const all = getSubmittedReturns();
+  const target = all.find((r) => r.returnId === returnId);
+  if (!target) return null;
+  const updated: SubmittedReturn = {
+    ...target,
+    status: 'deal_completed',
+    dealCompletedAt: new Date().toISOString(),
+    ecoCreditsAwarded: ecoCredits,
+  };
+  saveReturn(updated);
+  return updated;
 }

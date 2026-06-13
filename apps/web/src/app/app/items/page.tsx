@@ -18,6 +18,9 @@ const RETURN_STATUS_LABEL: Record<SubmittedReturn['status'], string> = {
   awaiting_pickup: 'Pickup scheduled',
   in_transit: 'In transit',
   processed: 'Returned',
+  pending_seller_approval: 'Pickup scheduled',
+  seller_approved: 'In transit',
+  deal_completed: 'Returned',
 };
 
 function purchasedOn(iso: string): string {

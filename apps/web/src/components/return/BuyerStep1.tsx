@@ -39,7 +39,16 @@ export function BuyerStep1({ order, onSubmit }: Props) {
     if (!files) return;
     const remaining = 5 - photos.length;
     const toAdd = Array.from(files).slice(0, remaining);
-    setPhotos((prev) => [...prev, ...toAdd.map((f) => URL.createObjectURL(f))]);
+    void Promise.all(
+      toAdd.map(
+        (f) =>
+          new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.readAsDataURL(f);
+          }),
+      ),
+    ).then((dataUrls) => setPhotos((prev) => [...prev, ...dataUrls]));
   }
 
   function removePhoto(idx: number) {

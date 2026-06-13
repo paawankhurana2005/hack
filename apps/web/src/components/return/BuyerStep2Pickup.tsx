@@ -67,6 +67,9 @@ export function BuyerStep2Pickup({
 
       await new Promise((r) => setTimeout(r, 800));
 
+      const isGradeALocalResale =
+        gradingResult?.grade === 'A' && routingDecision?.decision === 'local_resale';
+
       saveReturn({
         returnId: generateReturnId(),
         orderId,
@@ -75,11 +78,12 @@ export function BuyerStep2Pickup({
         priceCents,
         reason,
         photoCount: photos.length,
+        photoUrls: photos.length > 0 ? photos : undefined,
         gradingResult,
         routingDecision,
         submittedAt: new Date().toISOString(),
         agentArrivesAt: new Date(Date.now() + 3 * 3600000).toISOString(),
-        status: 'awaiting_pickup',
+        status: isGradeALocalResale ? 'pending_seller_approval' : 'awaiting_pickup',
       });
 
       setPhase('ready');

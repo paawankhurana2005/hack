@@ -21,9 +21,12 @@ const GRADE_STYLE: Record<string, string> = {
   Salvage: 'bg-danger/20 text-danger',
 };
 
-const STATUS_STYLE: Record<SubmittedReturn['status'], { label: string; cls: string }> = {
+const STATUS_STYLE: Record<SubmittedReturn['status'], { label: string; cls: string; dot?: boolean }> = {
+  pending_seller_approval: { label: 'Needs approval', cls: 'bg-warning/20 text-warning font-bold', dot: true },
   awaiting_pickup: { label: 'Awaiting pickup', cls: 'bg-brand/15 text-brand' },
   in_transit: { label: 'In transit', cls: 'bg-warning/15 text-warning' },
+  seller_approved: { label: 'Routed to buyer', cls: 'bg-success/15 text-success' },
+  deal_completed: { label: 'Deal closed', cls: 'bg-success/20 text-success' },
   processed: { label: 'Processed', cls: 'bg-success/15 text-success' },
 };
 
@@ -124,7 +127,10 @@ export default function SellerReturnsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${status.cls}`}>
+                    <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold ${status.cls}`}>
+                      {status.dot && (
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+                      )}
                       {status.label}
                     </span>
                   </td>
