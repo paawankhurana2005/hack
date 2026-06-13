@@ -12,10 +12,13 @@ export interface ShopEntry extends ShopItem {
   sellerId: string;
 }
 
-// Static catalog items belong to "external" sellers, except the hero, which is
-// Aarav's listing (so it appears in Meera's shop and Aarav's My Listings).
+// Most catalog items belong to "external" sellers, but a few are owned by our
+// real users so they appear in OTHER users' shops and in the owner's My Listings.
 const STATIC_SELLER: Record<string, string> = {
-  [HERO_ID]: 'user_aarav',
+  [HERO_ID]: 'user_aarav', // Nike Pegasus
+  shop_sony: 'user_meera',
+  shop_coach: 'user_ananya',
+  shop_canon: 'user_rohan',
 };
 
 function fromStatic(item: ShopItem): ShopEntry {

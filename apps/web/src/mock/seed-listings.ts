@@ -4,11 +4,39 @@
 //   1. Pegasus  — healthy: reprice → widen → improve → holds, then sells in Shop.
 //   2. Worn runners — unsellable: reprice to floor → widen → recommends RECYCLE.
 
-import type { MarketContext, Money } from '@reloop/shared';
+import type { ConditionGrade, MarketContext, Money } from '@reloop/shared';
 import type { CasualListing } from './casual-listings';
-import { heroShopItem } from './shop-items';
+import { findShopItem, heroShopItem } from './shop-items';
 
 const inr = (amountCents: number): Money => ({ amountCents, currency: 'INR' });
+
+// Build a seller's My-Listings entry from a Shop catalog item, so the same item
+// is buyable by others (via the catalog) AND shows in the owner's My Listings
+// with the Listing Agent watching it.
+function listingFromShop(
+  shopId: string,
+  sellerId: string,
+  sellerName: string,
+  agent: { floorCents: number; market: MarketContext },
+): CasualListing {
+  const it = findShopItem(shopId)!;
+  return {
+    id: it.id,
+    title: it.card.title,
+    imageUrl: it.imageUrl,
+    listedPrice: it.listingPrice,
+    status: 'listed',
+    views: 9,
+    listedAt: it.card.issuedAt,
+    sellerId,
+    sellerName,
+    category: it.category,
+    grade: it.card.grade as ConditionGrade,
+    floorCents: agent.floorCents,
+    retailCents: it.originalPrice.amountCents,
+    market: agent.market,
+  };
+}
 
 // The user's hero — also lives in the Shop (they're the seller). Buying it there
 // flips it to Sold here. The agent walks its price down toward the comparable.
@@ -63,8 +91,31 @@ export const wornRunnersListing: CasualListing = {
   market: WORN_RUNNERS_MARKET,
 };
 
+// Other users' listings — each is a Shop catalog item assigned to a real user, so
+// the marketplace has cross-user inventory and every user has a My Listings entry.
+export const sonyListing = listingFromShop('shop_sony', 'user_meera', 'Meera Iyer', {
+  floorCents: 1100000, // ₹11,000
+  market: { comparableCents: 1500000, localDemand: 'high', holdingCostPerDayCents: 9000, baseViewsPerDay: 9 },
+});
+
+export const coachListing = listingFromShop('shop_coach', 'user_ananya', 'Ananya Rao', {
+  floorCents: 800000, // ₹8,000
+  market: { comparableCents: 1100000, localDemand: 'medium', holdingCostPerDayCents: 8000, baseViewsPerDay: 6 },
+});
+
+export const canonListing = listingFromShop('shop_canon', 'user_rohan', 'Rohan Verma', {
+  floorCents: 1500000, // ₹15,000
+  market: { comparableCents: 2000000, localDemand: 'low', holdingCostPerDayCents: 12000, baseViewsPerDay: 4 },
+});
+
 /** Seed listings shown for the demo (newest-feeling first). */
-export const seedListings: CasualListing[] = [wornRunnersListing, pegasusListing];
+export const seedListings: CasualListing[] = [
+  wornRunnersListing,
+  pegasusListing,
+  sonyListing,
+  coachListing,
+  canonListing,
+];
 
 export function findSeedListing(id: string): CasualListing | undefined {
   return seedListings.find((l) => l.id === id);

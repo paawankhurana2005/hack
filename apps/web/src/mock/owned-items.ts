@@ -93,6 +93,66 @@ export const ownedItems: UserOwnedItem[] = [
     originalListingImages: ['/demo/camera.jpg'],
     originalSpecs: { Model: 'EOS M50', Color: 'Black', Kit: '15-45mm lens' },
   },
+
+  // --- Rohan ---------------------------------------------------------------
+  {
+    id: 'own_wildcraft_backpack',
+    ownerId: 'user_rohan',
+    title: 'Wildcraft Trekking Backpack',
+    category: 'fashion',
+    imageUrl: '/demo/handbag.jpg',
+    purchaseDate: '2023-09-18',
+    originalPrice: inr(349900), // ₹3,499
+    description: 'Used for two treks. Switched to a bigger pack.',
+    returnEligible: false,
+    originalListingImages: ['/demo/handbag.jpg'],
+    originalSpecs: { Model: 'Trailblazer 45L', Color: 'Grey' },
+  },
+  {
+    id: 'own_galaxy_a54',
+    ownerId: 'user_rohan',
+    title: 'Samsung Galaxy A54',
+    category: 'electronics',
+    imageUrl: '/demo/smartphone.jpg',
+    purchaseDate: '2026-06-04',
+    originalPrice: inr(389900), // ₹3,899
+    description: 'Bought as a backup — don’t need it after all.',
+    returnEligible: true,
+    returnByDate: '2026-06-21',
+    orderId: 'ORD-2003',
+    originalListingImages: ['/demo/smartphone.jpg'],
+    originalSpecs: { Model: 'Galaxy A54 5G', Color: 'Awesome Graphite', Storage: '128GB' },
+  },
+
+  // --- Ananya --------------------------------------------------------------
+  {
+    id: 'own_nike_revolution',
+    ownerId: 'user_ananya',
+    title: 'Nike Revolution 6',
+    category: 'sports',
+    imageUrl: '/demo/sneakers.jpg',
+    purchaseDate: '2023-11-22',
+    originalPrice: inr(379900), // ₹3,799
+    description: 'Light running shoes. Moved on to trail shoes.',
+    returnEligible: false,
+    originalListingImages: ['/demo/sneakers.jpg'],
+    originalSpecs: { Model: 'Revolution 6', Color: 'Black/White', Size: 'US 7' },
+  },
+  {
+    id: 'own_jbl_tune',
+    ownerId: 'user_ananya',
+    title: 'JBL Tune 760NC',
+    category: 'electronics',
+    imageUrl: '/demo/headphones.jpg',
+    purchaseDate: '2026-06-01',
+    originalPrice: inr(599900), // ₹5,999
+    description: 'Comfortable but the ANC isn’t for me.',
+    returnEligible: true,
+    returnByDate: '2026-06-18',
+    orderId: 'ORD-2004',
+    originalListingImages: ['/demo/headphones.jpg'],
+    originalSpecs: { Model: 'Tune 760NC', Color: 'Black' },
+  },
 ];
 
 export function getOwnedItems(accountId: string): UserOwnedItem[] {

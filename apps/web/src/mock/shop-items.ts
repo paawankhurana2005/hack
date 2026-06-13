@@ -156,6 +156,66 @@ const SPECS: Spec[] = [
     listingPaise: 480000, // ₹4,800
     listedAt: '2025-06-03',
   },
+  {
+    id: 'shop_ultraboost',
+    title: 'Adidas Ultraboost 22',
+    category: 'sports',
+    imageUrl: '/demo/sneakers.jpg',
+    sellerName: 'Ishaan · Chennai',
+    grade: 'like-new',
+    confidence: 0.92,
+    summary: 'Worn a handful of times. Boost sole springy, knit upper spotless.',
+    issues: ['Faint outsole wear'],
+    verified: true,
+    originalPaise: 1699900, // ₹16,999
+    listingPaise: 799900, // ₹7,999
+    listedAt: '2025-06-06',
+  },
+  {
+    id: 'shop_galaxy',
+    title: 'Samsung Galaxy S22',
+    category: 'electronics',
+    imageUrl: '/demo/smartphone.jpg',
+    sellerName: 'Diya · Kolkata',
+    grade: 'good',
+    confidence: 0.86,
+    summary: 'Battery health 91%. Screen clean, slight wear on the frame corners.',
+    issues: ['Corner wear', 'Battery at 91%'],
+    verified: true,
+    originalPaise: 5499900, // ₹54,999
+    listingPaise: 2600000, // ₹26,000
+    listedAt: '2025-06-04',
+  },
+  {
+    id: 'shop_boat',
+    title: 'boAt Rockerz 550',
+    category: 'electronics',
+    imageUrl: '/demo/headphones.jpg',
+    sellerName: 'Vihaan · Jaipur',
+    grade: 'good',
+    confidence: 0.88,
+    summary: 'Over-ear, big bass. Light headband wear, pads in great shape.',
+    issues: ['Minor headband wear'],
+    verified: true,
+    originalPaise: 199900, // ₹1,999
+    listingPaise: 99900, // ₹999
+    listedAt: '2025-06-07',
+  },
+  {
+    id: 'shop_tote',
+    title: 'Leather Tote Bag',
+    category: 'fashion',
+    imageUrl: '/demo/handbag.jpg',
+    sellerName: 'Saanvi · Ahmedabad',
+    grade: 'like-new',
+    confidence: 0.9,
+    summary: 'Full-grain leather, barely used. Hardware bright, no scuffs.',
+    issues: [],
+    verified: false,
+    originalPaise: 1899900, // ₹18,999
+    listingPaise: 899900, // ₹8,999
+    listedAt: '2025-05-31',
+  },
 ];
 
 export const shopItems: ShopItem[] = SPECS.map(toShopItem);

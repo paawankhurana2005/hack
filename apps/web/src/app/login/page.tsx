@@ -1,36 +1,25 @@
 'use client';
 
+import { useState } from 'react';
 import { useRole } from '@/lib/role-context';
-import { ACCOUNTS, type Account } from '@/lib/accounts';
+import { ACCOUNTS, findAccountByHandle } from '@/lib/accounts';
 import { Eyebrow, GridBackdrop } from '@/components/ui/section';
-
-function AccountButton({ account, onPick }: { account: Account; onPick: (id: string) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onPick(account.id)}
-      className="group rounded-2xl bg-card p-6 text-left ring-1 ring-border transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-brand/10 hover:ring-brand/40"
-    >
-      <div className="flex items-center justify-between">
-        <span className="grid size-11 place-items-center rounded-full bg-brand/15 font-mono text-sm font-semibold text-brand">
-          {account.initials}
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          {account.kind === 'seller' ? 'Pro · High-volume' : `User · ${account.city}`}
-        </span>
-      </div>
-      <h2 className="mt-5 text-xl font-semibold tracking-tight text-foreground">{account.name}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{account.blurb}</p>
-      <span className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand py-2 pl-2 pr-4 text-sm font-medium text-brand-foreground ring-1 ring-brand/50 transition group-hover:shadow-[0_0_30px_rgba(234,179,8,0.25)]">
-        <span className="grid size-6 place-items-center rounded bg-brand-foreground/10">→</span>
-        Continue as {account.name.split(' ')[0]}
-      </span>
-    </button>
-  );
-}
 
 export default function LoginPage() {
   const { setAccount } = useRole();
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const account = findAccountByHandle(value);
+    if (!account) {
+      setError(`No account “${value.trim()}”. Try a username below.`);
+      return;
+    }
+    setAccount(account.id);
+  }
+
   const users = ACCOUNTS.filter((a) => a.kind === 'user');
   const sellers = ACCOUNTS.filter((a) => a.kind === 'seller');
 
@@ -41,7 +30,7 @@ export default function LoginPage() {
         <div className="absolute left-1/2 top-1/3 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/10 blur-[140px]" />
       </div>
 
-      <div className="relative w-full max-w-3xl text-center">
+      <div className="relative w-full max-w-md text-center">
         <div className="mb-6 flex items-center justify-center gap-2.5">
           <div className="relative grid size-7 place-items-center rounded-full bg-brand">
             <div className="size-3 rounded-full border-2 border-brand-foreground" />
@@ -50,34 +39,72 @@ export default function LoginPage() {
           <span className="text-lg font-semibold tracking-tight text-foreground">ReLoop</span>
         </div>
 
-        <Eyebrow className="mb-4">Select identity · demo</Eyebrow>
+        <Eyebrow className="mb-4">Sign in · demo</Eyebrow>
         <h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-          Continue as…
+          Who are you?
         </h1>
-        <p className="mx-auto mt-3 max-w-md text-pretty text-muted-foreground">
-          No password needed — this is a demo. Pick who you are. Switch any time from the top bar.
+        <p className="mx-auto mt-3 max-w-sm text-pretty text-muted-foreground">
+          No password needed. Type a username to open that profile.
         </p>
 
-        {/* Users */}
-        <div className="mt-10 flex items-center gap-3">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-brand">Shoppers</span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2">
-          {users.map((a) => (
-            <AccountButton key={a.id} account={a} onPick={setAccount} />
-          ))}
-        </div>
+        <form onSubmit={submit} className="mt-8">
+          <div className="flex items-center gap-2 rounded-xl bg-card p-2 ring-1 ring-border focus-within:ring-brand/50">
+            <span className="pl-2 font-mono text-sm text-muted-foreground">@</span>
+            <input
+              autoFocus
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setError('');
+              }}
+              placeholder="username"
+              className="flex-1 bg-transparent py-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 rounded-lg bg-brand py-2 pl-2 pr-4 text-sm font-medium text-brand-foreground ring-1 ring-brand/50 transition hover:shadow-[0_0_30px_rgba(234,179,8,0.25)] active:scale-95"
+            >
+              <span className="grid size-6 place-items-center rounded bg-brand-foreground/10">→</span>
+              Enter
+            </button>
+          </div>
+          {error && <p className="mt-2 text-left text-xs text-destructive">{error}</p>}
+        </form>
 
-        {/* Seller */}
-        <div className="mt-10 flex items-center gap-3">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-brand">Seller</span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2">
-          {sellers.map((a) => (
-            <AccountButton key={a.id} account={a} onPick={setAccount} />
-          ))}
+        {/* Available handles — click to fill */}
+        <div className="mt-8 space-y-3 text-left">
+          <div>
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-brand">Shoppers</p>
+            <div className="flex flex-wrap gap-2">
+              {users.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setAccount(a.id)}
+                  className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+                >
+                  {a.handle}
+                  <span className="ml-1.5 text-muted-foreground/50">· {a.name.split(' ')[0]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-brand">Sellers</p>
+            <div className="flex flex-wrap gap-2">
+              {sellers.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setAccount(a.id)}
+                  className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+                >
+                  {a.handle}
+                  <span className="ml-1.5 text-muted-foreground/50">· {a.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
