@@ -14,7 +14,7 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-2001',
     productName: 'boAt Rockerz 550 Headphones',
-    imageUrl: '/demo/headphones.jpg',
+    imageUrl: '/catalog/boat-headphones.jpg',
     orderDate: '2026-06-02T00:00:00Z',
     priceCents: 199900,
     currency: 'INR',
@@ -24,7 +24,7 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-2002',
     productName: 'Canon EOS M50 Camera',
-    imageUrl: '/demo/camera.jpg',
+    imageUrl: '/catalog/canon-camera.jpg',
     orderDate: '2026-05-30T00:00:00Z',
     priceCents: 549900,
     currency: 'INR',
@@ -34,7 +34,7 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-2003',
     productName: 'Samsung Galaxy A54',
-    imageUrl: '/demo/smartphone.jpg',
+    imageUrl: '/catalog/galaxy-phone.jpg',
     orderDate: '2026-06-04T00:00:00Z',
     priceCents: 389900,
     currency: 'INR',
@@ -44,7 +44,7 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-2004',
     productName: 'JBL Tune 760NC',
-    imageUrl: '/demo/headphones.jpg',
+    imageUrl: '/catalog/jbl-headphones.jpg',
     orderDate: '2026-06-01T00:00:00Z',
     priceCents: 599900,
     currency: 'INR',

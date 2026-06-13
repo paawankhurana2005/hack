@@ -9,8 +9,8 @@ import {
 
 const inr = (amountCents: number): Money => ({ amountCents, currency: 'INR' });
 
-// The user's own listed hero — appears in the Shop AND in My Listings (one person
-// plays both sides). Buying it flips it to Sold in My Listings via the shared store.
+// The hero listing (Aarav's) — appears in the Shop AND in My Listings. Buying it
+// flips it to Sold in My Listings via the shared marketplace store.
 export const HERO_ID = 'shop_pegasus';
 
 interface Spec {
@@ -65,17 +65,21 @@ function toShopItem(s: Spec): ShopItem {
   };
 }
 
+// Each product uses a distinct catalog photo. Items mapped to real users in
+// lib/market.ts (pegasus, sony, coach, watch) appear in others' shops and the
+// owner's My Listings; the rest are external sellers.
 const SPECS: Spec[] = [
+  // --- Users' listings (cross-user resale) ---------------------------------
   {
     id: HERO_ID,
-    title: 'Nike Air Zoom Pegasus 40',
+    title: 'Adidas Samba OG',
     category: 'sports',
-    imageUrl: '/demo/sneakers.jpg',
-    sellerName: 'You',
+    imageUrl: '/catalog/pegasus.jpg',
+    sellerName: 'Aarav Shah',
     grade: 'like-new',
     confidence: 0.94,
-    summary: 'Worn twice — clean uppers, crisp tread, no creasing. Practically new.',
-    issues: ['Faint crease on left toe box'],
+    summary: 'Worn a handful of times — clean suede, crisp gum sole, no creasing.',
+    issues: ['Faint toe crease'],
     verified: true,
     originalPaise: 999900, // ₹9,999
     listingPaise: 399900, // ₹3,999 — hero discount
@@ -85,8 +89,8 @@ const SPECS: Spec[] = [
     id: 'shop_sony',
     title: 'Sony WH-1000XM4 Headphones',
     category: 'electronics',
-    imageUrl: '/demo/headphones.jpg',
-    sellerName: 'Aarav · Bengaluru',
+    imageUrl: '/catalog/sony-headphones.jpg',
+    sellerName: 'Meera Iyer',
     grade: 'good',
     confidence: 0.88,
     summary: 'Fully functional, light cosmetic wear on the headband. Pads intact.',
@@ -97,26 +101,11 @@ const SPECS: Spec[] = [
     listedAt: '2025-06-05',
   },
   {
-    id: 'shop_iphone',
-    title: 'iPhone 13 · 128GB',
-    category: 'electronics',
-    imageUrl: '/demo/smartphone.jpg',
-    sellerName: 'Meera · Pune',
-    grade: 'good',
-    confidence: 0.85,
-    summary: 'Battery health 89%. Screen flawless, minor edge wear on the frame.',
-    issues: ['Light edge wear', 'Battery at 89%'],
-    verified: true,
-    originalPaise: 6990000, // ₹69,900
-    listingPaise: 3800000, // ₹38,000
-    listedAt: '2025-06-08',
-  },
-  {
     id: 'shop_coach',
-    title: 'Coach Leather Handbag',
+    title: 'Prada Galleria Handbag',
     category: 'fashion',
-    imageUrl: '/demo/handbag.jpg',
-    sellerName: 'Ananya · Delhi',
+    imageUrl: '/catalog/coach-handbag.jpg',
+    sellerName: 'Ananya Rao',
     grade: 'like-new',
     confidence: 0.91,
     summary: 'Barely used, stored in dust bag. Hardware bright, leather supple.',
@@ -127,94 +116,96 @@ const SPECS: Spec[] = [
     listedAt: '2025-05-29',
   },
   {
-    id: 'shop_canon',
-    title: 'Canon EOS M50 Camera',
+    id: 'shop_watch',
+    title: 'Apple Watch Series 8',
     category: 'electronics',
-    imageUrl: '/demo/camera.jpg',
-    sellerName: 'Rohan · Mumbai',
-    grade: 'fair',
-    confidence: 0.79,
-    summary: 'Works well, visible use. Low shutter count, kit lens included.',
-    issues: ['Scuffs on body', 'Small mark near grip'],
-    verified: true,
-    originalPaise: 5499000, // ₹54,990
-    listingPaise: 2400000, // ₹24,000
-    listedAt: '2025-06-01',
-  },
-  {
-    id: 'shop_puma',
-    title: 'Puma Slipstream Sneakers',
-    category: 'fashion',
-    imageUrl: '/demo/puma-slipstream/profile.jpg',
-    sellerName: 'Kabir · Hyderabad',
+    imageUrl: '/catalog/apple-watch.jpg',
+    sellerName: 'Rohan Verma',
     grade: 'good',
-    confidence: 0.9,
-    summary: 'Retro court sneakers, light creasing, soles clean. Lots of life left.',
-    issues: ['Light creasing', 'Faint sole scuff'],
+    confidence: 0.87,
+    summary: 'Battery health 92%. Screen flawless, light wear on the case edge.',
+    issues: ['Edge wear', 'Battery at 92%'],
     verified: true,
-    originalPaise: 899900, // ₹8,999
-    listingPaise: 480000, // ₹4,800
-    listedAt: '2025-06-03',
+    originalPaise: 4500000, // ₹45,000
+    listingPaise: 2200000, // ₹22,000
+    listedAt: '2025-06-02',
+  },
+
+  // --- External sellers ----------------------------------------------------
+  {
+    id: 'shop_iphone',
+    title: 'iPhone 13 Pro · 128GB',
+    category: 'electronics',
+    imageUrl: '/catalog/iphone.jpg',
+    sellerName: 'Meghna · Pune',
+    grade: 'good',
+    confidence: 0.85,
+    summary: 'Battery health 89%. Screen flawless, minor edge wear on the frame.',
+    issues: ['Light edge wear', 'Battery at 89%'],
+    verified: true,
+    originalPaise: 11999000, // ₹1,19,990
+    listingPaise: 6500000, // ₹65,000
+    listedAt: '2025-06-08',
   },
   {
-    id: 'shop_ultraboost',
-    title: 'Adidas Ultraboost 22',
+    id: 'shop_asics',
+    title: 'Asics Gel Running Shoes',
     category: 'sports',
-    imageUrl: '/demo/sneakers.jpg',
+    imageUrl: '/catalog/ultraboost.jpg',
     sellerName: 'Ishaan · Chennai',
-    grade: 'like-new',
-    confidence: 0.92,
-    summary: 'Worn a handful of times. Boost sole springy, knit upper spotless.',
-    issues: ['Faint outsole wear'],
+    grade: 'good',
+    confidence: 0.86,
+    summary: 'Plenty of cushioning left, light outsole wear. Great daily trainer.',
+    issues: ['Outsole wear', 'Faint scuffs'],
     verified: true,
-    originalPaise: 1699900, // ₹16,999
-    listingPaise: 799900, // ₹7,999
+    originalPaise: 999900, // ₹9,999
+    listingPaise: 449900, // ₹4,499
     listedAt: '2025-06-06',
   },
   {
-    id: 'shop_galaxy',
-    title: 'Samsung Galaxy S22',
+    id: 'shop_speaker',
+    title: 'Marshall Emberton Speaker',
     category: 'electronics',
-    imageUrl: '/demo/smartphone.jpg',
-    sellerName: 'Diya · Kolkata',
-    grade: 'good',
-    confidence: 0.86,
-    summary: 'Battery health 91%. Screen clean, slight wear on the frame corners.',
-    issues: ['Corner wear', 'Battery at 91%'],
-    verified: true,
-    originalPaise: 5499900, // ₹54,999
-    listingPaise: 2600000, // ₹26,000
-    listedAt: '2025-06-04',
-  },
-  {
-    id: 'shop_boat',
-    title: 'boAt Rockerz 550',
-    category: 'electronics',
-    imageUrl: '/demo/headphones.jpg',
+    imageUrl: '/catalog/jbl-speaker.jpg',
     sellerName: 'Vihaan · Jaipur',
-    grade: 'good',
-    confidence: 0.88,
-    summary: 'Over-ear, big bass. Light headband wear, pads in great shape.',
-    issues: ['Minor headband wear'],
+    grade: 'like-new',
+    confidence: 0.9,
+    summary: 'Big sound, barely used. Grille spotless, battery holds full charge.',
+    issues: [],
     verified: true,
-    originalPaise: 199900, // ₹1,999
-    listingPaise: 99900, // ₹999
+    originalPaise: 1599000, // ₹15,990
+    listingPaise: 850000, // ₹8,500
     listedAt: '2025-06-07',
   },
   {
     id: 'shop_tote',
-    title: 'Leather Tote Bag',
+    title: 'Denim Tote Bag',
     category: 'fashion',
-    imageUrl: '/demo/handbag.jpg',
+    imageUrl: '/catalog/tote-bag.jpg',
     sellerName: 'Saanvi · Ahmedabad',
-    grade: 'like-new',
-    confidence: 0.9,
-    summary: 'Full-grain leather, barely used. Hardware bright, no scuffs.',
-    issues: [],
+    grade: 'good',
+    confidence: 0.88,
+    summary: 'Sturdy everyday tote, light fading. Straps and lining in great shape.',
+    issues: ['Light fading'],
     verified: false,
-    originalPaise: 1899900, // ₹18,999
-    listingPaise: 899900, // ₹8,999
+    originalPaise: 499900, // ₹4,999
+    listingPaise: 220000, // ₹2,200
     listedAt: '2025-05-31',
+  },
+  {
+    id: 'shop_console',
+    title: 'Retro Game Console',
+    category: 'toys',
+    imageUrl: '/catalog/ps5.jpg',
+    sellerName: 'Dev · Kolkata',
+    grade: 'fair',
+    confidence: 0.8,
+    summary: 'Powers on, classic woodgrain finish. Some shelf wear, no controllers.',
+    issues: ['Shelf wear', 'No controllers included'],
+    verified: true,
+    originalPaise: 1499900, // ₹14,999
+    listingPaise: 600000, // ₹6,000
+    listedAt: '2025-06-01',
   },
 ];
 
