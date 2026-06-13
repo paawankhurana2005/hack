@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 const nav = [
   { href: '/seller', label: 'Overview' },
   { href: '/seller/returns', label: 'Returns' },
+  { href: '/seller/bulk-exchange', label: 'Bulk Exchange' },
+  { href: '/seller/spare-parts', label: 'Spare Parts' },
   { href: '/seller/inventory', label: 'Inventory' },
   { href: '/seller/insights', label: 'Insights' },
 ];
@@ -21,7 +23,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
         </p>
         <nav className="flex flex-col gap-1">
           {nav.map((n) => {
-            const active = pathname === n.href;
+            const active = n.href === '/seller' ? pathname === n.href : pathname.startsWith(n.href);
             return (
               <Link
                 key={n.href}

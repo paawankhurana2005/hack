@@ -1,69 +1,71 @@
 'use client';
 
 import { useState } from 'react';
-import type { ReturnFlowState } from '@reloop/shared';
+import type { ReturnReason } from '@reloop/shared';
 import { StepIndicator } from '@/components/ui/step-indicator';
 import { mockOrders } from '@/lib/mocks/return-flow';
-import { Step1Reason } from './Step1Reason';
-import { Step2Grading } from './Step2Grading';
-import { Step3Bridge } from './Step3Bridge';
-import { Step4Handoff } from './Step4Handoff';
-import { Step5Done } from './Step5Done';
+import { BuyerStep1 } from './BuyerStep1';
+import { BuyerStep2Pickup } from './BuyerStep2Pickup';
+import { BuyerStep3Done } from './BuyerStep3Done';
 
-const STEP_LABELS = ['Reason', 'Doorstep grading', 'Intelligent Bridge', 'Handoff', 'Done'];
+const STEP_LABELS = ['Reason & Photos', 'Pickup', 'Done'];
 
 interface Props {
   orderId: string;
-  gradingScenario: string | undefined;
-  routingScenario: string | undefined;
-  handoffScenario: string | undefined;
 }
 
-export function ReturnFlowClient({ orderId, gradingScenario, routingScenario, handoffScenario }: Props) {
-  // mockOrders is a non-empty constant; the fallback is always defined
+interface BuyerState {
+  step: 1 | 2 | 3;
+  reason: ReturnReason | null;
+  photos: string[];
+  agentWindow: string;
+}
+
+export function ReturnFlowClient({ orderId }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const order = mockOrders.find((o) => o.orderId === orderId) ?? mockOrders[0]!;
 
-  const [flowState, setFlowState] = useState<ReturnFlowState>({
-    orderId,
-    reason: 'changed_mind',
+  const [state, setState] = useState<BuyerState>({
+    step: 1,
+    reason: null,
     photos: [],
-    currentStep: 1,
+    agentWindow: '',
   });
 
-  function handleNext(partial: Partial<ReturnFlowState>) {
-    setFlowState((prev) => {
-      const rawNext = partial.currentStep ?? prev.currentStep + 1;
-      const nextStep = (Math.min(rawNext, 5) as 1 | 2 | 3 | 4 | 5);
-      return { ...prev, ...partial, currentStep: nextStep };
-    });
+  function handleStep1Submit(reason: ReturnReason, photos: string[]) {
+    setState((prev) => ({ ...prev, step: 2, reason, photos }));
   }
 
-  const stepProps = { flowState, onNext: handleNext };
+  function handleStep2Done(agentWindow: string) {
+    setState((prev) => ({ ...prev, step: 3, agentWindow }));
+  }
 
   return (
     <section className="mx-auto max-w-2xl px-6 py-8">
-      <StepIndicator steps={STEP_LABELS} current={flowState.currentStep - 1} />
+      <StepIndicator steps={STEP_LABELS} current={state.step - 1} />
 
       <div className="mt-8">
-        {flowState.currentStep === 1 && (
-          <Step1Reason {...stepProps} order={order} />
+        {state.step === 1 && (
+          <BuyerStep1 order={order} onSubmit={handleStep1Submit} />
         )}
-        {flowState.currentStep === 2 && (
-          <Step2Grading {...stepProps} gradingScenario={gradingScenario} />
-        )}
-        {flowState.currentStep === 3 && (
-          <Step3Bridge
-            {...stepProps}
-            routingScenario={routingScenario}
-            handoffScenario={handoffScenario}
+        {state.step === 2 && state.reason && (
+          <BuyerStep2Pickup
+            orderId={order.orderId}
+            productName={order.productName}
+            priceCents={order.priceCents}
+            category={order.category}
+            sku={order.sku}
+            reason={state.reason}
+            photos={state.photos}
+            onDone={handleStep2Done}
           />
         )}
-        {flowState.currentStep === 4 && (
-          <Step4Handoff {...stepProps} />
-        )}
-        {flowState.currentStep === 5 && (
-          <Step5Done {...stepProps} order={order} />
+        {state.step === 3 && (
+          <BuyerStep3Done
+            productName={order.productName}
+            priceCents={order.priceCents}
+            agentWindow={state.agentWindow}
+          />
         )}
       </div>
     </section>
