@@ -4,7 +4,7 @@
 import type { DemandLevel, SellItemDraft } from '@reloop/shared';
 
 export interface MarketEstimate {
-  /** Typical current online retail price, in USD cents. */
+  /** Typical current online retail price, in INR paise (minor units). */
   estimatedRetailCents: number;
   demand: DemandLevel;
   /** One-sentence market note (product popularity / price context). */

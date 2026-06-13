@@ -5,7 +5,7 @@ import { formatMoney } from '@/lib/money';
 import { ownedItems } from '@/mock/owned-items';
 
 function purchasedOn(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
 
 export default function MyItemsPage() {

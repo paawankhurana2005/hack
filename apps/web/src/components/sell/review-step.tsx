@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/section';
 import { formatMoney } from '@/lib/money';
+import { HealthCard } from './health-card';
 
 const gradeTone = {
   new: 'success',
@@ -21,15 +22,6 @@ const gradeTone = {
   fair: 'warning',
   poor: 'danger',
 } as const;
-
-function when(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 export function ReviewStep({
   item,
@@ -81,12 +73,12 @@ export function ReviewStep({
             </Badge>
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_auto]">
             <div>
               <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 Your photos
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {userPhotos.map((p, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -100,19 +92,14 @@ export function ReviewStep({
             </div>
             <div>
               <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                Original listing
+                As listed
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                {item.originalListingImages.map((src, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={src}
-                    src={src}
-                    alt={`Original ${i + 1}`}
-                    className="h-16 w-full rounded-lg object-cover ring-1 ring-border"
-                  />
-                ))}
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.imageUrl}
+                alt="As listed on Amazon"
+                className="h-16 w-24 rounded-lg object-cover ring-1 ring-border"
+              />
             </div>
           </div>
 
@@ -220,37 +207,17 @@ export function ReviewStep({
         </Panel>
       </div>
 
-      {/* e. Health Card preview */}
-      <Card>
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
-              Product Health Card · preview
-            </p>
-            <h3 className="mt-1 font-semibold tracking-tight text-foreground">{card.title}</h3>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <Badge tone={gradeTone[card.grade]}>{card.grade}</Badge>
-            {card.authenticityVerified && <Badge tone="success">✓ Authenticity verified</Badge>}
-          </div>
-        </div>
-        <p className="mt-3 text-sm text-foreground">{card.summary}</p>
-        <div className="mt-4 rounded-xl bg-background/60 p-4">
-          <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-brand">History</p>
-          <ol className="relative space-y-3 pl-4">
-            <span className="absolute bottom-1 left-[5px] top-1 w-px bg-border" />
-            {card.history.map((e) => (
-              <li key={e.label} className="relative flex items-center justify-between text-sm">
-                <span className="flex items-center gap-3 text-foreground">
-                  <span className="absolute -left-4 size-2 rounded-full bg-brand ring-2 ring-card" />
-                  {e.label}
-                </span>
-                <span className="font-mono text-[11px] text-muted-foreground">{when(e.at)}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </Card>
+      {/* e. Health Card preview (showpiece) */}
+      <div>
+        <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-brand">
+          Product Health Card · preview
+        </p>
+        <HealthCard
+          card={card}
+          originalPrice={item.originalPrice}
+          referenceMatch={ref?.authenticityMatch}
+        />
+      </div>
 
       {/* f. Projected impact */}
       <Card>

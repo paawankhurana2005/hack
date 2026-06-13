@@ -2,75 +2,39 @@ import type { Money, OwnedItem } from '@reloop/shared';
 
 export type { OwnedItem };
 
-const usd = (amountCents: number): Money => ({ amountCents, currency: 'USD' });
+const inr = (amountCents: number): Money => ({ amountCents, currency: 'INR' });
 
-// Mock "order history". Pre-grading facts only — NO condition is shown before the
-// AI grades the user's photos. originalListingImages + originalSpecs are the
-// reference the grader diffs against.
+// The user's real order history. Pre-grading facts only — NO condition is shown
+// before the AI grades the user's live photos. originalListingImages + originalSpecs
+// are the "as listed on Amazon" reference the grader diffs against.
 export const ownedItems: OwnedItem[] = [
   {
-    id: 'own_headphones',
-    title: 'Sony WH-1000XM4 Headphones',
-    category: 'electronics',
-    imageUrl: '/demo/headphones.jpg',
-    purchaseDate: '2024-03-12',
-    originalPrice: usd(34800),
-    description: 'Noise-cancelling over-ear headphones, barely used since upgrading.',
-    originalListingImages: ['/demo/headphones.jpg'],
-    originalSpecs: { Model: 'WH-1000XM4', Color: 'Black', Connectivity: 'Bluetooth 5.0' },
-  },
-  {
-    id: 'own_smartphone',
-    title: 'iPhone 13 · 128GB',
-    category: 'electronics',
-    imageUrl: '/demo/smartphone.jpg',
-    purchaseDate: '2023-09-28',
-    originalPrice: usd(79900),
-    description: 'Replaced after an upgrade. Screen and battery in great shape.',
-    originalListingImages: ['/demo/smartphone.jpg'],
-    originalSpecs: { Model: 'A2482', Storage: '128GB', Color: 'Midnight' },
-  },
-  {
-    id: 'own_camera',
-    title: 'Canon EOS M50 Camera',
-    category: 'electronics',
-    imageUrl: '/demo/camera.jpg',
-    purchaseDate: '2022-11-05',
-    originalPrice: usd(64900),
-    description: 'Mirrorless camera with kit lens. Outgrew it as a hobby.',
-    originalListingImages: ['/demo/camera.jpg'],
-    originalSpecs: { Model: 'EOS M50', Lens: '15-45mm kit', Color: 'Black' },
-  },
-  {
-    id: 'own_handbag',
-    title: 'Coach Leather Handbag',
-    category: 'fashion',
-    imageUrl: '/demo/handbag.jpg',
-    purchaseDate: '2023-06-18',
-    originalPrice: usd(29500),
-    description: 'Classic tan leather tote. Used a handful of times.',
-    originalListingImages: ['/demo/handbag.jpg'],
-    originalSpecs: { Model: 'C5690', Material: 'Pebbled leather', Color: 'Tan' },
-  },
-  {
-    id: 'own_sneakers',
-    title: 'Nike Pegasus Runners',
+    id: 'own_ua_charged',
+    title: 'Under Armour Charged Assert 10',
     category: 'sports',
-    imageUrl: '/demo/sneakers.jpg',
-    purchaseDate: '2024-01-22',
-    originalPrice: usd(13000),
-    description: 'Road-running shoes, wrong size for me after a few runs.',
-    originalListingImages: ['/demo/sneakers.jpg'],
-    originalSpecs: { Model: 'Pegasus 40', Size: 'US 10', Color: 'White/Black' },
+    imageUrl: '/demo/ua-charged/front.jpg',
+    purchaseDate: '2024-02-10',
+    originalPrice: inr(699900), // ₹6,999
+    description: 'Everyday running shoes. Replaced with a newer pair.',
+    originalListingImages: [
+      '/demo/ua-charged/front.jpg',
+      '/demo/ua-charged/side.jpg',
+      '/demo/ua-charged/sole.jpg',
+    ],
+    originalSpecs: {
+      Model: 'Charged Assert 10',
+      'Style #': '3026175-101',
+      Color: 'White',
+      Size: 'US 10',
+    },
   },
   {
-    // Showcase item for the reference comparison — 4 original listing angles.
     id: 'own_puma',
     title: 'Puma Slipstream Sneakers',
     category: 'fashion',
     imageUrl: '/demo/puma-slipstream/profile.jpg',
     purchaseDate: '2023-12-02',
-    originalPrice: usd(9000),
+    originalPrice: inr(899900), // ₹8,999
     description: 'Retro court sneakers. Grew out of the style.',
     originalListingImages: [
       '/demo/puma-slipstream/profile.jpg',
@@ -78,7 +42,7 @@ export const ownedItems: OwnedItem[] = [
       '/demo/puma-slipstream/top.jpg',
       '/demo/puma-slipstream/label.jpg',
     ],
-    originalSpecs: { Model: '392434-01', Color: 'White/Green', Size: 'US 9' },
+    originalSpecs: { Model: '392434-01', Color: 'White/Vapor Gray', Size: 'US 9' },
   },
 ];
 

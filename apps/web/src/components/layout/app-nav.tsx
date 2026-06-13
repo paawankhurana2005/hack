@@ -5,8 +5,10 @@ import { usePathname } from 'next/navigation';
 import { useRole } from '@/lib/role-context';
 
 const tabs = [
+  { href: '/app/shop', label: 'Shop' },
   { href: '/app/items', label: 'My Items' },
   { href: '/app/listings', label: 'My Listings' },
+  { href: '/app/rewards', label: 'Rewards' },
 ];
 
 /** Sub-nav for the user app — tabs + role label + log out, styled like the flow sub-bars. */

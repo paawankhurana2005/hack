@@ -13,23 +13,26 @@ import {
 import type { CompressedImage } from '@/lib/image';
 import { ApiRequestError, createHealthCard, gradeItem, priceItem } from '@/lib/api-client';
 import { addListing } from '@/lib/listings-store';
+import { earnSeller } from '@/lib/credits-store';
 import { PageShell } from '@/components/layout/page-shell';
+import { DetailStep } from './detail-step';
 import { CaptureStep } from './capture-step';
 import { ProcessingStep, type Stage } from './processing-step';
 import { ReviewStep } from './review-step';
 import { ConfirmedStep } from './confirmed-step';
 
-type Phase = 'capture' | 'processing' | 'review' | 'confirmed';
+type Phase = 'detail' | 'capture' | 'processing' | 'review' | 'confirmed';
 
 const PHASE_TITLE: Record<Phase, { eyebrow: string; title: string; description?: string }> = {
+  detail: { eyebrow: 'Sell · Step 01 · Item', title: 'Sell this item' },
   capture: {
-    eyebrow: 'Sell · Step 01 · Capture',
+    eyebrow: 'Sell · Step 02 · Capture',
     title: 'Show us the item',
     description: "Add a few photos. We'll grade the condition and check it against the original listing.",
   },
-  processing: { eyebrow: 'Sell · Step 02 · Inspection', title: 'Inspecting your item' },
+  processing: { eyebrow: 'Sell · Step 03 · Inspection', title: 'Inspecting your item' },
   review: {
-    eyebrow: 'Sell · Step 03 · Review',
+    eyebrow: 'Sell · Step 04 · Review',
     title: 'Review & confirm',
     description: 'Here’s what the AI found — and what your item is worth for a second life.',
   },
@@ -42,7 +45,7 @@ function errText(e: unknown, fallback: string): string {
 
 export function SellSession({ item }: { item: OwnedItem }) {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>('capture');
+  const [phase, setPhase] = useState<Phase>('detail');
   const [images, setImages] = useState<CompressedImage[]>([]);
   const [stage, setStage] = useState<Stage>('grading');
   const [failedStage, setFailedStage] = useState<Stage | null>(null);
@@ -124,6 +127,8 @@ export function SellSession({ item }: { item: OwnedItem }) {
       views: 0,
       listedAt: new Date().toISOString(),
     });
+    // Seller earns EcoCredits for diverting the item from landfill.
+    if (impact) earnSeller(impact.ecoCredits, `Listed ${item.title}`);
     setPhase('confirmed');
   }
 
@@ -131,6 +136,8 @@ export function SellSession({ item }: { item: OwnedItem }) {
 
   return (
     <PageShell eyebrow={header.eyebrow} title={header.title} description={header.description}>
+      {phase === 'detail' && <DetailStep item={item} onStart={() => setPhase('capture')} />}
+
       {phase === 'capture' && <CaptureStep item={item} onStart={onStart} />}
 
       {phase === 'processing' && (
@@ -138,7 +145,7 @@ export function SellSession({ item }: { item: OwnedItem }) {
           stage={stage}
           failedStage={failedStage}
           errorMsg={errorMsg}
-          photoCount={images.length}
+          photos={images}
           onRetry={() => void run(images)}
           onBack={() => setPhase('capture')}
         />
@@ -159,6 +166,7 @@ export function SellSession({ item }: { item: OwnedItem }) {
       {phase === 'confirmed' && (
         <ConfirmedStep
           item={item}
+          card={card}
           impact={impact}
           onViewListings={() => router.push('/app/listings')}
         />

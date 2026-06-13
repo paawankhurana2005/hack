@@ -29,15 +29,15 @@ const DEMAND_ADJUST: Record<DemandLevel, number> = {
   low: -0.05,
 };
 
-const RETAIL_MIN_CENTS = 100; // $1
-const RETAIL_MAX_CENTS = 1_000_000; // $10,000
+const RETAIL_MIN_CENTS = 10_000; // ₹100
+const RETAIL_MAX_CENTS = 50_000_000; // ₹5,00,000
 
-function usd(cents: number): Money {
-  return { amountCents: cents, currency: 'USD' };
+function inr(cents: number): Money {
+  return { amountCents: cents, currency: 'INR' };
 }
 
 function fmt(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+  return `₹${(cents / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 }
 
 export class PricingService {
@@ -84,8 +84,8 @@ export class PricingService {
       id: `price_${randomUUID()}`,
       productId: `prod_${randomUUID()}`,
       grade: req.grade,
-      estimatedRetail: usd(retailCents),
-      suggestedPrice: usd(suggestedCents),
+      estimatedRetail: inr(retailCents),
+      suggestedPrice: inr(suggestedCents),
       discountPct,
       demand: estimate.demand,
       rationale,

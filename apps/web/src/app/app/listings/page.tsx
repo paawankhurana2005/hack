@@ -7,6 +7,20 @@ import { Badge } from '@/components/ui/badge';
 import { formatMoney } from '@/lib/money';
 import { casualListings, type CasualListing, type ListingStatus } from '@/mock/casual-listings';
 import { getListings } from '@/lib/listings-store';
+import { heroShopItem } from '@/mock/shop-items';
+import { isSold } from '@/lib/marketplace-store';
+
+// The user's hero listing also lives in the Shop (they're the seller). Buying it
+// there flips it to Sold here — the loop, demonstrated by one person.
+const heroListing: CasualListing = {
+  id: heroShopItem.id,
+  title: heroShopItem.card.title,
+  imageUrl: heroShopItem.imageUrl,
+  listedPrice: heroShopItem.listingPrice,
+  status: 'listed',
+  views: 12,
+  listedAt: heroShopItem.card.issuedAt,
+};
 
 const STATUS_TONE: Record<ListingStatus, 'neutral' | 'accent' | 'success'> = {
   listed: 'neutral',
@@ -23,15 +37,19 @@ const STATUS_LABEL: Record<ListingStatus, string> = {
 };
 
 function listedOn(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
 export default function MyListingsPage() {
-  // Start from the seed (SSR-stable), then merge in any user-created listings.
-  const [listings, setListings] = useState<CasualListing[]>(casualListings);
+  // SSR-stable seed (hero), then merge in user-created listings on mount.
+  const [listings, setListings] = useState<CasualListing[]>([heroListing, ...casualListings]);
   useEffect(() => {
-    setListings(getListings());
+    setListings([...getListings(), heroListing]);
   }, []);
+
+  // Effective status reflects marketplace sales (a Shop purchase flips it to Sold).
+  const effectiveStatus = (l: CasualListing): ListingStatus =>
+    isSold(l.id) ? 'sold' : l.status;
 
   return (
     <PageShell
@@ -51,13 +69,19 @@ export default function MyListingsPage() {
         </Card>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {listings.map((listing) => (
+          {listings.map((listing) => {
+            const status = effectiveStatus(listing);
+            return (
             <Card key={listing.id} className="flex flex-col overflow-hidden p-0">
               <div className="relative aspect-[4/3] overflow-hidden bg-background">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={listing.imageUrl} alt={listing.title} className="h-full w-full object-cover" />
+                <img
+                  src={listing.imageUrl}
+                  alt={listing.title}
+                  className={`h-full w-full object-cover ${status === 'sold' ? 'opacity-50 grayscale' : ''}`}
+                />
                 <span className="absolute right-3 top-3">
-                  <Badge tone={STATUS_TONE[listing.status]}>{STATUS_LABEL[listing.status]}</Badge>
+                  <Badge tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>
                 </span>
               </div>
               <div className="flex flex-1 flex-col p-5">
@@ -71,7 +95,8 @@ export default function MyListingsPage() {
                 </div>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

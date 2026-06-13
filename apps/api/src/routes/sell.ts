@@ -22,7 +22,7 @@ const categoryEnum = z.enum([
 ]);
 
 const gradeEnum = z.enum(['new', 'like-new', 'good', 'fair', 'poor']);
-const moneySchema = z.object({ amountCents: z.number(), currency: z.literal('USD') });
+const moneySchema = z.object({ amountCents: z.number(), currency: z.literal('INR') });
 
 const draftSchema = z.object({
   title: z.string().trim().min(1).max(140),

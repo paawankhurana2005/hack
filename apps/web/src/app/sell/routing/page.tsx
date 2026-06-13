@@ -16,7 +16,7 @@ type Status = 'no-input' | 'loading' | 'success' | 'error';
 const demandTone = { low: 'warning', medium: 'neutral', high: 'success' } as const;
 
 function fmt(m: Money): string {
-  return `$${(m.amountCents / 100).toFixed(2)}`;
+  return `₹${(m.amountCents / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 }
 
 export default function SellRoutingPage() {

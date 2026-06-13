@@ -24,10 +24,26 @@ const CO2_BASELINE_KG: Record<ItemCategory, number> = {
   other: 5,
 };
 
-/** EcoCredits = round(co2SavedKg × 3 + resaleDollars × 0.1). */
+/** Seller side. EcoCredits = round(co2SavedKg × 3 + resaleRupees × 0.002). */
 export function estimateImpact(category: ItemCategory, resaleValue: Money): ImpactEstimate {
   const co2SavedKg = CO2_BASELINE_KG[category];
-  const resaleDollars = resaleValue.amountCents / 100;
-  const ecoCredits = Math.round(co2SavedKg * 3 + resaleDollars * 0.1);
+  const resaleRupees = resaleValue.amountCents / 100;
+  const ecoCredits = Math.round(co2SavedKg * 3 + resaleRupees * 0.002);
+  return { co2SavedKg, ecoCredits };
+}
+
+/**
+ * Buyer side — reward for choosing second-life over buying new: the same carbon
+ * diverted, plus value kept in circulation (what the buyer saved vs new).
+ * EcoCredits = round(co2SavedKg × 3 + savedRupees × 0.002).
+ */
+export function estimateBuyerImpact(
+  category: ItemCategory,
+  originalPrice: Money,
+  listingPrice: Money,
+): ImpactEstimate {
+  const co2SavedKg = CO2_BASELINE_KG[category];
+  const savedRupees = Math.max(0, (originalPrice.amountCents - listingPrice.amountCents) / 100);
+  const ecoCredits = Math.round(co2SavedKg * 3 + savedRupees * 0.002);
   return { co2SavedKg, ecoCredits };
 }

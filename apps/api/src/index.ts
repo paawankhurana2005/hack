@@ -18,7 +18,17 @@ import { healthCardHandler } from './routes/health-card.js';
 
 const app = express();
 
-app.use(cors({ origin: config.WEB_ORIGIN }));
+// Allow the configured web origin, plus any localhost port in dev (so the web
+// dev server's port doesn't have to match WEB_ORIGIN exactly).
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      const ok =
+        !origin || origin === config.WEB_ORIGIN || /^https?:\/\/localhost:\d+$/.test(origin);
+      cb(null, ok);
+    },
+  }),
+);
 // Base64 images make for large bodies; raise the JSON limit accordingly.
 app.use(express.json({ limit: '20mb' }));
 

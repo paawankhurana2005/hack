@@ -26,11 +26,11 @@ export const mockRouting: RoutingDecision = {
     'Strong nearby demand and high resale value relative to handling cost make a local resale the best path — it also avoids a warehouse round-trip.',
   factors: [
     { label: 'Nearby demand', value: 'High', weight: 0.4 },
-    { label: 'Resale value', value: '$48', weight: 0.3 },
+    { label: 'Resale value', value: '₹3,800', weight: 0.3 },
     { label: 'Local handling cost', value: 'Low', weight: 0.2 },
     { label: 'Carbon impact', value: 'Saves 1.8kg', weight: 0.1 },
   ],
-  estimatedValue: { amountCents: 4800, currency: 'USD' },
+  estimatedValue: { amountCents: 380000, currency: 'INR' },
   carbonSavedKg: 1.8,
   decidedAt: '2026-06-12T10:01:00.000Z',
 };
@@ -44,7 +44,7 @@ export const mockHealthCard: ProductHealthCard = {
   summary: 'Lightly used, fully functional, with minor cosmetic wear.',
   detectedIssues: ['Light scuff on bottom-left corner', 'Minor screen dust'],
   authenticityVerified: true,
-  listingPrice: { amountCents: 4800, currency: 'USD' },
+  listingPrice: { amountCents: 380000, currency: 'INR' },
   history: [
     { label: 'Graded', at: '2026-06-12T10:00:00.000Z' },
     { label: 'Verified authentic', at: '2026-06-12T10:00:30.000Z' },

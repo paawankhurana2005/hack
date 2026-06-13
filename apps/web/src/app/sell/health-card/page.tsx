@@ -21,7 +21,7 @@ const gradeTone = {
 } as const;
 
 function fmt(m: Money): string {
-  return `$${(m.amountCents / 100).toFixed(2)}`;
+  return `₹${(m.amountCents / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 }
 
 function when(iso: string): string {
