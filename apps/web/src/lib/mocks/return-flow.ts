@@ -10,6 +10,27 @@ import type {
 } from '@reloop/shared';
 
 export const mockOrders: MockOrder[] = [
+  // Orders mapped to users' return-eligible owned items (My Items → Return).
+  {
+    orderId: 'ORD-2001',
+    productName: 'boAt Rockerz 550 Headphones',
+    imageUrl: '/demo/headphones.jpg',
+    orderDate: '2026-06-02T00:00:00Z',
+    priceCents: 199900,
+    currency: 'INR',
+    sku: 'B0BOAT5500',
+    category: 'electronics',
+  },
+  {
+    orderId: 'ORD-2002',
+    productName: 'Canon EOS M50 Camera',
+    imageUrl: '/demo/camera.jpg',
+    orderDate: '2026-05-30T00:00:00Z',
+    priceCents: 549900,
+    currency: 'INR',
+    sku: 'B0CANONM50',
+    category: 'electronics',
+  },
   {
     orderId: 'ORD-1001',
     productName: 'Sony WH-1000XM5 Wireless Headphones',

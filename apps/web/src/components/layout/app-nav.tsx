@@ -14,7 +14,7 @@ const tabs = [
 /** Sub-nav for the user app — tabs + role label + log out, styled like the flow sub-bars. */
 export function AppNav() {
   const pathname = usePathname();
-  const { logout } = useRole();
+  const { logout, account } = useRole();
 
   return (
     <div className="border-b border-border/60 bg-card/30 backdrop-blur">
@@ -36,15 +36,22 @@ export function AppNav() {
           })}
         </nav>
         <div className="flex items-center gap-3">
-          <span className="hidden font-mono text-[10px] uppercase tracking-widest text-muted-foreground sm:inline">
-            Shop &amp; Sell
-          </span>
+          {account && (
+            <span className="hidden items-center gap-2 sm:flex">
+              <span className="grid size-6 place-items-center rounded-full bg-brand/15 font-mono text-[10px] font-semibold text-brand">
+                {account.initials}
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                {account.name}
+              </span>
+            </span>
+          )}
           <button
             type="button"
             onClick={logout}
             className="rounded-full border border-border px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-brand hover:text-brand"
           >
-            Switch / Log out
+            Switch
           </button>
         </div>
       </div>

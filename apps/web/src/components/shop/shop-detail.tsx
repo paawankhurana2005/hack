@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { estimateBuyerImpact, type Money, type ShopItem } from '@reloop/shared';
+import { estimateBuyerImpact, type Money } from '@reloop/shared';
 import { PageShell } from '@/components/layout/page-shell';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,11 +12,12 @@ import { formatMoney } from '@/lib/money';
 import { buyItem, isSold, type PurchaseResult } from '@/lib/marketplace-store';
 import { getAgentState } from '@/lib/agent-store';
 import { recordSale } from '@/lib/sale-store';
-import { earnSeller } from '@/lib/credits-store';
+import { earnFor } from '@/lib/credits-store';
+import type { ShopEntry } from '@/lib/market';
 
 const inr = (cents: number): Money => ({ amountCents: cents, currency: 'INR' });
 
-export function ShopDetail({ item }: { item: ShopItem }) {
+export function ShopDetail({ item }: { item: ShopEntry }) {
   const { card } = item;
   const [alreadySold, setAlreadySold] = useState(false);
   const [result, setResult] = useState<PurchaseResult | null>(null);
@@ -46,7 +47,8 @@ export function ShopDetail({ item }: { item: ShopItem }) {
       co2SavedKg: res.co2SavedKg,
       soldAt: new Date().toISOString(),
     });
-    earnSeller(res.sellerCredits, `Sold ${card.title}`);
+    // The SELLER (a different account) gets paid into their own ledger.
+    earnFor(item.sellerId, res.sellerCredits, `Sold ${card.title}`);
     setResult(res);
     setAlreadySold(true);
   }

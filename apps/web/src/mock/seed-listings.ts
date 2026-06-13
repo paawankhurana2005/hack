@@ -27,6 +27,8 @@ export const pegasusListing: CasualListing = {
   status: 'listed',
   views: 12,
   listedAt: heroShopItem.card.issuedAt,
+  sellerId: 'user_aarav',
+  sellerName: 'Aarav Shah',
   category: 'sports',
   grade: 'like-new',
   floorCents: 300000, // ₹3,000 — the rail
@@ -52,6 +54,8 @@ export const wornRunnersListing: CasualListing = {
   status: 'listed',
   views: 4,
   listedAt: '2025-06-09T09:00:00.000Z',
+  sellerId: 'user_aarav',
+  sellerName: 'Aarav Shah',
   category: 'sports',
   grade: 'poor',
   floorCents: 110000, // ₹1,100 — lowest sustainable resale

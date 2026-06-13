@@ -1,10 +1,12 @@
-// EcoCredits ledger (demo, localStorage). Buyer earns come from recorded Shop
-// purchases; seller earns and voucher redemptions live in this ledger. Balance =
-// total earned − total redeemed. Vouchers are display-only (no real money).
+// EcoCredits ledger (demo, localStorage) — PER USER. Buyer earns come from the
+// signed-in user's recorded Shop purchases; seller earns + voucher redemptions
+// live in this user's ledger. Balance = total earned − total redeemed. Vouchers
+// are display-only (no real money).
 
 import { getPurchases } from './marketplace-store';
+import { nsKey, readJson, writeJson } from './storage';
 
-const LEDGER_KEY = 'reloop.credits.ledger';
+const LEDGER_BASE = 'credits.ledger';
 
 export interface CreditEntry {
   kind: 'earn' | 'redeem';
@@ -27,26 +29,16 @@ export const VOUCHER_TIERS: VoucherTier[] = [
   { credits: 300, valuePaise: 45000 }, // ₹450
 ];
 
-function readLedger(): CreditEntry[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(LEDGER_KEY);
-    return raw ? (JSON.parse(raw) as CreditEntry[]) : [];
-  } catch {
-    return [];
-  }
+function readLedger(accountId?: string): CreditEntry[] {
+  return readJson<CreditEntry[]>(nsKey(LEDGER_BASE, accountId), []);
 }
 
-function writeLedger(entries: CreditEntry[]): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(LEDGER_KEY, JSON.stringify(entries));
-  } catch {
-    /* storage blocked — session-only */
-  }
+function writeLedger(entries: CreditEntry[], accountId?: string): void {
+  writeJson(nsKey(LEDGER_BASE, accountId), entries);
 }
 
-/** All credit events (buyer earns from purchases + seller earns + redemptions), newest first. */
+/** All credit events for the signed-in user (buyer earns from purchases + seller
+ *  earns + redemptions), newest first. */
 export function getActivity(): CreditEntry[] {
   const buyerEarns: CreditEntry[] = getPurchases().map((p) => ({
     kind: 'earn',
@@ -61,9 +53,18 @@ export function getBalance(): number {
   return getActivity().reduce((b, e) => (e.kind === 'earn' ? b + e.amount : b - e.amount), 0);
 }
 
+/** Credit the signed-in user (e.g. for listing an item). */
 export function earnSeller(amount: number, label: string): void {
+  earnFor(undefined, amount, label);
+}
+
+/** Credit a SPECIFIC account — used when one user's purchase pays another user. */
+export function earnFor(accountId: string | undefined, amount: number, label: string): void {
   if (amount <= 0) return;
-  writeLedger([{ kind: 'earn', amount, label, at: new Date().toISOString() }, ...readLedger()]);
+  writeLedger(
+    [{ kind: 'earn', amount, label, at: new Date().toISOString() }, ...readLedger(accountId)],
+    accountId,
+  );
 }
 
 /** Redeem a tier if affordable; returns the voucher code or null. */

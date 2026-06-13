@@ -14,6 +14,7 @@ import type { CompressedImage } from '@/lib/image';
 import { ApiRequestError, createHealthCard, gradeItem, priceItem } from '@/lib/api-client';
 import { addListing } from '@/lib/listings-store';
 import { earnSeller } from '@/lib/credits-store';
+import { useRole } from '@/lib/role-context';
 import { PageShell } from '@/components/layout/page-shell';
 import { DetailStep } from './detail-step';
 import { CaptureStep } from './capture-step';
@@ -45,6 +46,7 @@ function errText(e: unknown, fallback: string): string {
 
 export function SellSession({ item }: { item: OwnedItem }) {
   const router = useRouter();
+  const { account } = useRole();
   const [phase, setPhase] = useState<Phase>('detail');
   const [images, setImages] = useState<CompressedImage[]>([]);
   const [stage, setStage] = useState<Stage>('grading');
@@ -128,6 +130,13 @@ export function SellSession({ item }: { item: OwnedItem }) {
       status: 'listed',
       views: 0,
       listedAt: new Date().toISOString(),
+      // Whose listing this is — drives My Listings + who gets paid on sale.
+      sellerId: account?.id,
+      sellerName: account?.name,
+      // Shop-rendering data so other users can buy it.
+      originalPrice: item.originalPrice,
+      card: card ?? undefined,
+      impact: impact ?? undefined,
       // Agent metadata so the Listing Agent can reason over this real listing.
       category: item.category,
       grade: grading?.grade,

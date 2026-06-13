@@ -4,27 +4,33 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PageShell } from '@/components/layout/page-shell';
 import { ShopCard } from '@/components/shop/shop-card';
-import { shopItems } from '@/mock/shop-items';
+import { getShopEntries, type ShopEntry } from '@/lib/market';
 import { getSoldIds } from '@/lib/marketplace-store';
 import { getBalance } from '@/lib/credits-store';
 import { getAgentState } from '@/lib/agent-store';
+import { useRole } from '@/lib/role-context';
 
 export default function ShopPage() {
+  const { accountId } = useRole();
+  const [entries, setEntries] = useState<ShopEntry[]>([]);
   const [soldIds, setSoldIds] = useState<string[]>([]);
   const [credits, setCredits] = useState(0);
   const [prices, setPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
+    if (!accountId) return;
+    const list = getShopEntries(accountId);
+    setEntries(list);
     setSoldIds(getSoldIds());
     setCredits(getBalance());
     // Reflect any agent reprices on the catalog price.
     const map: Record<string, number> = {};
-    for (const it of shopItems) {
+    for (const it of list) {
       const a = getAgentState(it.id);
       if (a) map[it.id] = a.priceCents;
     }
     setPrices(map);
-  }, []);
+  }, [accountId]);
 
   return (
     <PageShell
@@ -45,7 +51,7 @@ export default function ShopPage() {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {shopItems.map((item) => (
+        {entries.map((item) => (
           <ShopCard
             key={item.id}
             item={item}

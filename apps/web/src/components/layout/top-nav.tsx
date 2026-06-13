@@ -12,8 +12,14 @@ const links = [
 
 export function TopNav() {
   const pathname = usePathname();
-  // The entity-select page is a standalone full-screen entry — no global chrome.
-  if (pathname === '/login') return null;
+  // Login is a standalone entry; the user app (/app) and seller dashboard
+  // (/seller) have their own dedicated nav — no global marketing chrome there.
+  if (
+    pathname === '/login' ||
+    pathname.startsWith('/app') ||
+    pathname.startsWith('/seller')
+  )
+    return null;
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-surface/70 backdrop-blur-xl">
       <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">

@@ -1,14 +1,16 @@
-// Demo marketplace state (localStorage, no backend): which items are sold, the
-// buyer's purchases, and the buyer's running EcoCredits. A purchase is a pure,
-// controllable state change — the foundation of the simulated buy flow.
+// Marketplace state (demo, localStorage). The SOLD set is GLOBAL — the
+// marketplace is shared, so one user's listing can be bought by another. The
+// buyer's PURCHASES are per-user (namespaced) so each account has its own history
+// and EcoCredits.
 
 import type { Money, ShopItem } from '@reloop/shared';
 import { estimateBuyerImpact, estimateImpact } from '@reloop/shared';
+import { nsKey, readJson, writeJson } from './storage';
+
+const SOLD_KEY = 'reloop.market.sold'; // global
+const PURCHASES_BASE = 'purchases'; // per-user
 
 const inr = (cents: number): Money => ({ amountCents: cents, currency: 'INR' });
-
-const SOLD_KEY = 'reloop.sold';
-const PURCHASES_KEY = 'reloop.purchases';
 
 export interface Purchase {
   id: string;
@@ -18,35 +20,17 @@ export interface Purchase {
   at: string; // ISO
 }
 
-function read<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function write(key: string, value: unknown): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* storage blocked — flow still completes in-memory for the session */
-  }
-}
-
 export function getSoldIds(): string[] {
-  return read<string[]>(SOLD_KEY, []);
+  return readJson<string[]>(SOLD_KEY, []);
 }
 
 export function isSold(id: string): boolean {
   return getSoldIds().includes(id);
 }
 
+/** Purchases by the signed-in user. */
 export function getPurchases(): Purchase[] {
-  return read<Purchase[]>(PURCHASES_KEY, []);
+  return readJson<Purchase[]>(nsKey(PURCHASES_BASE), []);
 }
 
 export interface PurchaseResult {
@@ -56,16 +40,17 @@ export interface PurchaseResult {
 }
 
 /**
- * Simulated transaction: mark sold, record the purchase, award buyer EcoCredits.
- * `salePriceCents` lets the caller sell at the agent's current (repriced) price so
- * the sale stays consistent with the agent's own history.
+ * Simulated transaction: mark sold (global), record the purchase for the signed-in
+ * buyer, award buyer EcoCredits. `salePriceCents` lets the caller sell at the
+ * agent's current (repriced) price so the sale stays consistent with its history.
+ * The SELLER's credit is awarded by the caller (it lands in the seller's ledger).
  */
 export function buyItem(item: ShopItem, salePriceCents?: number): PurchaseResult {
   const salePrice = inr(salePriceCents ?? item.listingPrice.amountCents);
   const buyer = estimateBuyerImpact(item.category, item.originalPrice, salePrice);
   const seller = estimateImpact(item.category, salePrice);
 
-  write(SOLD_KEY, Array.from(new Set([...getSoldIds(), item.id])));
+  writeJson(SOLD_KEY, Array.from(new Set([...getSoldIds(), item.id])));
   const purchase: Purchase = {
     id: item.id,
     title: item.card.title,
@@ -73,7 +58,7 @@ export function buyItem(item: ShopItem, salePriceCents?: number): PurchaseResult
     buyerCredits: buyer.ecoCredits,
     at: new Date().toISOString(),
   };
-  write(PURCHASES_KEY, [purchase, ...getPurchases()]);
+  writeJson(nsKey(PURCHASES_BASE), [purchase, ...getPurchases()]);
 
   return {
     buyerCredits: buyer.ecoCredits,

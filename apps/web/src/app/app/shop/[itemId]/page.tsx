@@ -1,13 +1,24 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { PageShell } from '@/components/layout/page-shell';
 import { Card } from '@/components/ui/card';
-import { findShopItem } from '@/mock/shop-items';
+import { findShopEntry, type ShopEntry } from '@/lib/market';
 import { ShopDetail } from '@/components/shop/shop-detail';
 
-export default function ShopItemPage({ params }: { params: { itemId: string } }) {
-  const item = findShopItem(params.itemId);
+export default function ShopItemPage() {
+  const params = useParams();
+  const id = Array.isArray(params.itemId) ? params.itemId[0]! : (params.itemId as string);
+  const [item, setItem] = useState<ShopEntry | null | undefined>(undefined);
 
-  if (!item) {
+  useEffect(() => {
+    setItem(findShopEntry(id) ?? null);
+  }, [id]);
+
+  if (item === undefined) return <PageShell eyebrow="Shop" title="Item" />;
+  if (item === null) {
     return (
       <PageShell eyebrow="Shop" title="Item not found">
         <Card>

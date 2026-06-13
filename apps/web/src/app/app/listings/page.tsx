@@ -13,6 +13,7 @@ import { seedListings } from '@/mock/seed-listings';
 import { isSold } from '@/lib/marketplace-store';
 import { getSale, type SellerSale } from '@/lib/sale-store';
 import { ensureAgent, type AgentState } from '@/lib/agent-store';
+import { useRole } from '@/lib/role-context';
 
 type Filter = 'all' | 'active' | 'sold';
 const ACTIVE_STATUSES: ListingStatus[] = ['listed', 'viewed', 'matched'];
@@ -49,16 +50,16 @@ function agentChip(a: AgentState): { label: string; tone: 'neutral' | 'accent' }
 }
 
 export default function MyListingsPage() {
-  // SSR-stable seed, then merge user-created listings + agent state on mount.
-  const [listings, setListings] = useState<CasualListing[]>(seedListings);
+  const { accountId } = useRole();
+  const [listings, setListings] = useState<CasualListing[]>([]);
   const [agents, setAgents] = useState<Record<string, AgentState>>({});
   const [sales, setSales] = useState<Record<string, SellerSale>>({});
   const [filter, setFilter] = useState<Filter>('all');
 
   useEffect(() => {
-    const userCreated = getListings();
-    const all = [...userCreated, ...seedListings];
-    // De-dupe by id (a user could list the hero too).
+    if (!accountId) return;
+    // Shared listing pool + seeds, scoped to the signed-in seller.
+    const all = [...getListings(), ...seedListings].filter((l) => l.sellerId === accountId);
     const seen = new Set<string>();
     const deduped = all.filter((l) => (seen.has(l.id) ? false : (seen.add(l.id), true)));
     setListings(deduped);
@@ -74,7 +75,7 @@ export default function MyListingsPage() {
     }
     setAgents(map);
     setSales(saleMap);
-  }, []);
+  }, [accountId]);
 
   const statusOf = (l: CasualListing): ListingStatus =>
     agents[l.id]?.status ?? (isSold(l.id) ? 'sold' : l.status);

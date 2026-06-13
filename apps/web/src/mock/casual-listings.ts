@@ -1,4 +1,11 @@
-import type { ConditionGrade, ItemCategory, MarketContext, Money } from '@reloop/shared';
+import type {
+  ConditionGrade,
+  ImpactEstimate,
+  ItemCategory,
+  MarketContext,
+  Money,
+  ProductHealthCard,
+} from '@reloop/shared';
 
 export type ListingStatus = 'listed' | 'viewed' | 'matched' | 'sold' | 'recycled' | 'donated';
 
@@ -11,6 +18,9 @@ export interface CasualListing {
   status: ListingStatus;
   views?: number;
   listedAt: string; // ISO
+  /** The account that owns this listing (whose My Listings it shows in). */
+  sellerId?: string;
+  sellerName?: string;
   // --- Agent metadata (optional; seeds bake it, the sell flow populates it) ---
   category?: ItemCategory;
   grade?: ConditionGrade;
@@ -20,6 +30,10 @@ export interface CasualListing {
   retailCents?: number;
   /** Simulated local-market signals the agent reasons over. */
   market?: MarketContext;
+  // --- Shop-rendering data (present once the listing is buyable by others) -----
+  originalPrice?: Money;
+  card?: ProductHealthCard;
+  impact?: ImpactEstimate;
 }
 
 // No seed listings here — My Listings shows the demo seeds (seed-listings.ts) plus
