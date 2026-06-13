@@ -88,6 +88,7 @@ export default function SellIntentPage() {
 
   return (
     <PageShell
+      eyebrow="Sell / Step 01 · Intent"
       title="What are you selling?"
       description="Add a few details and photos. We'll grade the condition with AI."
     >
@@ -95,26 +96,30 @@ export default function SellIntentPage() {
         <Card>
           <SamplePicker onSelect={onSample} disabled={busy} />
 
-          <div className="my-6 h-px bg-navy-700" />
+          <div className="my-6 h-px bg-border" />
 
           <div className="space-y-4">
             <label className="block">
-              <span className="text-sm text-muted">Title</span>
+              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                Title
+              </span>
               <input
                 type="text"
                 value={draft.title}
                 onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                 placeholder="e.g. Wireless headphones"
-                className="mt-1 w-full rounded-md border border-navy-600 bg-navy-900 px-3 py-2 text-white placeholder:text-navy-600 focus:border-orange-500 focus:outline-none"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:border-brand focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </label>
 
             <label className="block">
-              <span className="text-sm text-muted">Category</span>
+              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                Category
+              </span>
               <select
                 value={draft.category}
                 onChange={(e) => setDraft({ ...draft, category: e.target.value as ItemCategory })}
-                className="mt-1 w-full rounded-md border border-navy-600 bg-navy-900 px-3 py-2 text-white focus:border-orange-500 focus:outline-none"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {categories.map((c) => (
                   <option key={c} value={c}>
@@ -125,23 +130,27 @@ export default function SellIntentPage() {
             </label>
 
             <label className="block">
-              <span className="text-sm text-muted">Notes (optional)</span>
+              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                Notes (optional)
+              </span>
               <textarea
                 value={draft.notes}
                 onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
                 placeholder="Anything the grader should know"
                 rows={2}
-                className="mt-1 w-full rounded-md border border-navy-600 bg-navy-900 px-3 py-2 text-white placeholder:text-navy-600 focus:border-orange-500 focus:outline-none"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:border-brand focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </label>
           </div>
         </Card>
 
         <Card>
-          <p className="text-sm font-medium text-white">Photos</p>
-          <p className="mt-1 text-xs text-muted">Up to {MAX_IMAGES}. Resized in your browser.</p>
+          <p className="font-mono text-[11px] uppercase tracking-wider text-brand">Photos</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Up to {MAX_IMAGES}. Resized in your browser.
+          </p>
 
-          <label className="mt-3 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-navy-600 bg-navy-900 px-4 py-6 text-sm text-muted transition-colors hover:border-orange-500 hover:text-orange-500">
+          <label className="mt-3 flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-border bg-background px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-brand hover:text-brand">
             {images.length >= MAX_IMAGES ? 'Limit reached' : 'Add photos'}
             <input
               type="file"
@@ -161,12 +170,12 @@ export default function SellIntentPage() {
                   <img
                     src={img.dataUrl}
                     alt={`Photo ${i + 1}`}
-                    className="h-24 w-full rounded-sm object-cover"
+                    className="h-24 w-full rounded-lg object-cover ring-1 ring-border"
                   />
                   <button
                     type="button"
                     onClick={() => removeImage(i)}
-                    className="absolute right-1 top-1 rounded-sm bg-navy-900/80 px-1.5 text-xs text-white hover:text-orange-500"
+                    className="absolute right-1 top-1 rounded-md bg-background/80 px-1.5 text-xs text-foreground backdrop-blur hover:text-brand"
                     aria-label="Remove photo"
                   >
                     ✕

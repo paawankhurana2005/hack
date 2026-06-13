@@ -5,6 +5,7 @@ import { FlowNav } from '@/components/layout/flow-nav';
 export default function SellHandoffPage() {
   return (
     <PageShell
+      eyebrow="Sell / Step 05 · Handoff"
       title="Local match & handoff"
       description="We've found a nearby buyer — Amazon arranges the handoff. The item never touches a warehouse."
     >

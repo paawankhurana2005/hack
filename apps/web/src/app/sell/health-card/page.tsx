@@ -84,12 +84,13 @@ export default function SellHealthCardPage() {
 
   return (
     <PageShell
+      eyebrow="Sell / Step 04 · Trust"
       title="Product Health Card"
       description="The trust layer — verifiable condition, history, and authenticity that travels with the item."
     >
       {status === 'no-input' && (
         <Card>
-          <p className="text-sm text-muted">
+          <p className="text-sm text-muted-foreground">
             We need a grade and a price first. Step back through grading and pricing.
           </p>
           <div className="mt-4">
@@ -102,13 +103,16 @@ export default function SellHealthCardPage() {
 
       {status === 'loading' && (
         <Card>
-          <p className="text-sm text-orange-500">Issuing the health card…</p>
+          <div className="flex items-center gap-3">
+            <span className="size-1.5 animate-pulse rounded-full bg-brand" />
+            <p className="font-mono text-sm text-brand">Issuing the health card…</p>
+          </div>
         </Card>
       )}
 
       {status === 'error' && (
-        <Card className="border-danger/40">
-          <p className="text-sm text-danger">{error}</p>
+        <Card className="ring-destructive/40">
+          <p className="text-sm text-destructive">{error}</p>
           <div className="mt-4 flex gap-3">
             <Button variant="primary" onClick={() => void run()}>
               Try again
@@ -125,8 +129,12 @@ export default function SellHealthCardPage() {
           <Card>
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-bold text-white">{card.title}</h2>
-                <p className="mt-1 text-xs text-muted">Health Card · {card.id}</p>
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Health Card · {card.id}
+                </span>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+                  {card.title}
+                </h2>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <Badge tone={gradeTone[card.grade]}>{card.grade}</Badge>
@@ -136,32 +144,45 @@ export default function SellHealthCardPage() {
               </div>
             </div>
 
-            <p className="mt-4 text-sm text-white">{card.summary}</p>
-            <p className="mt-1 text-xs text-muted">
-              Grading confidence {(card.confidence * 100).toFixed(0)}%
-            </p>
+            <p className="mt-4 text-sm text-foreground">{card.summary}</p>
+            <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Grading confidence
+              </span>
+              <span className="font-mono text-sm text-brand">
+                {(card.confidence * 100).toFixed(0)}%
+              </span>
+            </div>
 
             {card.detectedIssues.length > 0 && (
               <div className="mt-4">
-                <p className="text-xs font-medium text-muted">Condition notes</p>
-                <ul className="mt-1 list-inside list-disc text-sm text-muted">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Condition notes
+                </p>
+                <ul className="mt-2 space-y-1.5">
                   {card.detectedIssues.map((issue) => (
-                    <li key={issue}>{issue}</li>
+                    <li key={issue} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand" />
+                      {issue}
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
 
-            <div className="mt-5 border-t border-navy-700 pt-4">
-              <p className="text-xs font-medium text-muted">History</p>
-              <ol className="mt-2 space-y-2">
+            <div className="mt-5 rounded-xl bg-background/60 p-4">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-brand">
+                Timeline
+              </p>
+              <ol className="relative space-y-3 pl-4">
+                <span className="absolute bottom-1 left-[5px] top-1 w-px bg-border" />
                 {card.history.map((e) => (
-                  <li key={e.label} className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2 text-white">
-                      <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                  <li key={e.label} className="relative flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-3 text-foreground">
+                      <span className="absolute -left-4 size-2 rounded-full bg-brand ring-2 ring-card" />
                       {e.label}
                     </span>
-                    <span className="text-xs text-muted">{when(e.at)}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground">{when(e.at)}</span>
                   </li>
                 ))}
               </ol>
@@ -171,13 +192,19 @@ export default function SellHealthCardPage() {
           <Card>
             {card.listingPrice && (
               <>
-                <p className="text-sm text-muted">Listing price</p>
-                <p className="mt-1 text-3xl font-bold text-white">{fmt(card.listingPrice)}</p>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Listing price
+                </p>
+                <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums text-brand">
+                  {fmt(card.listingPrice)}
+                </p>
               </>
             )}
             <div className="mt-5">
-              <p className="text-xs font-medium text-muted">Shareable link</p>
-              <p className="mt-1 break-all rounded-md border border-navy-700 bg-navy-900 p-2 text-xs text-muted">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Shareable link
+              </p>
+              <p className="mt-2 break-all rounded-lg border border-border bg-background p-2 font-mono text-[11px] text-muted-foreground">
                 {card.healthCardUrl}
               </p>
               <Button
@@ -187,7 +214,7 @@ export default function SellHealthCardPage() {
               >
                 {copied ? 'Copied ✓' : 'Copy link'}
               </Button>
-              <p className="mt-3 text-xs text-muted">
+              <p className="mt-3 text-xs text-muted-foreground">
                 This card travels with the item to its next owner.
               </p>
             </div>

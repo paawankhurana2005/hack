@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type {
   GradingResult,
   ItemCategory,
@@ -36,6 +36,24 @@ const SellFlowContext = createContext<SellFlowValue | null>(null);
 export function SellFlowProvider({ children }: { children: React.ReactNode }) {
   const [draft, setDraft] = useState<SellDraft>(emptyDraft);
   const [images, setImages] = useState<CompressedImage[]>([]);
+
+  // Pre-seed from "My Items" (sessionStorage) once on mount, if present. Reading
+  // post-mount (not in the initializer) avoids any hydration mismatch.
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem('reloop.sellSeed');
+    if (!raw) return;
+    window.sessionStorage.removeItem('reloop.sellSeed');
+    try {
+      const seed = JSON.parse(raw) as Partial<SellDraft>;
+      setDraft({
+        title: seed.title ?? '',
+        category: (seed.category as ItemCategory) ?? 'electronics',
+        notes: seed.notes ?? '',
+      });
+    } catch {
+      /* malformed seed — ignore, keep empty draft */
+    }
+  }, []);
   const [result, setResult] = useState<GradingResult | null>(null);
   const [pricing, setPricing] = useState<PricingResult | null>(null);
   const [card, setCard] = useState<ProductHealthCard | null>(null);

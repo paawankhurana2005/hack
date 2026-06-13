@@ -22,26 +22,26 @@ type Status = 'loading' | 'error_fallback' | 'done';
 const DECISION_STYLES: Record<ReturnRoutingDecision['decision'], { label: string; cls: string }> = {
   local_resale: { label: 'Local Buyer Match', cls: 'bg-success/20 text-success border-success/30' },
   refurbish: { label: 'Local Refurbishment', cls: 'bg-warning/20 text-warning border-warning/30' },
-  donate: { label: 'Local Donation', cls: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  recycle: { label: 'Local Recycling', cls: 'bg-teal-500/20 text-teal-400 border-teal-500/30' },
-  warehouse: { label: 'Warehouse Return', cls: 'bg-navy-700 text-muted border-navy-600' },
-  return_to_seller: { label: 'Return to Seller', cls: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  donate: { label: 'Local Donation', cls: 'bg-secondary text-foreground border-border' },
+  recycle: { label: 'Local Recycling', cls: 'bg-secondary text-brand border-border' },
+  warehouse: { label: 'Warehouse Return', cls: 'bg-secondary text-muted-foreground border-border' },
+  return_to_seller: { label: 'Return to Seller', cls: 'bg-brand/20 text-brand border-brand/30' },
 };
 
 function PulseSkeleton() {
   return (
     <Card>
       <div className="animate-pulse space-y-4">
-        <div className="h-10 w-full rounded bg-navy-700" />
+        <div className="h-10 w-full rounded bg-secondary" />
         <div className="space-y-2">
-          <div className="h-3 w-full rounded bg-navy-700" />
-          <div className="h-3 w-5/6 rounded bg-navy-700" />
-          <div className="h-3 w-4/6 rounded bg-navy-700" />
+          <div className="h-3 w-full rounded bg-secondary" />
+          <div className="h-3 w-5/6 rounded bg-secondary" />
+          <div className="h-3 w-4/6 rounded bg-secondary" />
         </div>
-        <div className="h-6 w-32 rounded bg-navy-700" />
+        <div className="h-6 w-32 rounded bg-secondary" />
         <div className="mt-4 text-center">
-          <p className="text-sm font-semibold text-white">Searching for local buyers near you…</p>
-          <p className="mt-1 text-xs text-muted">
+          <p className="text-sm font-semibold text-foreground">Searching for local buyers near you…</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             Comparing local demand, handling costs, and carbon impact
           </p>
         </div>
@@ -105,14 +105,14 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
   if (status === 'error_fallback') {
     return (
       <Card>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted-foreground">
           Unable to compute routing at this time. Proceeding with standard return.
         </p>
         <div className="mt-4 flex justify-end">
           <button
             type="button"
             onClick={handleErrorFallback}
-            className="rounded-md bg-orange-500 px-5 py-2.5 text-sm font-semibold text-navy-900 hover:bg-orange-600"
+            className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground hover:bg-brand-strong"
           >
             Continue
           </button>
@@ -132,8 +132,8 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
       <div className="space-y-5">
         {/* Grading-deferred notice */}
         {!flowState.gradingResult && (
-          <div className="rounded-md border border-navy-600 bg-navy-700 p-3">
-            <p className="text-sm text-muted">
+          <div className="rounded-lg border border-border bg-secondary p-3">
+            <p className="text-sm text-muted-foreground">
               No pre-grading — condition will be verified in person at pickup before any resale.
             </p>
           </div>
@@ -153,19 +153,19 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
               <span className="text-sm font-semibold text-success">
                 {decision.nearbyBuyers} verified buyers found within {decision.radiusKm}km
               </span>
-              <span className="text-xs text-muted">matched by Amazon</span>
+              <span className="text-xs text-muted-foreground">matched by Amazon</span>
             </div>
             {decision.warehouseDistanceKm !== undefined && (
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="rounded-md bg-navy-800 p-3 text-center">
-                  <p className="text-xs text-muted">Local route</p>
+                <div className="rounded-lg bg-card p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Local route</p>
                   <p className="mt-1 text-lg font-bold text-success">{decision.radiusKm}km</p>
                   {decision.localMargin !== undefined && (
                     <p className="text-xs text-success">+{formatCurrency(decision.localMargin)} recovered</p>
                   )}
                 </div>
-                <div className="rounded-md bg-navy-800 p-3 text-center">
-                  <p className="text-xs text-muted">Warehouse route</p>
+                <div className="rounded-lg bg-card p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Warehouse route</p>
                   <p className="mt-1 text-lg font-bold text-danger">{decision.warehouseDistanceKm}km</p>
                   {decision.warehouseMargin !== undefined && (
                     <p className="text-xs text-danger">{formatCurrency(decision.warehouseMargin)} loss</p>
@@ -182,7 +182,7 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
             <p className="text-sm font-semibold text-warning">
               Refurbishment partner found {decision.radiusKm ? `${decision.radiusKm}km away` : 'nearby'}
             </p>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-xs text-muted-foreground">
               vs. {decision.warehouseDistanceKm}km warehouse round-trip
               {decision.warehouseMargin !== undefined && ` (projected ${formatCurrency(decision.warehouseMargin)} loss)`}
             </p>
@@ -191,7 +191,7 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
 
         {/* Recycle */}
         {decision.decision === 'recycle' && (
-          <div className="flex items-center gap-2 text-teal-400">
+          <div className="flex items-center gap-2 text-brand">
             <span>♻️</span>
             <span className="text-sm">Certified local recycler. Zero landfill guaranteed.</span>
           </div>
@@ -199,8 +199,8 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
 
         {/* Return to seller */}
         {decision.decision === 'return_to_seller' && (
-          <div className="rounded-md border border-navy-600 bg-navy-700 p-3">
-            <p className="text-sm text-muted">
+          <div className="rounded-lg border border-border bg-secondary p-3">
+            <p className="text-sm text-muted-foreground">
               This item will be returned to the seller per their policy. Your refund is unaffected.
             </p>
           </div>
@@ -208,16 +208,16 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
 
         {/* Warehouse note — last resort */}
         {decision.decision === 'warehouse' && (
-          <div className="rounded-md border border-navy-600 bg-navy-700 p-3">
-            <p className="text-sm text-muted">
+          <div className="rounded-lg border border-border bg-secondary p-3">
+            <p className="text-sm text-muted-foreground">
               No local buyers or partners found nearby. Standard warehouse return will be used.
             </p>
           </div>
         )}
 
         {/* Reasoning trace */}
-        <div className="rounded-md border-l-4 border-navy-600 bg-navy-700 p-4">
-          <p className="text-sm leading-relaxed text-muted">{decision.reasoning}</p>
+        <div className="rounded-lg border-l-4 border-border bg-secondary p-4">
+          <p className="text-sm leading-relaxed text-muted-foreground">{decision.reasoning}</p>
         </div>
 
         {/* CO₂ badge */}
@@ -232,21 +232,21 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
 
         {/* Fallback chain */}
         {isLocal && fallbackLabels.length > 0 && (
-          <p className="text-xs text-muted">
+          <p className="text-xs text-muted-foreground">
             If unmatched in {decision.dwellBudgetHours}h → {fallbackLabels.join(' → ')}
           </p>
         )}
 
         {/* 3P opt-in note */}
         {decision.sellerType === '3P' && decision.decision !== 'return_to_seller' && (
-          <p className="text-xs text-muted">Seller has opted into local routing.</p>
+          <p className="text-xs text-muted-foreground">Seller has opted into local routing.</p>
         )}
 
         <div className="flex justify-end pt-2">
           <button
             type="button"
             onClick={handleContinue}
-            className="rounded-md bg-orange-500 px-5 py-2.5 text-sm font-semibold text-navy-900 hover:bg-orange-600"
+            className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground hover:bg-brand-strong"
           >
             Continue
           </button>

@@ -6,6 +6,7 @@ import { PageShell } from '@/components/layout/page-shell';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Panel } from '@/components/ui/section';
 import { FlowNav } from '@/components/layout/flow-nav';
 import { priceItem, ApiRequestError } from '@/lib/api-client';
 import { useSellFlow } from '../sell-flow-context';
@@ -64,12 +65,13 @@ export default function SellRoutingPage() {
 
   return (
     <PageShell
+      eyebrow="Sell / Step 03 · Intelligence"
       title="Pricing & match prep"
       description="A fair resale price, anchored to the item's estimated retail and condition."
     >
       {status === 'no-input' && (
         <Card>
-          <p className="text-sm text-muted">Grade an item first, then we can price it.</p>
+          <p className="text-sm text-muted-foreground">Grade an item first, then we can price it.</p>
           <div className="mt-4">
             <Button href="/sell/grading" variant="secondary">
               ← Back to grading
@@ -79,17 +81,20 @@ export default function SellRoutingPage() {
       )}
 
       {status === 'loading' && (
-        <Card>
-          <p className="text-sm text-orange-500">Estimating a fair price…</p>
-          <p className="mt-1 text-xs text-muted">
+        <Panel label="/api/sell/price · live trace" status="RUN ●">
+          <div className="flex items-center gap-3">
+            <span className="size-1.5 animate-pulse rounded-full bg-brand" />
+            <p className="font-mono text-sm text-brand">Estimating a fair price…</p>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
             Looking up typical retail and applying the condition discount.
           </p>
-        </Card>
+        </Panel>
       )}
 
       {status === 'error' && (
-        <Card className="border-danger/40">
-          <p className="text-sm text-danger">{error}</p>
+        <Card className="ring-destructive/40">
+          <p className="text-sm text-destructive">{error}</p>
           <div className="mt-4 flex gap-3">
             <Button variant="primary" onClick={() => void run()}>
               Try again
@@ -104,35 +109,41 @@ export default function SellRoutingPage() {
       {status === 'success' && pricing && (
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
-            <p className="text-sm text-muted">Suggested resale price</p>
-            <p className="mt-1 text-4xl font-bold text-white">{fmt(pricing.suggestedPrice)}</p>
-            <p className="mt-2 text-sm text-muted">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Suggested resale price
+            </p>
+            <p className="mt-2 text-5xl font-semibold tracking-tight tabular-nums text-brand">
+              {fmt(pricing.suggestedPrice)}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
               <span className="line-through">{fmt(pricing.estimatedRetail)}</span>{' '}
-              <span className="text-orange-500">
+              <span className="text-brand">
                 {Math.round(pricing.discountPct * 100)}% off est. retail
               </span>
             </p>
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-4 flex items-center gap-2">
               <Badge tone="accent">{pricing.grade}</Badge>
               <Badge tone={demandTone[pricing.demand]}>{pricing.demand} demand</Badge>
             </div>
-            <p className="mt-4 text-xs text-muted">
+            <p className="mt-4 text-xs text-muted-foreground">
               Retail is an AI estimate, not a live marketplace quote.
             </p>
           </Card>
 
-          <Card>
-            <p className="text-sm text-muted">Why this price</p>
-            <p className="mt-2 text-sm text-white">{pricing.rationale}</p>
-            <ul className="mt-4 space-y-1 text-sm text-muted">
+          <Panel label="/api/sell/price · rationale">
+            <p className="text-sm text-foreground">{pricing.rationale}</p>
+            <div className="mt-4 space-y-px">
               {pricing.factors.map((f) => (
-                <li key={f.label} className="flex justify-between">
-                  <span>{f.label}</span>
-                  <span className="text-white">{f.value}</span>
-                </li>
+                <div
+                  key={f.label}
+                  className="flex items-center justify-between border-b border-border/40 py-2"
+                >
+                  <span className="text-xs text-muted-foreground">{f.label}</span>
+                  <span className="font-mono text-xs text-foreground">{f.value}</span>
+                </div>
               ))}
-            </ul>
-          </Card>
+            </div>
+          </Panel>
         </div>
       )}
 

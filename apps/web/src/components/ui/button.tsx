@@ -4,12 +4,13 @@ import type { ReactNode } from 'react';
 type Variant = 'primary' | 'secondary';
 
 const base =
-  'inline-flex items-center justify-center rounded-md px-5 py-2.5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-navy-900 disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-surface active:scale-95 disabled:cursor-not-allowed disabled:opacity-50';
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-orange-500 text-navy-900 hover:bg-orange-600 hover:text-white',
+  primary:
+    'bg-brand text-brand-foreground ring-1 ring-brand/50 hover:bg-brand-strong hover:shadow-[0_0_30px_rgba(234,179,8,0.25)]',
   secondary:
-    'border border-navy-600 bg-transparent text-white hover:border-orange-500 hover:text-orange-500',
+    'border border-border bg-transparent text-foreground hover:border-brand hover:text-brand',
 };
 
 interface ButtonProps {

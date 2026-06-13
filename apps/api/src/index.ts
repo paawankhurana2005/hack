@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { MOCK_MODE } from './lib/env.js';
 import { NvidiaVlmProvider } from './services/grading/nvidia-provider.js';
 import { GradingService } from './services/grading/grading-service.js';
+import { MockReferenceComparator } from './services/grading/mock-reference-comparator.js';
 import { NvidiaMarketProvider } from './services/pricing/nvidia-market-provider.js';
 import { PricingService } from './services/pricing/pricing-service.js';
 import { HealthCardService } from './services/health-card/health-card-service.js';
@@ -25,7 +26,10 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', mockMode: MOCK_MODE });
 });
 
-const gradingService = new GradingService(new NvidiaVlmProvider(config));
+const gradingService = new GradingService(
+  new NvidiaVlmProvider(config),
+  new MockReferenceComparator(),
+);
 const pricingService = new PricingService(new NvidiaMarketProvider(config));
 const healthCardService = new HealthCardService();
 app.use('/api/sell', createSellRouter(gradingService, pricingService, healthCardService));

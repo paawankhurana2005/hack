@@ -11,12 +11,13 @@ const rows = [
 export default function SellerReturnsPage() {
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-white">Returns queue</h1>
-      <p className="mt-2 text-muted">Returns graded at the source, with their routed path.</p>
+      <span className="mb-3 block font-mono text-xs uppercase tracking-widest text-brand">Seller / Returns</span>
+      <h1 className="text-3xl font-semibold tracking-tight text-foreground">Returns queue</h1>
+      <p className="mt-2 text-muted-foreground">Returns graded at the source, with their routed path.</p>
 
       <Card className="mt-8 overflow-hidden p-0">
         <table className="w-full text-left text-sm">
-          <thead className="bg-navy-700 text-muted">
+          <thead className="bg-secondary/60 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             <tr>
               <th className="px-4 py-3 font-medium">Return</th>
               <th className="px-4 py-3 font-medium">Item</th>
@@ -26,9 +27,9 @@ export default function SellerReturnsPage() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-t border-navy-700">
-                <td className="px-4 py-3 text-white">{r.id}</td>
-                <td className="px-4 py-3 text-muted">{r.item}</td>
+              <tr key={r.id} className="border-t border-border">
+                <td className="px-4 py-3 font-mono text-foreground">{r.id}</td>
+                <td className="px-4 py-3 text-muted-foreground">{r.item}</td>
                 <td className="px-4 py-3">
                   <Badge tone="neutral">{r.grade}</Badge>
                 </td>

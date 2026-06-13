@@ -11,11 +11,11 @@ export function StepIndicator({ steps, current }: StepIndicatorProps) {
         const isActive = i === current;
         const isDone = i < current;
         const circle = isActive
-          ? 'bg-orange-500 text-navy-900'
+          ? 'bg-brand text-brand-foreground'
           : isDone
-            ? 'bg-navy-600 text-white'
-            : 'bg-navy-800 text-muted border border-navy-600';
-        const text = isActive ? 'text-white font-semibold' : 'text-muted';
+            ? 'bg-secondary text-foreground'
+            : 'bg-card text-muted-foreground border border-border';
+        const text = isActive ? 'text-foreground font-semibold' : 'text-muted-foreground';
         return (
           <li key={label} className="flex items-center gap-2">
             <span
@@ -24,7 +24,7 @@ export function StepIndicator({ steps, current }: StepIndicatorProps) {
               {i + 1}
             </span>
             <span className={text}>{label}</span>
-            {i < steps.length - 1 && <span className="mx-1 text-navy-600">→</span>}
+            {i < steps.length - 1 && <span className="mx-1 text-border">→</span>}
           </li>
         );
       })}

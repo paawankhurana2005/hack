@@ -4,8 +4,9 @@ import { Placeholder } from '@/components/placeholder';
 export default function SellerOverviewPage() {
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-white">Overview</h1>
-      <p className="mt-2 text-muted">Returns handled at volume, at a glance.</p>
+      <span className="mb-3 block font-mono text-xs uppercase tracking-widest text-brand">Seller / Overview</span>
+      <h1 className="text-3xl font-semibold tracking-tight text-foreground">Overview</h1>
+      <p className="mt-2 text-muted-foreground">Returns handled at volume, at a glance.</p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <Stat label="Items in second life" value="1,284" hint="+12% this week" />

@@ -1,11 +1,6 @@
 import Link from 'next/link';
 import { mockOrders } from '@/lib/mocks/return-flow';
-
-const CATEGORY_COLORS: Record<string, string> = {
-  electronics: 'bg-blue-900 text-blue-300',
-  apparel: 'bg-purple-900 text-purple-300',
-  kitchenware: 'bg-amber-900 text-amber-300',
-};
+import { Eyebrow, GridBackdrop } from '@/components/ui/section';
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', {
@@ -21,31 +16,41 @@ function formatPrice(cents: number) {
 
 export default function ReturnSelectorPage() {
   return (
-    <section className="mx-auto max-w-2xl px-6 py-10">
-      <h1 className="text-2xl font-bold tracking-tight text-white">Return an item</h1>
-      <p className="mt-2 text-muted">Select the order you'd like to return.</p>
+    <section className="mx-auto max-w-2xl px-6 pb-16 pt-12">
+      <div className="relative">
+        <GridBackdrop />
+        <div className="relative">
+          <Eyebrow className="mb-3">Return / Select order</Eyebrow>
+          <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+            Return an item
+          </h1>
+          <p className="mt-3 text-muted-foreground">Select the order you'd like to return.</p>
+        </div>
+      </div>
 
-      <div className="mt-8 space-y-4">
+      <div className="mt-10 space-y-4">
         {mockOrders.map((order) => (
           <Link
             key={order.orderId}
             href={`/return/${order.orderId}`}
-            className="block rounded-lg border border-navy-600 bg-navy-800 p-5 shadow-sm transition-colors hover:border-orange-500 hover:bg-navy-700"
+            className="group block rounded-2xl bg-card p-5 ring-1 ring-border transition-all hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-brand/10 hover:ring-brand/40"
           >
             <div className="flex items-start gap-4">
-              <div
-                className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-md text-lg font-bold ${CATEGORY_COLORS[order.category] ?? 'bg-navy-700 text-white'}`}
-              >
+              <div className="grid size-14 flex-shrink-0 place-items-center rounded-xl bg-brand/15 text-lg font-semibold text-brand">
                 {order.productName[0]}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-white">{order.productName}</p>
-                <p className="mt-1 text-sm text-muted">Order #{order.orderId}</p>
-                <p className="text-sm text-muted">Ordered {formatDate(order.orderDate)}</p>
+                <p className="font-semibold text-foreground">{order.productName}</p>
+                <p className="mt-1 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Order #{order.orderId}
+                </p>
+                <p className="text-sm text-muted-foreground">Ordered {formatDate(order.orderDate)}</p>
               </div>
               <div className="flex-shrink-0 text-right">
-                <p className="font-semibold text-orange-500">{formatPrice(order.priceCents)}</p>
-                <p className="mt-1 text-xs text-muted capitalize">{order.category}</p>
+                <p className="font-semibold tabular-nums text-brand">{formatPrice(order.priceCents)}</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {order.category}
+                </p>
               </div>
             </div>
           </Link>

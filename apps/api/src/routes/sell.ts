@@ -30,12 +30,19 @@ const draftSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 });
 
+const referenceSchema = z.object({
+  // URLs (may be relative, e.g. "/demo/..."), not base64 — keep this small.
+  originalListingImages: z.array(z.string().min(1).max(2000)).max(8),
+  originalSpecs: z.record(z.string().max(120)),
+});
+
 const gradeSchema = z.object({
   draft: draftSchema,
   imagesBase64: z
     .array(z.string().min(1).max(MAX_B64_LEN))
     .min(1, 'at least one image is required')
     .max(MAX_IMAGES, `at most ${MAX_IMAGES} images`),
+  reference: referenceSchema.optional(),
 });
 
 const priceSchema = z.object({

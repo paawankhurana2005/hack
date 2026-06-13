@@ -3,8 +3,9 @@ import { Placeholder } from '@/components/placeholder';
 export default function SellerInsightsPage() {
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-white">Insights</h1>
-      <p className="mt-2 text-muted">Trends across recovery, path mix, and prevented returns.</p>
+      <span className="mb-3 block font-mono text-xs uppercase tracking-widest text-brand">Seller / Insights</span>
+      <h1 className="text-3xl font-semibold tracking-tight text-foreground">Insights</h1>
+      <p className="mt-2 text-muted-foreground">Trends across recovery, path mix, and prevented returns.</p>
 
       <div className="mt-8">
         <Placeholder

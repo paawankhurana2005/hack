@@ -2,20 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens as CSS variables — mirror of src/lib/tokens.ts. */
+/* Design tokens as CSS variables — mirror of src/lib/tokens.ts.
+   Stored as oklch channels (no oklch() wrapper) so Tailwind can apply alpha. */
 :root {
-  --navy-900: #131a22;
-  --navy-800: #232f3e;
-  --navy-700: #2f3b4c;
-  --navy-600: #3a4a5e;
-  --orange-500: #ff9900;
-  --orange-600: #ec7211;
-  --text-primary: #ffffff;
-  --text-muted: #c7d0da;
+  --surface: 0.16 0.005 285;
+  --background: 0.16 0.005 285;
+  --foreground: 0.985 0 0;
+  --card: 0.21 0.006 285;
+  --card-foreground: 0.985 0 0;
+  --popover: 0.21 0.006 285;
+  --popover-foreground: 0.985 0 0;
+  --primary: 0.985 0 0;
+  --primary-foreground: 0.16 0.005 285;
+  --secondary: 0.27 0.006 285;
+  --secondary-foreground: 0.985 0 0;
+  --muted: 0.27 0.006 285;
+  --muted-foreground: 0.705 0.01 285;
+  --accent: 0.27 0.006 285;
+  --accent-foreground: 0.985 0 0;
+  --destructive: 0.62 0.22 25;
+  --destructive-foreground: 0.985 0 0;
+  --border: 0.3 0.006 285;
+  --input: 0.3 0.006 285;
+  --ring: 0.85 0.17 88;
+  --brand: 0.82 0.17 88;
+  --brand-foreground: 0.16 0.005 285;
+  --brand-strong: 0.78 0.17 88;
 }
 
-body {
-  background-color: var(--navy-900);
-  color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
+@layer base {
+  * {
+    border-color: oklch(var(--border));
+  }
+  html,
+  body {
+    background-color: oklch(var(--surface));
+    color: oklch(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  ::selection {
+    background-color: oklch(var(--brand));
+    color: oklch(var(--brand-foreground));
+  }
+}
+
+/* Keyframes powering the landing-page motion (utilities mapped in tailwind config). */
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes scan-line {
+  0% {
+    transform: translateY(-10%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(420%);
+    opacity: 0;
+  }
+}
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.9;
+  }
 }

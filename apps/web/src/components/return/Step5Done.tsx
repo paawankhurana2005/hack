@@ -61,12 +61,12 @@ export function Step5Done({ flowState, order }: Props) {
             <span className="text-success text-lg">✓</span>
           </div>
           <div>
-            <p className="font-semibold text-white">Return confirmed — refund processing</p>
-            <p className="mt-1 text-sm text-muted">
+            <p className="font-semibold text-foreground">Return confirmed — refund processing</p>
+            <p className="mt-1 text-sm text-muted-foreground">
               Your refund of{' '}
-              <span className="font-semibold text-white">{formatPrice(order.priceCents)}</span> is
+              <span className="font-semibold text-foreground">{formatPrice(order.priceCents)}</span> is
               on its way. Expected by{' '}
-              <span className="text-white">{refundByDate()}</span>.
+              <span className="text-foreground">{refundByDate()}</span>.
             </p>
           </div>
         </div>
@@ -74,19 +74,19 @@ export function Step5Done({ flowState, order }: Props) {
 
       {/* What happens to the item */}
       <Card>
-        <p className="text-sm font-semibold uppercase tracking-wide text-muted">What happens next</p>
-        <p className="mt-2 text-white">{ITEM_DESTINATION[decision]}</p>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">What happens next</p>
+        <p className="mt-2 text-foreground">{ITEM_DESTINATION[decision]}</p>
       </Card>
 
       {/* Seller notification — local routes only */}
       {sellerBenefit && (
-        <div className="flex items-start gap-3 rounded-lg border border-navy-600 bg-navy-800 p-4">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-navy-600 bg-navy-700 text-sm">
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-4">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-sm">
             📬
           </div>
           <div>
-            <p className="text-sm font-semibold text-white">Seller notified</p>
-            <p className="mt-0.5 text-sm text-muted">{sellerBenefit}</p>
+            <p className="text-sm font-semibold text-foreground">Seller notified</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{sellerBenefit}</p>
           </div>
         </div>
       )}
@@ -97,7 +97,7 @@ export function Step5Done({ flowState, order }: Props) {
           <span className="text-2xl">🌿</span>
           <div>
             <p className="font-semibold text-success">{co2}kg of CO₂ avoided</p>
-            <p className="text-xs text-muted">vs. a warehouse round-trip for this item</p>
+            <p className="text-xs text-muted-foreground">vs. a warehouse round-trip for this item</p>
           </div>
         </div>
       )}
@@ -106,12 +106,12 @@ export function Step5Done({ flowState, order }: Props) {
       {showHealthCard && (
         <Card>
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-navy-600 bg-navy-700 text-lg">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-lg">
               🔒
             </div>
             <div>
-              <p className="font-semibold text-white">Product Health Card created</p>
-              <p className="mt-1 text-sm text-muted">
+              <p className="font-semibold text-foreground">Product Health Card created</p>
+              <p className="mt-1 text-sm text-muted-foreground">
                 A verified condition report has been created for{' '}
                 {decision === 'refurbish' ? 'the refurbishment partner' : "the next owner"}.
                 It records grade, defects, and authenticity check.
@@ -125,7 +125,7 @@ export function Step5Done({ flowState, order }: Props) {
       <div className="flex justify-end">
         <a
           href="/home"
-          className="inline-flex items-center justify-center rounded-md bg-orange-500 px-6 py-2.5 text-sm font-semibold text-navy-900 hover:bg-orange-600"
+          className="inline-flex items-center justify-center rounded-lg bg-brand px-6 py-2.5 text-sm font-semibold text-brand-foreground hover:bg-brand-strong"
         >
           Return to Orders
         </a>

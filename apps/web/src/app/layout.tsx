@@ -1,21 +1,24 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 import './globals.css';
+import { RoleProvider } from '@/lib/role-context';
 import { TopNav } from '@/components/layout/top-nav';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
-
 export const metadata: Metadata = {
-  title: 'ReLoop',
-  description: 'Give returned and unused products a second life.',
+  title: 'ReLoop — Recommerce, Rewired',
+  description:
+    'ReLoop is the invisible AI layer that turns Amazon returns into a regenerative loop. Real-time grading, smart routing, instant trust.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="min-h-screen font-sans">
-        <TopNav />
-        <main>{children}</main>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="min-h-screen bg-surface font-sans text-foreground antialiased">
+        <RoleProvider>
+          <TopNav />
+          <main>{children}</main>
+        </RoleProvider>
       </body>
     </html>
   );

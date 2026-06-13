@@ -3,11 +3,11 @@ import type { ReactNode } from 'react';
 type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
 
 const tones: Record<Tone, string> = {
-  neutral: 'bg-navy-700 text-muted',
-  accent: 'bg-orange-500/15 text-orange-500',
-  success: 'bg-success/15 text-success',
-  warning: 'bg-warning/15 text-warning',
-  danger: 'bg-danger/15 text-danger',
+  neutral: 'bg-secondary text-muted-foreground',
+  accent: 'bg-brand/15 text-brand',
+  success: 'bg-brand/15 text-brand',
+  warning: 'bg-brand/15 text-brand',
+  danger: 'bg-destructive/15 text-destructive',
 };
 
 interface BadgeProps {
@@ -18,7 +18,7 @@ interface BadgeProps {
 export function Badge({ children, tone = 'neutral' }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${tones[tone]}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${tones[tone]}`}
     >
       {children}
     </span>

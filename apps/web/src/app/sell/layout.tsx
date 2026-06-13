@@ -26,11 +26,9 @@ export default function SellLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <SellFlowProvider>
-      <div className="border-b border-navy-700 bg-navy-800">
+      <div className="border-b border-border/60 bg-card/30 backdrop-blur">
         <div className="mx-auto max-w-6xl px-6 py-5">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-orange-500">
-            Sell flow
-          </p>
+          <p className="mb-3 font-mono text-xs uppercase tracking-widest text-brand">Sell flow</p>
           <StepIndicator steps={steps.map((s) => s.label)} current={current} />
         </div>
       </div>

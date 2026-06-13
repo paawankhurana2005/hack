@@ -25,7 +25,7 @@ export function SamplePicker({ onSelect, disabled }: SamplePickerProps) {
 
   return (
     <div>
-      <p className="text-sm font-medium text-muted">Try a sample item</p>
+      <p className="font-mono text-[11px] uppercase tracking-wider text-brand">Try a sample item</p>
       <div className="mt-3 flex flex-wrap gap-3">
         {demoItems.map((item) => {
           const isLoading = loadingId === item.id;
@@ -35,9 +35,9 @@ export function SamplePicker({ onSelect, disabled }: SamplePickerProps) {
               type="button"
               onClick={() => handle(item)}
               disabled={disabled || loadingId !== null}
-              className="group flex w-28 flex-col items-center gap-2 rounded-md border border-navy-600 bg-navy-800 p-2 text-center transition-colors hover:border-orange-500 disabled:opacity-50"
+              className="group flex w-28 flex-col items-center gap-2 rounded-xl border border-border bg-card p-2 text-center transition-all hover:-translate-y-0.5 hover:border-brand/50 disabled:opacity-50"
             >
-              <span className="relative h-16 w-full overflow-hidden rounded-sm bg-navy-900">
+              <span className="relative h-16 w-full overflow-hidden rounded-lg bg-background">
                 <Image
                   src={item.imagePaths[0] ?? ''}
                   alt={item.title}
@@ -46,12 +46,12 @@ export function SamplePicker({ onSelect, disabled }: SamplePickerProps) {
                   className="object-cover"
                 />
                 {isLoading && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-navy-900/70 text-xs text-orange-500">
+                  <span className="absolute inset-0 flex items-center justify-center bg-background/70 font-mono text-[10px] uppercase tracking-widest text-brand backdrop-blur">
                     Loading…
                   </span>
                 )}
               </span>
-              <span className="line-clamp-2 text-xs text-muted group-hover:text-white">
+              <span className="line-clamp-2 text-xs text-muted-foreground group-hover:text-foreground">
                 {item.title}
               </span>
             </button>

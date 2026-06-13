@@ -32,9 +32,9 @@ export function Step4Handoff({ flowState, onNext }: Props) {
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <span className="text-2xl">📦</span>
-            <p className="font-semibold text-white">Standard return pickup</p>
+            <p className="font-semibold text-foreground">Standard return pickup</p>
           </div>
-          <p className="text-sm text-muted">
+          <p className="text-sm text-muted-foreground">
             Hand your item to the Amazon delivery agent when they arrive for your standard return
             pickup. No extra steps needed.
           </p>
@@ -42,7 +42,7 @@ export function Step4Handoff({ flowState, onNext }: Props) {
             <button
               type="button"
               onClick={handleContinue}
-              className="rounded-md bg-orange-500 px-5 py-2.5 text-sm font-semibold text-navy-900 hover:bg-orange-600"
+              className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground hover:bg-brand-strong"
             >
               Done
             </button>
@@ -71,8 +71,8 @@ export function Step4Handoff({ flowState, onNext }: Props) {
     <div className="space-y-4">
       {/* Fallback note banner */}
       {handoff.note && (
-        <div className="rounded-md border border-navy-600 bg-navy-700 p-3">
-          <p className="text-sm text-muted">{handoff.note}</p>
+        <div className="rounded-lg border border-border bg-secondary p-3">
+          <p className="text-sm text-muted-foreground">{handoff.note}</p>
         </div>
       )}
 
@@ -81,47 +81,47 @@ export function Step4Handoff({ flowState, onNext }: Props) {
           {/* Method header */}
           <div className="flex items-center gap-3">
             <span className="text-2xl">{methodIcon}</span>
-            <p className="font-semibold text-white">{methodTitle}</p>
+            <p className="font-semibold text-foreground">{methodTitle}</p>
           </div>
 
-          <p className="text-sm text-muted">{primaryCopy}</p>
+          <p className="text-sm text-muted-foreground">{primaryCopy}</p>
 
           {/* QR code placeholder */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               Your QR code
             </p>
-            <div className="flex h-32 w-32 items-center justify-center rounded-md border border-navy-600 bg-navy-700">
+            <div className="flex h-32 w-32 items-center justify-center rounded-lg border border-border bg-secondary">
               <div className="text-center">
-                <p className="text-xs font-mono text-muted leading-tight">{handoff.qrCode}</p>
+                <p className="text-xs font-mono text-muted-foreground leading-tight">{handoff.qrCode}</p>
               </div>
             </div>
           </div>
 
           {/* Confirmation ID */}
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               Confirmation ID
             </p>
-            <p className="font-mono text-lg font-bold text-orange-500">{handoff.confirmationId}</p>
+            <p className="font-mono text-lg font-bold text-brand">{handoff.confirmationId}</p>
           </div>
 
           {/* Map placeholder */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               Location
             </p>
-            <div className="flex h-28 items-center justify-center rounded-md bg-navy-700">
-              <p className="text-sm text-muted">Map</p>
+            <div className="flex h-28 items-center justify-center rounded-lg bg-secondary">
+              <p className="text-sm text-muted-foreground">Map</p>
             </div>
-            <p className="mt-2 text-xs text-muted">{handoff.locationAddress}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{handoff.locationAddress}</p>
           </div>
 
           <div className="flex justify-end pt-2">
             <button
               type="button"
               onClick={handleContinue}
-              className="rounded-md bg-orange-500 px-5 py-2.5 text-sm font-semibold text-navy-900 hover:bg-orange-600"
+              className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground hover:bg-brand-strong"
             >
               I've arranged my drop-off
             </button>

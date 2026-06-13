@@ -23,9 +23,9 @@ const REASONS: { value: ReturnReason; label: string }[] = [
 ];
 
 const CATEGORY_COLORS: Record<MockOrder['category'], string> = {
-  electronics: 'bg-blue-900 text-blue-300',
-  apparel: 'bg-purple-900 text-purple-300',
-  kitchenware: 'bg-amber-900 text-amber-300',
+  electronics: 'bg-brand/15 text-brand',
+  apparel: 'bg-brand/15 text-brand',
+  kitchenware: 'bg-brand/15 text-brand',
 };
 
 function formatDate(iso: string) {
@@ -101,32 +101,32 @@ export function Step1Reason({ onNext, order }: Props) {
       <Card>
         <div className="flex items-start gap-4">
           <div
-            className={`flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-md text-lg font-bold ${CATEGORY_COLORS[order.category]}`}
+            className={`flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg text-lg font-bold ${CATEGORY_COLORS[order.category]}`}
           >
             {order.productName[0]}
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-white">{order.productName}</p>
-            <p className="mt-1 text-sm text-muted">Order #{order.orderId}</p>
-            <p className="text-sm text-muted">Ordered {formatDate(order.orderDate)}</p>
-            <p className="mt-1 text-sm font-semibold text-orange-500">{formatPrice(order.priceCents)}</p>
+            <p className="font-semibold text-foreground">{order.productName}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Order #{order.orderId}</p>
+            <p className="text-sm text-muted-foreground">Ordered {formatDate(order.orderDate)}</p>
+            <p className="mt-1 text-sm font-semibold text-brand">{formatPrice(order.priceCents)}</p>
           </div>
         </div>
       </Card>
 
       {/* Reason selector */}
       <Card>
-        <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
+        <p className="mb-4 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
           Why are you returning this item?
         </p>
         <div className="space-y-2">
           {REASONS.map(({ value, label }) => (
             <label
               key={value}
-              className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors ${
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
                 reason === value
-                  ? 'border-orange-500 bg-orange-500/10'
-                  : 'border-navy-600 hover:border-navy-500'
+                  ? 'border-brand bg-brand/10'
+                  : 'border-border hover:border-brand/50'
               }`}
             >
               <input
@@ -135,9 +135,9 @@ export function Step1Reason({ onNext, order }: Props) {
                 value={value}
                 checked={reason === value}
                 onChange={() => setReason(value)}
-                className="accent-orange-500"
+                className="accent-brand"
               />
-              <span className="text-sm text-white">{label}</span>
+              <span className="text-sm text-foreground">{label}</span>
             </label>
           ))}
         </div>
@@ -145,20 +145,20 @@ export function Step1Reason({ onNext, order }: Props) {
 
       {/* Inline alerts based on reason */}
       {reason === 'counterfeit' || reason === 'not_as_described' ? (
-        <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-4">
-          <p className="text-sm text-amber-400">
+        <div className="rounded-lg border border-brand/40 bg-brand/10 p-4">
+          <p className="text-sm text-brand">
             This return will be escalated for seller review. Your refund is protected.
           </p>
         </div>
       ) : reason === 'wrong_item' ? (
-        <div className="rounded-md border border-navy-600 bg-navy-700 p-4">
-          <p className="text-sm text-muted">
+        <div className="rounded-lg border border-border bg-secondary p-4">
+          <p className="text-sm text-muted-foreground">
             This item will be returned to inventory. Your refund is protected.
           </p>
         </div>
       ) : reason === 'arrived_damaged' ? (
-        <div className="rounded-md border border-navy-600 bg-navy-700 p-4">
-          <p className="text-sm text-muted">
+        <div className="rounded-lg border border-border bg-secondary p-4">
+          <p className="text-sm text-muted-foreground">
             A shipping claim will be opened on your behalf.
           </p>
         </div>
@@ -167,7 +167,7 @@ export function Step1Reason({ onNext, order }: Props) {
       {/* Photo upload — hidden for escalation reasons */}
       {!isEscalation && (
         <Card>
-          <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
+          <p className="mb-4 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             Photos (2–5)
           </p>
 
@@ -181,13 +181,13 @@ export function Step1Reason({ onNext, order }: Props) {
               addFiles(e.dataTransfer.files);
             }}
             onClick={() => fileInputRef.current?.click()}
-            className={`flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed p-8 transition-colors ${
-              dragging ? 'border-orange-500 bg-orange-500/10' : 'border-navy-600 hover:border-navy-500'
+            className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${
+              dragging ? 'border-brand bg-brand/10' : 'border-border hover:border-brand/50'
             }`}
           >
             <span className="text-3xl">📷</span>
-            <p className="mt-2 text-sm text-white">Drag & drop photos here</p>
-            <p className="text-xs text-muted">or click to browse · max 5</p>
+            <p className="mt-2 text-sm text-foreground">Drag & drop photos here</p>
+            <p className="text-xs text-muted-foreground">or click to browse · max 5</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -204,11 +204,11 @@ export function Step1Reason({ onNext, order }: Props) {
               {photos.map((url, i) => (
                 <div key={url} className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`photo ${i + 1}`} className="h-20 w-20 rounded-md object-cover" />
+                  <img src={url} alt={`photo ${i + 1}`} className="h-20 w-20 rounded-lg object-cover" />
                   <button
                     type="button"
                     onClick={() => removePhoto(i)}
-                    className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-danger text-xs text-white"
+                    className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-danger text-xs text-foreground"
                   >
                     ×
                   </button>
@@ -219,7 +219,7 @@ export function Step1Reason({ onNext, order }: Props) {
 
           {/* No-photo warning */}
           {reason && !hasPhotos && (
-            <p className="mt-4 text-sm text-muted">
+            <p className="mt-4 text-sm text-muted-foreground">
               Without photos, your item will be graded at the warehouse. Your refund isn't affected.
             </p>
           )}
@@ -232,7 +232,7 @@ export function Step1Reason({ onNext, order }: Props) {
           type="button"
           disabled={!reason}
           onClick={handleSubmit}
-          className="inline-flex items-center justify-center rounded-md bg-orange-500 px-6 py-2.5 text-sm font-semibold text-navy-900 transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center justify-center rounded-lg bg-brand px-6 py-2.5 text-sm font-semibold text-brand-foreground transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-40"
         >
           {ctaLabel}
         </button>
