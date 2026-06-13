@@ -118,14 +118,27 @@ export function SellSession({ item }: { item: OwnedItem }) {
   }
 
   function onConfirm() {
+    const listed = pricing?.suggestedPrice ?? item.originalPrice;
+    const retailCents = pricing?.estimatedRetail.amountCents ?? Math.round(listed.amountCents / 0.55);
     addListing({
       id: `lst_${Date.now()}`,
       title: item.title,
       imageUrl: images[0]?.dataUrl ?? item.imageUrl,
-      listedPrice: pricing?.suggestedPrice ?? item.originalPrice,
+      listedPrice: listed,
       status: 'listed',
       views: 0,
       listedAt: new Date().toISOString(),
+      // Agent metadata so the Listing Agent can reason over this real listing.
+      category: item.category,
+      grade: grading?.grade,
+      floorCents: Math.round(listed.amountCents * 0.55),
+      retailCents,
+      market: {
+        comparableCents: Math.round(listed.amountCents * 0.85),
+        localDemand: pricing?.demand ?? 'medium',
+        holdingCostPerDayCents: Math.max(2000, Math.round(listed.amountCents * 0.01)),
+        baseViewsPerDay: 6,
+      },
     });
     // Seller earns EcoCredits for diverting the item from landfill.
     if (impact) earnSeller(impact.ecoCredits, `Listed ${item.title}`);

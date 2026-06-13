@@ -2,6 +2,8 @@
 // elsewhere; defaults to the local API.
 
 import type {
+  AgentNarrateRequest,
+  AgentNarrateResponse,
   ApiError,
   GradeRequest,
   GradingResult,
@@ -68,6 +70,10 @@ export function gradeItem(req: GradeRequest): Promise<GradingResult> {
 
 export function priceItem(req: PriceRequest): Promise<PricingResult> {
   return postJson<PriceRequest, PricingResult>('/api/sell/price', req);
+}
+
+export function narrateAgent(req: AgentNarrateRequest): Promise<AgentNarrateResponse> {
+  return postJson<AgentNarrateRequest, AgentNarrateResponse>('/api/agent/narrate', req);
 }
 
 export function createHealthCard(req: HealthCardRequest): Promise<ProductHealthCard> {

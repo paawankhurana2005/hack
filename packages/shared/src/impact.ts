@@ -47,3 +47,23 @@ export function estimateBuyerImpact(
   const ecoCredits = Math.round(co2SavedKg * 3 + savedRupees * 0.002);
   return { co2SavedKg, ecoCredits };
 }
+
+// When resale isn't viable, routing beats landfill. Donating extends the item's
+// life (fuller carbon benefit); recycling recovers materials (partial benefit).
+const ROUTE_CO2_FACTOR: Record<'donate' | 'recycle', number> = {
+  donate: 0.7,
+  recycle: 0.4,
+};
+
+/**
+ * Impact of routing an unsellable item to donate/recycle instead of landfill.
+ * EcoCredits = round(co2SavedKg × 3) — carbon-only, no resale value to reward.
+ */
+export function estimateRouteImpact(
+  category: ItemCategory,
+  route: 'donate' | 'recycle',
+): ImpactEstimate {
+  const co2SavedKg = Math.round(CO2_BASELINE_KG[category] * ROUTE_CO2_FACTOR[route]);
+  const ecoCredits = Math.round(co2SavedKg * 3);
+  return { co2SavedKg, ecoCredits };
+}

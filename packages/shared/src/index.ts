@@ -9,3 +9,4 @@ export * from './return.js';
 export * from './owned-item.js';
 export * from './impact.js';
 export * from './shop.js';
+export * from './agent.js';
