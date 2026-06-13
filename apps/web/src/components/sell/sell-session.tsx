@@ -133,6 +133,7 @@ export function SellSession({ item }: { item: OwnedItem }) {
       // Whose listing this is — drives My Listings + who gets paid on sale.
       sellerId: account?.id,
       sellerName: account?.name,
+      sourceItemId: item.id,
       // Shop-rendering data so other users can buy it.
       originalPrice: item.originalPrice,
       card: card ?? undefined,

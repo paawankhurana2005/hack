@@ -21,6 +21,8 @@ export interface CasualListing {
   /** The account that owns this listing (whose My Listings it shows in). */
   sellerId?: string;
   sellerName?: string;
+  /** The owned item this listing was created from (links back to My Items). */
+  sourceItemId?: string;
   // --- Agent metadata (optional; seeds bake it, the sell flow populates it) ---
   category?: ItemCategory;
   grade?: ConditionGrade;
