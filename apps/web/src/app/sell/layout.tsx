@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { StepIndicator } from '@/components/ui/step-indicator';
+import { SellFlowProvider } from './sell-flow-context';
 
 const steps = [
   { href: '/sell', label: 'Intent' },
@@ -24,7 +25,7 @@ export default function SellLayout({ children }: { children: React.ReactNode }) 
   );
 
   return (
-    <div>
+    <SellFlowProvider>
       <div className="border-b border-navy-700 bg-navy-800">
         <div className="mx-auto max-w-6xl px-6 py-5">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-orange-500">
@@ -34,6 +35,6 @@ export default function SellLayout({ children }: { children: React.ReactNode }) 
         </div>
       </div>
       {children}
-    </div>
+    </SellFlowProvider>
   );
 }

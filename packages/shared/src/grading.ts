@@ -11,6 +11,8 @@ export interface GradingResult {
   confidence: number;
   /** Human-readable issues spotted, e.g. ["scuff on corner"]. */
   detectedIssues: string[];
+  /** One-line plain-English condition summary from the model. */
+  summary: string;
   photoUrls: string[];
   /** ISO 8601 timestamp. */
   gradedAt: string;

@@ -1,8 +1,10 @@
 // Product Health Card — "the trust layer".
 // Verifiable condition, history, and authenticity that travels with the item.
-// Stub contract for the scaffold.
 
-import type { ConditionGrade, ID } from './common.js';
+import type { ConditionGrade, ID, Money } from './common.js';
+import type { GradingResult } from './grading.js';
+import type { PricingResult } from './pricing.js';
+import type { SellItemDraft } from './sell.js';
 
 export interface HealthCardEvent {
   label: string; // e.g. "Graded", "Verified authentic"
@@ -15,8 +17,24 @@ export interface ProductHealthCard {
   productId: ID;
   title: string;
   grade: ConditionGrade;
+  /** Grading confidence, 0..1. */
+  confidence: number;
+  /** One-line buyer-facing condition/trust summary. */
+  summary: string;
+  detectedIssues: string[];
   authenticityVerified: boolean;
+  /** Recommended resale price carried onto the card. */
+  listingPrice?: Money;
   history: HealthCardEvent[];
   /** Shareable link that follows the item to its next owner. */
   healthCardUrl: string;
+  /** ISO 8601 timestamp the card was issued. */
+  issuedAt: string;
+}
+
+/** Request body for POST /api/sell/health-card. */
+export interface HealthCardRequest {
+  draft: SellItemDraft;
+  grading: GradingResult;
+  pricing: PricingResult;
 }

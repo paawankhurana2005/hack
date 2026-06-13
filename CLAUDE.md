@@ -44,24 +44,29 @@ prediction (demand/returns); rules for the routing decision.
 - Clean, confident, minimal. Friendly, not corporate-cold.
 - Consistent design tokens — define them once, reuse everywhere.
 
-## Workflow — SPEC FIRST, ALWAYS (most important rule)
-We build in iterations. Every iteration follows this exact loop:
+## Workflow — CHAT-DRIVEN, SPEC AS LIVING DOC
+We build in iterations. Approval happens **in chat**, not via a blocking
+written-spec gate. The loop:
 
-1. **Spec.** Before writing ANY implementation code, write a spec to
-   `specs/NNN-short-name.md` using this structure:
+1. **Align in chat.** Before building, raise scope, decisions, and open questions
+   directly in chat. I answer and approve in chat ("approved" / changes). No need
+   to write the full spec first and stop — just ask what you need to know.
+2. **Spec as documentation.** Still maintain `specs/NNN-short-name.md` as the
+   living record of each iteration (kept current for maintenance), using this
+   structure:
    - **Goal** — what this iteration delivers and why.
    - **Scope** — explicitly in-scope and out-of-scope.
    - **Affected files** — what gets created/changed.
    - **Data contracts** — any types added/changed in `packages/shared`.
    - **UI / behavior** — screens, routes, states (mock data is fine).
    - **Acceptance criteria** — how we'll know it's done.
-   - **Open questions** — anything you need me to decide.
-2. **STOP and wait for my approval.** Do not write implementation code until I
-   reply "approved" (or give changes). If I request changes, update the spec and
-   wait again.
-3. **Build** — implement strictly within the approved scope.
-4. If something needs to go beyond the approved scope mid-build, STOP, tell me,
-   and amend the spec. Never silently expand scope.
+   - **Resolved decisions / open questions.**
+   Write or update the spec to reflect what we agreed; it documents the build, it
+   doesn't block it.
+3. **Build** — implement what was approved in chat.
+4. If something needs to go beyond what we agreed mid-build, STOP, tell me in
+   chat, and get a yes before expanding. Never silently expand scope. Update the
+   spec afterward to match what shipped.
 
 ## Current phase
 Scaffolding only. NO real functionality yet — no AI, no backend logic, no real

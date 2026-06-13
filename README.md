@@ -25,8 +25,25 @@ pnpm dev:web
 pnpm dev:api
 ```
 
+## Configuration
+
+The API needs an NVIDIA inference key. Copy the examples and fill them in:
+
+```bash
+cp apps/api/.env.example apps/api/.env        # add NVIDIA_API_KEY
+cp apps/web/.env.local.example apps/web/.env.local
+```
+
+`.env` files are gitignored — never commit a real key.
+
 ## Current status
 
-**Scaffold only (Spec 001).** Every screen is a placeholder — no AI, no backend
-logic, no real data. Features land in later spec-gated iterations. See
-`specs/001-scaffold.md`.
+**Specs 001–004** are built. The Sell flow is live through **entry → grading →
+pricing → health card** (real `meta/llama-3.2-90b-vision-instruct` grading +
+`meta/llama-3.3-70b-instruct` pricing; the health card is deterministic
+assembly). Handoff → done are still placeholders. See `specs/`.
+
+## Credits
+
+Demo product images under `apps/web/public/demo/` are from
+[Unsplash](https://unsplash.com) (free to use, no attribution required).

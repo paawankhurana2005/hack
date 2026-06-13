@@ -13,6 +13,7 @@ export const mockGrading: GradingResult = {
   grade: 'good',
   confidence: 0.86,
   detectedIssues: ['Light scuff on bottom-left corner', 'Minor screen dust'],
+  summary: 'Lightly used with minor cosmetic wear; fully functional.',
   photoUrls: [],
   gradedAt: '2026-06-12T10:00:00.000Z',
 };
@@ -39,10 +40,15 @@ export const mockHealthCard: ProductHealthCard = {
   productId: 'prod_001',
   title: 'Wireless Noise-Cancelling Headphones',
   grade: 'good',
+  confidence: 0.86,
+  summary: 'Lightly used, fully functional, with minor cosmetic wear.',
+  detectedIssues: ['Light scuff on bottom-left corner', 'Minor screen dust'],
   authenticityVerified: true,
+  listingPrice: { amountCents: 4800, currency: 'USD' },
   history: [
     { label: 'Graded', at: '2026-06-12T10:00:00.000Z' },
     { label: 'Verified authentic', at: '2026-06-12T10:00:30.000Z' },
   ],
   healthCardUrl: 'https://reloop.example/card/card_001',
+  issuedAt: '2026-06-12T10:01:00.000Z',
 };
