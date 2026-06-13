@@ -10,3 +10,4 @@ export * from './owned-item.js';
 export * from './impact.js';
 export * from './shop.js';
 export * from './agent.js';
+export * from './rufus.js';

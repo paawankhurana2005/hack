@@ -13,6 +13,7 @@ import { PricingService } from './services/pricing/pricing-service.js';
 import { HealthCardService } from './services/health-card/health-card-service.js';
 import { createSellRouter } from './routes/sell.js';
 import { createAgentRouter } from './routes/agent.js';
+import { createRufusRouter } from './routes/rufus.js';
 import { gradeHandler } from './routes/grade.js';
 import { routeHandler } from './routes/route.js';
 import { healthCardHandler } from './routes/health-card.js';
@@ -45,6 +46,7 @@ const pricingService = new PricingService(new NvidiaMarketProvider(config));
 const healthCardService = new HealthCardService();
 app.use('/api/sell', createSellRouter(gradingService, pricingService, healthCardService));
 app.use('/api/agent', createAgentRouter(config));
+app.use('/api/rufus', createRufusRouter(config));
 
 app.post('/api/grade', (req, res) => { void gradeHandler(req, res); });
 app.post('/api/route', (req, res) => { void routeHandler(req, res); });

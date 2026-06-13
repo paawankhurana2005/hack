@@ -77,7 +77,7 @@ const WORN_RUNNERS_MARKET: MarketContext = {
 export const wornRunnersListing: CasualListing = {
   id: 'lst_worn_runners',
   title: 'Worn Running Shoes · 3 yrs',
-  imageUrl: '/demo/ua-charged/side.jpg',
+  imageUrl: '/catalog/worn-runners.jpg',
   listedPrice: inr(180000), // ₹1,800
   status: 'listed',
   views: 4,
@@ -103,8 +103,8 @@ export const coachListing = listingFromShop('shop_coach', 'user_ananya', 'Ananya
   market: { comparableCents: 1100000, localDemand: 'medium', holdingCostPerDayCents: 8000, baseViewsPerDay: 6 },
 });
 
-export const canonListing = listingFromShop('shop_canon', 'user_rohan', 'Rohan Verma', {
-  floorCents: 1500000, // ₹15,000
+export const watchListing = listingFromShop('shop_watch', 'user_rohan', 'Rohan Verma', {
+  floorCents: 1800000, // ₹18,000
   market: { comparableCents: 2000000, localDemand: 'low', holdingCostPerDayCents: 12000, baseViewsPerDay: 4 },
 });
 
@@ -114,7 +114,7 @@ export const seedListings: CasualListing[] = [
   pegasusListing,
   sonyListing,
   coachListing,
-  canonListing,
+  watchListing,
 ];
 
 export function findSeedListing(id: string): CasualListing | undefined {

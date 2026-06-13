@@ -15,10 +15,10 @@ export interface ShopEntry extends ShopItem {
 // Most catalog items belong to "external" sellers, but a few are owned by our
 // real users so they appear in OTHER users' shops and in the owner's My Listings.
 const STATIC_SELLER: Record<string, string> = {
-  [HERO_ID]: 'user_aarav', // Nike Pegasus
-  shop_sony: 'user_meera',
-  shop_coach: 'user_ananya',
-  shop_canon: 'user_rohan',
+  [HERO_ID]: 'user_aarav', // Adidas Samba
+  shop_sony: 'user_meera', // Sony headphones
+  shop_coach: 'user_ananya', // Prada handbag
+  shop_watch: 'user_rohan', // Apple Watch
 };
 
 function fromStatic(item: ShopItem): ShopEntry {
