@@ -12,9 +12,18 @@ const gradeTone = {
   poor: 'danger',
 } as const;
 
-export function ShopCard({ item, sold }: { item: ShopItem; sold?: boolean }) {
+export function ShopCard({
+  item,
+  sold,
+  priceCents,
+}: {
+  item: ShopItem;
+  sold?: boolean;
+  priceCents?: number;
+}) {
   const { card } = item;
-  const discount = Math.round((1 - item.listingPrice.amountCents / item.originalPrice.amountCents) * 100);
+  const price = { amountCents: priceCents ?? item.listingPrice.amountCents, currency: 'INR' as const };
+  const discount = Math.round((1 - price.amountCents / item.originalPrice.amountCents) * 100);
 
   return (
     <Link href={`/app/shop/${item.id}`} className="group block">
@@ -53,7 +62,7 @@ export function ShopCard({ item, sold }: { item: ShopItem; sold?: boolean }) {
 
           <div className="mt-3 flex items-end gap-2">
             <span className="text-xl font-semibold tabular-nums text-brand">
-              {formatMoney(item.listingPrice)}
+              {formatMoney(price)}
             </span>
             <span className="pb-0.5 text-xs text-muted-foreground line-through">
               {formatMoney(item.originalPrice)}

@@ -11,7 +11,11 @@ import type { CasualListing, ListingStatus } from '@/mock/casual-listings';
 import { getListings } from '@/lib/listings-store';
 import { seedListings } from '@/mock/seed-listings';
 import { isSold } from '@/lib/marketplace-store';
+import { getSale, type SellerSale } from '@/lib/sale-store';
 import { ensureAgent, type AgentState } from '@/lib/agent-store';
+
+type Filter = 'all' | 'active' | 'sold';
+const ACTIVE_STATUSES: ListingStatus[] = ['listed', 'viewed', 'matched'];
 
 const STATUS_TONE: Record<ListingStatus, 'neutral' | 'accent' | 'success'> = {
   listed: 'neutral',
@@ -48,6 +52,8 @@ export default function MyListingsPage() {
   // SSR-stable seed, then merge user-created listings + agent state on mount.
   const [listings, setListings] = useState<CasualListing[]>(seedListings);
   const [agents, setAgents] = useState<Record<string, AgentState>>({});
+  const [sales, setSales] = useState<Record<string, SellerSale>>({});
+  const [filter, setFilter] = useState<Filter>('all');
 
   useEffect(() => {
     const userCreated = getListings();
@@ -58,13 +64,29 @@ export default function MyListingsPage() {
     setListings(deduped);
 
     const map: Record<string, AgentState> = {};
+    const saleMap: Record<string, SellerSale> = {};
     for (const l of deduped) {
       const a = ensureAgent(l);
       if (isSold(l.id) && a.status !== 'sold') a.status = 'sold';
       map[l.id] = a;
+      const s = getSale(l.id);
+      if (s) saleMap[l.id] = s;
     }
     setAgents(map);
+    setSales(saleMap);
   }, []);
+
+  const statusOf = (l: CasualListing): ListingStatus =>
+    agents[l.id]?.status ?? (isSold(l.id) ? 'sold' : l.status);
+  const isActive = (l: CasualListing) => ACTIVE_STATUSES.includes(statusOf(l));
+  const visible = listings.filter((l) =>
+    filter === 'all' ? true : filter === 'active' ? isActive(l) : !isActive(l),
+  );
+  const counts = {
+    all: listings.length,
+    active: listings.filter(isActive).length,
+    sold: listings.filter((l) => !isActive(l)).length,
+  };
 
   return (
     <PageShell
@@ -72,13 +94,37 @@ export default function MyListingsPage() {
       title="My Listings"
       description="Items you've put up for a second life. An autonomous agent watches each one, repricing or re-routing it within hard guardrails — tap a listing to see it reason."
     >
+      {/* Active / Sold filter */}
+      <div className="mb-6 flex gap-2">
+        {(['all', 'active', 'sold'] as Filter[]).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFilter(f)}
+            className={`rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
+              filter === f
+                ? 'border-brand bg-brand/10 text-brand'
+                : 'border-border text-muted-foreground hover:text-brand'
+            }`}
+          >
+            {f} · {counts[f]}
+          </button>
+        ))}
+      </div>
+
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {listings.map((listing) => {
+        {visible.map((listing) => {
           const agent = agents[listing.id];
+          const sale = sales[listing.id];
           const status: ListingStatus = agent?.status ?? (isSold(listing.id) ? 'sold' : listing.status);
-          const priceCents = agent?.priceCents ?? listing.listedPrice.amountCents;
-          const chip = agent ? agentChip(agent) : null;
+          const priceCents = sale?.soldPriceCents ?? agent?.priceCents ?? listing.listedPrice.amountCents;
           const routedOrSold = status === 'sold' || status === 'recycled' || status === 'donated';
+          const chip =
+            status === 'sold' && sale
+              ? { label: `Sold · +${sale.sellerCredits} credits`, tone: 'accent' as const }
+              : agent
+                ? agentChip(agent)
+                : null;
           return (
             <Link key={listing.id} href={`/app/listings/${listing.id}`} className="group block">
               <Card className="flex h-full flex-col overflow-hidden p-0 transition-all group-hover:ring-brand/40">
@@ -108,7 +154,7 @@ export default function MyListingsPage() {
                   </div>
                   <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                     <span>Listed {listedOn(listing.listedAt)}</span>
-                    <span className="text-brand">View agent →</span>
+                    <span className="text-brand">{routedOrSold ? 'See story →' : 'View agent →'}</span>
                   </div>
                 </div>
               </Card>
@@ -116,6 +162,14 @@ export default function MyListingsPage() {
           );
         })}
       </div>
+
+      {visible.length === 0 && (
+        <Card className="border border-dashed border-border ring-0">
+          <p className="text-sm text-muted-foreground">
+            No {filter} listings yet.
+          </p>
+        </Card>
+      )}
 
       <Card className="mt-8">
         <p className="font-mono text-[10px] uppercase tracking-widest text-brand">

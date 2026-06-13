@@ -7,14 +7,23 @@ import { ShopCard } from '@/components/shop/shop-card';
 import { shopItems } from '@/mock/shop-items';
 import { getSoldIds } from '@/lib/marketplace-store';
 import { getBalance } from '@/lib/credits-store';
+import { getAgentState } from '@/lib/agent-store';
 
 export default function ShopPage() {
   const [soldIds, setSoldIds] = useState<string[]>([]);
   const [credits, setCredits] = useState(0);
+  const [prices, setPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setSoldIds(getSoldIds());
     setCredits(getBalance());
+    // Reflect any agent reprices on the catalog price.
+    const map: Record<string, number> = {};
+    for (const it of shopItems) {
+      const a = getAgentState(it.id);
+      if (a) map[it.id] = a.priceCents;
+    }
+    setPrices(map);
   }, []);
 
   return (
@@ -37,7 +46,12 @@ export default function ShopPage() {
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {shopItems.map((item) => (
-          <ShopCard key={item.id} item={item} sold={soldIds.includes(item.id)} />
+          <ShopCard
+            key={item.id}
+            item={item}
+            sold={soldIds.includes(item.id)}
+            priceCents={prices[item.id]}
+          />
         ))}
       </div>
     </PageShell>

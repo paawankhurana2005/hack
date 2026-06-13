@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { estimateBuyerImpact, type ShopItem } from '@reloop/shared';
+import { estimateBuyerImpact, type Money, type ShopItem } from '@reloop/shared';
 import { PageShell } from '@/components/layout/page-shell';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,22 +10,44 @@ import { Button } from '@/components/ui/button';
 import { HealthCard } from '@/components/sell/health-card';
 import { formatMoney } from '@/lib/money';
 import { buyItem, isSold, type PurchaseResult } from '@/lib/marketplace-store';
+import { getAgentState } from '@/lib/agent-store';
+import { recordSale } from '@/lib/sale-store';
+import { earnSeller } from '@/lib/credits-store';
+
+const inr = (cents: number): Money => ({ amountCents: cents, currency: 'INR' });
 
 export function ShopDetail({ item }: { item: ShopItem }) {
   const { card } = item;
   const [alreadySold, setAlreadySold] = useState(false);
   const [result, setResult] = useState<PurchaseResult | null>(null);
+  // If the seller's agent has repriced this item, sell at that live price so the
+  // sale stays consistent with the agent's own history.
+  const [priceCents, setPriceCents] = useState(item.listingPrice.amountCents);
 
   useEffect(() => {
     setAlreadySold(isSold(item.id));
+    const agent = getAgentState(item.id);
+    if (agent) setPriceCents(agent.priceCents);
   }, [item.id]);
 
-  const discount = Math.round((1 - item.listingPrice.amountCents / item.originalPrice.amountCents) * 100);
-  const buyerPreview = estimateBuyerImpact(item.category, item.originalPrice, item.listingPrice);
+  const price = inr(priceCents);
+  const discount = Math.round((1 - priceCents / item.originalPrice.amountCents) * 100);
+  const buyerPreview = estimateBuyerImpact(item.category, item.originalPrice, price);
   const sold = alreadySold || result !== null;
 
   function buy() {
-    setResult(buyItem(item));
+    const res = buyItem(item, priceCents);
+    recordSale({
+      id: item.id,
+      title: card.title,
+      soldPriceCents: priceCents,
+      originalPriceCents: item.originalPrice.amountCents,
+      sellerCredits: res.sellerCredits,
+      co2SavedKg: res.co2SavedKg,
+      soldAt: new Date().toISOString(),
+    });
+    earnSeller(res.sellerCredits, `Sold ${card.title}`);
+    setResult(res);
     setAlreadySold(true);
   }
 
@@ -101,7 +123,7 @@ export function ShopDetail({ item }: { item: ShopItem }) {
                     Price
                   </p>
                   <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums text-brand">
-                    {formatMoney(item.listingPrice)}
+                    {formatMoney(price)}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     <span className="line-through">{formatMoney(item.originalPrice)}</span> new ·{' '}
@@ -126,7 +148,7 @@ export function ShopDetail({ item }: { item: ShopItem }) {
                 </div>
               ) : (
                 <Button variant="primary" className="mt-5 w-full" onClick={buy}>
-                  Buy it · {formatMoney(item.listingPrice)}
+                  Buy it · {formatMoney(price)}
                 </Button>
               )}
               <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">

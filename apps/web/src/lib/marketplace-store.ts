@@ -3,7 +3,9 @@
 // controllable state change — the foundation of the simulated buy flow.
 
 import type { Money, ShopItem } from '@reloop/shared';
-import { estimateBuyerImpact } from '@reloop/shared';
+import { estimateBuyerImpact, estimateImpact } from '@reloop/shared';
+
+const inr = (cents: number): Money => ({ amountCents: cents, currency: 'INR' });
 
 const SOLD_KEY = 'reloop.sold';
 const PURCHASES_KEY = 'reloop.purchases';
@@ -53,15 +55,21 @@ export interface PurchaseResult {
   co2SavedKg: number;
 }
 
-/** Simulated transaction: mark sold, record the purchase, award buyer EcoCredits. */
-export function buyItem(item: ShopItem): PurchaseResult {
-  const buyer = estimateBuyerImpact(item.category, item.originalPrice, item.listingPrice);
+/**
+ * Simulated transaction: mark sold, record the purchase, award buyer EcoCredits.
+ * `salePriceCents` lets the caller sell at the agent's current (repriced) price so
+ * the sale stays consistent with the agent's own history.
+ */
+export function buyItem(item: ShopItem, salePriceCents?: number): PurchaseResult {
+  const salePrice = inr(salePriceCents ?? item.listingPrice.amountCents);
+  const buyer = estimateBuyerImpact(item.category, item.originalPrice, salePrice);
+  const seller = estimateImpact(item.category, salePrice);
 
   write(SOLD_KEY, Array.from(new Set([...getSoldIds(), item.id])));
   const purchase: Purchase = {
     id: item.id,
     title: item.card.title,
-    price: item.listingPrice,
+    price: salePrice,
     buyerCredits: buyer.ecoCredits,
     at: new Date().toISOString(),
   };
@@ -69,7 +77,7 @@ export function buyItem(item: ShopItem): PurchaseResult {
 
   return {
     buyerCredits: buyer.ecoCredits,
-    sellerCredits: item.impact.ecoCredits,
+    sellerCredits: seller.ecoCredits,
     co2SavedKg: buyer.co2SavedKg,
   };
 }

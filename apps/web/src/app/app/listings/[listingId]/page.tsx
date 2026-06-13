@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import type { ImpactEstimate } from '@reloop/shared';
+import { estimateImpact, type ImpactEstimate } from '@reloop/shared';
 import { PageShell } from '@/components/layout/page-shell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { findSeedListing } from '@/mock/seed-listings';
 import type { CasualListing } from '@/mock/casual-listings';
 import { getListings } from '@/lib/listings-store';
 import { isSold } from '@/lib/marketplace-store';
+import { getSale, type SellerSale } from '@/lib/sale-store';
 import {
   acceptRoute,
   ensureAgent,
@@ -28,6 +29,10 @@ import {
 
 const inr = (cents: number) => ({ amountCents: cents, currency: 'INR' as const });
 const TICK_MS = 1600;
+
+function soldOn(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
 
 function resolveListing(id: string): CasualListing | undefined {
   return findSeedListing(id) ?? getListings().find((l) => l.id === id);
@@ -44,6 +49,7 @@ export default function ListingDetailPage() {
   const [priceInput, setPriceInput] = useState('');
   const [routed, setRouted] = useState<ImpactEstimate | null>(null);
   const [dismissedBanner, setDismissedBanner] = useState(false);
+  const [sale, setSale] = useState<SellerSale | null>(null);
   const busy = useRef(false);
 
   useEffect(() => {
@@ -55,6 +61,24 @@ export default function ListingDetailPage() {
       if (isSold(l.id) && a.status !== 'sold') a.status = 'sold';
       setAgent(a);
       setPriceInput(String(Math.round(a.priceCents / 100)));
+      if (a.status === 'sold') {
+        const rec = getSale(l.id);
+        if (rec) {
+          setSale(rec);
+        } else {
+          // Derive a sale summary if the sale predates the sale-store.
+          const imp = estimateImpact(a.category, { amountCents: a.priceCents, currency: 'INR' });
+          setSale({
+            id: l.id,
+            title: l.title,
+            soldPriceCents: a.priceCents,
+            originalPriceCents: a.retailCents,
+            sellerCredits: imp.ecoCredits,
+            co2SavedKg: imp.co2SavedKg,
+            soldAt: new Date().toISOString(),
+          });
+        }
+      }
     }
   }, [id]);
 
@@ -99,6 +123,7 @@ export default function ListingDetailPage() {
   const active = isAgentActive(agent);
   const showRecycleBanner = !!agent.routeRecommendation && !routedDone && !dismissedBanner;
   const latest = agent.events[agent.events.length - 1];
+  const reprices = agent.priceHistory.length - 1;
 
   const statusChip = sold
     ? { tone: 'success' as const, label: 'Sold' }
@@ -156,6 +181,62 @@ export default function ListingDetailPage() {
       >
         ← My Listings
       </Link>
+
+      {/* Sold payoff — the loop closed */}
+      {sold && sale && (
+        <div className="mb-6 overflow-hidden rounded-3xl bg-gradient-to-b from-brand/15 to-card p-6 ring-1 ring-brand/40">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
+                Sold · loop closed
+              </p>
+              <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums text-brand [text-shadow:0_0_30px_rgba(234,179,8,0.3)]">
+                Sold for {formatMoney(inr(sale.soldPriceCents))}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {reprices > 0
+                  ? `Your agent made ${reprices} price ${reprices > 1 ? 'moves' : 'move'} to get it competitive — then it found a buyer.`
+                  : 'It found a buyer.'}{' '}
+                Sold {soldOn(sale.soldAt)}.
+              </p>
+            </div>
+            <span className="grid size-12 animate-glow place-items-center rounded-full border-2 border-brand text-xl text-brand">
+              ✓
+            </span>
+          </div>
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            <div className="rounded-xl bg-background/60 p-4 text-center">
+              <p className="text-2xl font-semibold tabular-nums text-brand">
+                {formatMoney(inr(sale.soldPriceCents))}
+              </p>
+              <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                Payout to you
+              </p>
+            </div>
+            <div className="rounded-xl bg-background/60 p-4 text-center">
+              <p className="text-2xl font-semibold tabular-nums text-brand">+{sale.sellerCredits}</p>
+              <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                EcoCredits earned
+              </p>
+            </div>
+            <div className="rounded-xl bg-background/60 p-4 text-center">
+              <p className="text-2xl font-semibold tabular-nums text-foreground">
+                {sale.co2SavedKg}
+                <span className="text-sm text-muted-foreground">kg</span>
+              </p>
+              <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                CO₂ saved
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/app/rewards"
+            className="mt-4 inline-block font-mono text-[10px] uppercase tracking-widest text-brand hover:underline"
+          >
+            See your rewards →
+          </Link>
+        </div>
+      )}
 
       {/* Header */}
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
@@ -258,8 +339,9 @@ export default function ListingDetailPage() {
         </Card>
       )}
 
-      {/* Controls + feed */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+      {/* Controls + feed (controls hidden once the item has left the loop) */}
+      <div className={`mt-6 grid gap-6 ${sold || routedDone ? '' : 'lg:grid-cols-[1fr_1.2fr]'}`}>
+        {!(sold || routedDone) && (
         <div className="space-y-6">
           {/* Clock */}
           <Card>
@@ -325,8 +407,9 @@ export default function ListingDetailPage() {
             </div>
           </Card>
         </div>
+        )}
 
-        <ActivityFeed events={agent.events} thinking={thinking} />
+        <ActivityFeed events={agent.events} thinking={thinking && !(sold || routedDone)} />
       </div>
     </PageShell>
   );
