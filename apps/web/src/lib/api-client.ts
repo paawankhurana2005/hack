@@ -11,6 +11,8 @@ import type {
   PriceRequest,
   PricingResult,
   ProductHealthCard,
+  RufusRequest,
+  RufusResponse,
 } from '@reloop/shared';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
@@ -74,6 +76,10 @@ export function priceItem(req: PriceRequest): Promise<PricingResult> {
 
 export function narrateAgent(req: AgentNarrateRequest): Promise<AgentNarrateResponse> {
   return postJson<AgentNarrateRequest, AgentNarrateResponse>('/api/agent/narrate', req);
+}
+
+export function askRufus(req: RufusRequest): Promise<RufusResponse> {
+  return postJson<RufusRequest, RufusResponse>('/api/rufus/ask', req);
 }
 
 export function createHealthCard(req: HealthCardRequest): Promise<ProductHealthCard> {

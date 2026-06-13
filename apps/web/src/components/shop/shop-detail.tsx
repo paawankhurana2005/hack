@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HealthCard } from '@/components/sell/health-card';
+import { RufusChat } from '@/components/rufus/rufus-chat';
 import { formatMoney } from '@/lib/money';
 import { buyItem, isSold, type PurchaseResult } from '@/lib/marketplace-store';
 import { getAgentState } from '@/lib/agent-store';
@@ -174,6 +175,24 @@ export function ShopDetail({ item }: { item: ShopEntry }) {
           ← Back to Shop
         </Link>
       </div>
+
+      {/* Rufus — Health-Card-aware shopping assistant for this item */}
+      <RufusChat
+        context={{
+          title: card.title,
+          category: item.category,
+          grade: card.grade,
+          confidence: card.confidence,
+          summary: card.summary,
+          detectedIssues: card.detectedIssues,
+          authenticityVerified: card.authenticityVerified,
+          listingPriceInr: priceCents / 100,
+          originalPriceInr: item.originalPrice.amountCents / 100,
+          co2SavedKg: item.impact.co2SavedKg,
+          ecoCredits: item.impact.ecoCredits,
+          sellerName: item.sellerName,
+        }}
+      />
     </PageShell>
   );
 }
