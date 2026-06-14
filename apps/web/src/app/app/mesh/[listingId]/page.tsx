@@ -61,9 +61,9 @@ export default function MeshListingPage() {
         {/* Left: photo + lender */}
         <div className="space-y-4">
           <Card className="overflow-hidden p-0">
-            <div className="relative aspect-[4/3] bg-background">
+            <div className="relative aspect-[4/3] bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={listing.imageUrl} alt={listing.title} className="h-full w-full object-cover" />
+              <img src={listing.imageUrl} alt={listing.title} className="h-full w-full object-contain p-8" />
             </div>
           </Card>
           <Card>

@@ -52,9 +52,9 @@ export default function StoreProductPage() {
       <div className="grid gap-8 lg:grid-cols-[1fr_1fr]">
         {/* Left: photo */}
         <Card className="overflow-hidden p-0">
-          <div className="relative aspect-[4/3] bg-background">
+          <div className="relative aspect-[4/3] bg-white">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
+            <img src={product.imageUrl} alt={product.title} className="h-full w-full object-contain p-8" />
           </div>
         </Card>
 

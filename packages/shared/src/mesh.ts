@@ -51,6 +51,8 @@ export interface MeshListing {
   id: ID;
   title: string;
   category: ItemCategory;
+  /** Display group for the borrow-side category filter (e.g. "Cameras", "Gaming"). */
+  group: string;
   imageUrl: string;
   blurb: string;
   lenderName: string;

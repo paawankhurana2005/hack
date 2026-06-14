@@ -5,11 +5,12 @@ import type { DormantSignal, Money } from '@reloop/shared';
 import { PageShell } from '@/components/layout/page-shell';
 import { Card } from '@/components/ui/card';
 import { GridBackdrop } from '@/components/ui/section';
+import { FilterBar } from '@/components/catalog/filter-bar';
 import { DormantCard } from '@/components/mesh/dormant-card';
 import { ListingCard } from '@/components/mesh/listing-card';
 import { formatMoney } from '@/lib/money';
 import { useRole } from '@/lib/role-context';
-import { getDormantItems, meshListings } from '@/mock/mesh';
+import { getDormantItems, meshListings, meshGroups } from '@/mock/mesh';
 
 type Tab = 'lend' | 'borrow';
 
@@ -25,6 +26,9 @@ export default function MeshPage() {
   const [dormant, setDormant] = useState<DormantSignal[]>([]);
   // Bumps when a lend is confirmed so the passive-income hero re-reads.
   const [, setVersion] = useState(0);
+  // Borrow-side filters.
+  const [group, setGroup] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (!accountId) return;
@@ -32,6 +36,19 @@ export default function MeshPage() {
   }, [accountId]);
 
   const monthly = useMemo(() => sumMonthly(dormant), [dormant]);
+
+  const borrowResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return meshListings.filter((l) => {
+      if (group && l.group !== group) return false;
+      if (!q) return true;
+      return (
+        l.title.toLowerCase().includes(q) ||
+        l.group.toLowerCase().includes(q) ||
+        l.blurb.toLowerCase().includes(q)
+      );
+    });
+  }, [group, query]);
 
   return (
     <PageShell
@@ -104,11 +121,28 @@ export default function MeshPage() {
             a fraction of buying new. Amazon brokers the handoff, holds the deposit, and covers it with
             buyer protection.
           </p>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {meshListings.map((l) => (
-              <ListingCard key={l.id} listing={l} />
-            ))}
-          </div>
+          <FilterBar
+            groups={[...meshGroups]}
+            active={group}
+            onSelect={setGroup}
+            query={query}
+            onQuery={setQuery}
+            placeholder="Search what you need…"
+            resultCount={borrowResults.length}
+          />
+          {borrowResults.length === 0 ? (
+            <Card className="border border-dashed border-border ring-0">
+              <p className="text-sm text-muted-foreground">
+                Nothing nearby matches “{query}”. Try a different search or category.
+              </p>
+            </Card>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {borrowResults.map((l) => (
+                <ListingCard key={l.id} listing={l} />
+              ))}
+            </div>
+          )}
         </>
       )}
     </PageShell>

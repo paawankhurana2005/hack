@@ -49,8 +49,10 @@ returnRate (0..1), confidence (0..1), reasons: { reason, share }[], recommendati
   size renders the Return-Risk panel (re-mounts per size, fades in). High/moderate
   risk reads amber (caution, not error); low risk reads gold/confident. "Switch to
   size N" updates the selection. "Add to cart" is disabled until a size is chosen.
-- **Hero demo product** — Nike Air Zoom Pegasus 40. Size 8 = high risk (38%, "runs
-  small"), recommends size 9 (6%). Size 9/10 = low; size 7/11 = moderate.
+- **Hero demo product** — Nike Air Jordan 1 Mid (sized footwear). Size 8 = high risk
+  (38%, "runs small"), recommends size 9 (6%). Size 9/10 = low; size 7/11 = moderate.
+  (Renamed from "Air Zoom Pegasus 40" in iteration 013 so the title matches its real
+  product photo; the size-prediction logic is unchanged.)
 
 ## Acceptance criteria
 - [x] `pnpm typecheck` clean across workspace.

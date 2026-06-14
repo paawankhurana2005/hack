@@ -13,9 +13,9 @@ export function ListingCard({ listing }: { listing: MeshListing }) {
   return (
     <Link href={`/app/mesh/${listing.id}`} className="group">
       <Card className="flex h-full flex-col overflow-hidden p-0 transition-colors group-hover:ring-brand/50">
-        <div className="relative aspect-[4/3] overflow-hidden bg-background">
+        <div className="relative aspect-[4/3] overflow-hidden bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={listing.imageUrl} alt={listing.title} className="h-full w-full object-cover" />
+          <img src={listing.imageUrl} alt={listing.title} className="h-full w-full object-contain p-5" />
           <span className="absolute left-3 top-3 rounded-full bg-background/80 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground backdrop-blur">
             {formatDistance(listing.distanceM)} away
           </span>

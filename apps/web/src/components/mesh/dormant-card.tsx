@@ -43,9 +43,9 @@ export function DormantCard({
 
   return (
     <Card className="flex flex-col overflow-hidden p-0">
-      <div className="relative aspect-[4/3] overflow-hidden bg-background">
+      <div className="relative aspect-[4/3] overflow-hidden bg-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={signal.imageUrl} alt={signal.title} className="h-full w-full object-cover" />
+        <img src={signal.imageUrl} alt={signal.title} className="h-full w-full object-contain p-5" />
         <span className="absolute left-3 top-3 rounded-full bg-background/80 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground backdrop-blur">
           Idle {signal.idleMonths} months
         </span>
