@@ -7,6 +7,8 @@ export * from './sell.js';
 export * from './pricing.js';
 export * from './return.js';
 export * from './owned-item.js';
+export * from './prevention.js';
+export * from './mesh.js';
 export * from './provenance.js';
 export * from './impact.js';
 export * from './shop.js';
