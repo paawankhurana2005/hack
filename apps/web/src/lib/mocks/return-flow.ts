@@ -14,7 +14,7 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-2001',
     productName: 'Apple AirPods',
-    imageUrl: '/catalog/boat-headphones.jpg',
+    imageUrl: '/catalog/airpods-pro.jpg',
     orderDate: '2026-06-02T00:00:00Z',
     priceCents: 1490000,
     currency: 'INR',
@@ -24,7 +24,7 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-2002',
     productName: 'Apple iPad Mini',
-    imageUrl: '/catalog/canon-camera.jpg',
+    imageUrl: '/catalog/ipad-air.jpg',
     orderDate: '2026-05-30T00:00:00Z',
     priceCents: 4990000,
     currency: 'INR',
@@ -44,7 +44,7 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-2004',
     productName: 'Wireless Earbuds',
-    imageUrl: '/catalog/jbl-headphones.jpg',
+    imageUrl: '/catalog/earphones.jpg',
     orderDate: '2026-06-01T00:00:00Z',
     priceCents: 599900,
     currency: 'INR',
@@ -54,7 +54,7 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-1001',
     productName: 'Sony WH-1000XM5 Wireless Headphones',
-    imageUrl: '',
+    imageUrl: '/catalog/sony-wh1000xm.jpg',
     orderDate: '2026-05-28T00:00:00Z',
     priceCents: 249900,
     currency: 'INR',
@@ -74,7 +74,7 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-1003',
     productName: 'Prestige 5L Pressure Cooker',
-    imageUrl: '',
+    imageUrl: '/catalog/pressure-cooker.jpg',
     orderDate: '2026-06-05T00:00:00Z',
     priceCents: 89900,
     currency: 'INR',

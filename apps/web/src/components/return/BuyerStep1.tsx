@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react';
 import type { MockOrder, ReturnReason } from '@reloop/shared';
 import { Card } from '@/components/ui/card';
+import { ProductThumb } from './ProductThumb';
+import { CameraIcon, CheckIcon, ArrowRightIcon } from './icons';
 
 interface Props {
   order: MockOrder;
@@ -21,6 +23,8 @@ const REASONS: { value: ReturnReason; label: string }[] = [
   { value: 'not_as_described', label: 'Not as described' },
 ];
 
+const MAX_PHOTOS = 5;
+
 function formatPrice(cents: number) {
   return `₹${(cents / 100).toLocaleString('en-IN')}`;
 }
@@ -37,7 +41,7 @@ export function BuyerStep1({ order, onSubmit }: Props) {
 
   function addFiles(files: FileList | null) {
     if (!files) return;
-    const remaining = 5 - photos.length;
+    const remaining = MAX_PHOTOS - photos.length;
     const toAdd = Array.from(files).slice(0, remaining);
     void Promise.all(
       toAdd.map(
@@ -55,75 +59,110 @@ export function BuyerStep1({ order, onSubmit }: Props) {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  const full = photos.length >= MAX_PHOTOS;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Order card */}
       <Card>
-        <div className="flex items-start gap-4">
-          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl bg-brand/15 text-xl font-bold text-brand">
-            {order.productName[0]}
-          </div>
+        <div className="flex items-center gap-4">
+          <ProductThumb name={order.productName} imageUrl={order.imageUrl} sizeClassName="h-16 w-16" />
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-foreground">{order.productName}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Order #{order.orderId}</p>
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Order #{order.orderId}
+            </p>
             <p className="text-sm text-muted-foreground">Ordered {formatDate(order.orderDate)}</p>
           </div>
-          <p className="flex-shrink-0 font-semibold text-brand">{formatPrice(order.priceCents)}</p>
+          <p className="flex-shrink-0 font-semibold text-foreground">{formatPrice(order.priceCents)}</p>
         </div>
       </Card>
 
       {/* Reason */}
       <Card>
-        <p className="mb-4 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          Why are you returning this item?
-        </p>
-        <div className="space-y-2">
-          {REASONS.map(({ value, label }) => (
-            <label
-              key={value}
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
-                reason === value ? 'border-brand bg-brand/10' : 'border-border hover:border-brand/50'
-              }`}
-            >
-              <input
-                type="radio"
-                name="reason"
-                value={value}
-                checked={reason === value}
-                onChange={() => setReason(value)}
-                className="accent-brand"
-              />
-              <span className="text-sm text-foreground">{label}</span>
-            </label>
-          ))}
+        <p className="font-mono text-[10px] uppercase tracking-widest text-brand">Reason for return</p>
+        <p className="mb-4 mt-1 text-sm text-muted-foreground">Why are you returning this item?</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {REASONS.map(({ value, label }) => {
+            const selected = reason === value;
+            return (
+              <label
+                key={value}
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-all ${
+                  selected
+                    ? 'border-brand bg-brand/10 text-foreground'
+                    : 'border-border text-muted-foreground hover:border-brand/50 hover:text-foreground'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="reason"
+                  value={value}
+                  checked={selected}
+                  onChange={() => setReason(value)}
+                  className="sr-only"
+                />
+                <span
+                  className={`grid size-5 flex-shrink-0 place-items-center rounded-full border transition-colors ${
+                    selected ? 'border-brand bg-brand text-brand-foreground' : 'border-border'
+                  }`}
+                >
+                  {selected && <CheckIcon className="h-3 w-3" />}
+                </span>
+                <span>{label}</span>
+              </label>
+            );
+          })}
         </div>
       </Card>
 
       {/* Photo upload */}
       <Card>
-        <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          Photos of item
-        </p>
-        <p className="mb-4 text-xs text-muted-foreground">
-          Upload photos for faster AI grading at your doorstep (optional, up to 5).
+        <p className="font-mono text-[10px] uppercase tracking-widest text-brand">Photos of item</p>
+        <p className="mb-4 mt-1 text-sm text-muted-foreground">
+          Add a few clear photos to speed up AI grading at your doorstep — optional, up to {MAX_PHOTOS}.
         </p>
 
         <div
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          role="button"
+          tabIndex={0}
+          aria-disabled={full}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!full) setDragging(true);
+          }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
-            addFiles(e.dataTransfer.files);
+            if (!full) addFiles(e.dataTransfer.files);
           }}
-          onClick={() => fileInputRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors ${
-            dragging ? 'border-brand bg-brand/10' : 'border-border hover:border-brand/50'
+          onClick={() => !full && fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && !full) {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+            full
+              ? 'cursor-not-allowed border-border opacity-60'
+              : dragging
+                ? 'cursor-pointer border-brand bg-brand/10'
+                : 'cursor-pointer border-border hover:border-brand/50'
           }`}
         >
-          <span className="text-3xl">📷</span>
-          <p className="mt-2 text-sm text-foreground">Drag & drop photos here</p>
-          <p className="text-xs text-muted-foreground">or click to browse · max 5</p>
+          <span className="grid size-11 place-items-center rounded-full bg-brand/15 text-brand ring-1 ring-brand/20">
+            <CameraIcon className="h-5 w-5" />
+          </span>
+          <p className="mt-3 text-sm font-medium text-foreground">
+            {full ? `Maximum ${MAX_PHOTOS} photos added` : 'Drag & drop photos, or click to browse'}
+          </p>
+          {!full && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              JPG or PNG · {photos.length}/{MAX_PHOTOS} added
+            </p>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -135,17 +174,25 @@ export function BuyerStep1({ order, onSubmit }: Props) {
         </div>
 
         {photos.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
             {photos.map((url, i) => (
-              <div key={url} className="relative">
+              <div key={url} className="group relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`photo ${i + 1}`} className="h-20 w-20 rounded-lg object-cover" />
+                <img
+                  src={url}
+                  alt={`Return photo ${i + 1}`}
+                  className="h-20 w-full rounded-lg object-cover ring-1 ring-border"
+                />
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); removePhoto(i); }}
-                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-danger text-xs text-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removePhoto(i);
+                  }}
+                  aria-label={`Remove photo ${i + 1}`}
+                  className="absolute right-1 top-1 grid size-6 place-items-center rounded-md bg-background/80 text-foreground backdrop-blur transition-colors hover:bg-background hover:text-brand"
                 >
-                  ×
+                  <span className="text-xs leading-none">✕</span>
                 </button>
               </div>
             ))}
@@ -158,9 +205,10 @@ export function BuyerStep1({ order, onSubmit }: Props) {
           type="button"
           disabled={!reason}
           onClick={() => reason && onSubmit(reason, photos)}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-2.5 text-sm font-semibold text-brand-foreground transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-2.5 text-sm font-semibold text-brand-foreground ring-1 ring-brand/50 transition-all hover:bg-brand-strong hover:shadow-[0_0_30px_rgba(234,179,8,0.25)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:shadow-none"
         >
-          Submit Return →
+          Submit return
+          <ArrowRightIcon className="h-4 w-4" />
         </button>
       </div>
     </div>

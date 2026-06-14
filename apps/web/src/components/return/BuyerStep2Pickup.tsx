@@ -1,10 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType, type SVGProps } from 'react';
 import type { ReturnGradingResult, ReturnRoutingDecision, ReturnReason } from '@reloop/shared';
 import { mockGradeItem, mockRouteItem } from '@/lib/mocks/return-flow';
 import { saveReturn, generateReturnId } from '@/lib/mocks/return-store';
 import { Card } from '@/components/ui/card';
+import {
+  ScanIcon,
+  MapPinIcon,
+  ClipboardCheckIcon,
+  TruckIcon,
+  PackageIcon,
+  CardIcon,
+  CheckIcon,
+  ArrowRightIcon,
+} from './icons';
 
 interface Props {
   orderId: string;
@@ -28,10 +38,12 @@ function computeAgentWindow() {
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
-const PHASE_STEPS: { key: Phase; label: string; icon: string }[] = [
-  { key: 'grading', label: 'AI analyzing your photos', icon: '🔍' },
-  { key: 'routing', label: 'Finding the best local path', icon: '🗺️' },
-  { key: 'saving', label: 'Confirming your return', icon: '📋' },
+type Icon = ComponentType<SVGProps<SVGSVGElement>>;
+
+const PHASE_STEPS: { key: Phase; label: string; Icon: Icon }[] = [
+  { key: 'grading', label: 'Analyzing your photos', Icon: ScanIcon },
+  { key: 'routing', label: 'Finding the best local path', Icon: MapPinIcon },
+  { key: 'saving', label: 'Confirming your return', Icon: ClipboardCheckIcon },
 ];
 
 const PHASE_ORDER: Phase[] = ['grading', 'routing', 'saving', 'ready'];
@@ -96,29 +108,41 @@ export function BuyerStep2Pickup({
   if (phase !== 'ready') {
     return (
       <Card>
-        <p className="mb-6 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
           Processing your return
         </p>
-        <div className="space-y-5">
+        <p className="mb-6 mt-1 text-sm text-muted-foreground">
+          This takes a few seconds — no need to refresh.
+        </p>
+        <div className="space-y-4">
           {PHASE_STEPS.map((step, i) => {
             const isDone = currentIdx > i;
             const isActive = currentIdx === i;
+            const StepIcon = step.Icon;
             return (
               <div key={step.key} className="flex items-center gap-4">
                 <div
-                  className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-base transition-all ${
+                  className={`grid size-10 flex-shrink-0 place-items-center rounded-full transition-all ${
                     isDone
-                      ? 'bg-success/20 text-success'
+                      ? 'bg-brand/20 text-brand'
                       : isActive
-                        ? 'bg-brand/20 text-brand'
+                        ? 'bg-brand/15 text-brand ring-1 ring-brand/30'
                         : 'bg-secondary text-muted-foreground'
                   }`}
                 >
-                  {isDone ? '✓' : <span className={isActive ? 'animate-pulse' : ''}>{step.icon}</span>}
+                  {isDone ? (
+                    <CheckIcon className="h-5 w-5" />
+                  ) : (
+                    <StepIcon className={`h-5 w-5 ${isActive ? 'animate-pulse' : ''}`} />
+                  )}
                 </div>
                 <p
                   className={`text-sm ${
-                    isDone ? 'text-success' : isActive ? 'font-semibold text-foreground' : 'text-muted-foreground'
+                    isDone
+                      ? 'text-foreground'
+                      : isActive
+                        ? 'font-semibold text-foreground'
+                        : 'text-muted-foreground'
                   }`}
                 >
                   {step.label}
@@ -142,8 +166,8 @@ export function BuyerStep2Pickup({
     <div className="space-y-5">
       <Card>
         <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
-            <span className="text-lg text-success">✓</span>
+          <div className="grid size-10 flex-shrink-0 place-items-center rounded-full bg-brand/20 text-brand">
+            <CheckIcon className="h-5 w-5" />
           </div>
           <p className="font-semibold text-foreground">Return confirmed — agent dispatched</p>
         </div>
@@ -151,7 +175,9 @@ export function BuyerStep2Pickup({
         {/* Agent ETA */}
         <div className="rounded-xl border border-brand/30 bg-brand/5 p-5">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🚚</span>
+            <span className="grid size-11 flex-shrink-0 place-items-center rounded-xl bg-brand/15 text-brand ring-1 ring-brand/20">
+              <TruckIcon className="h-6 w-6" />
+            </span>
             <div>
               <p className="font-semibold text-foreground">Amazon agent arriving today</p>
               <p className="mt-0.5 text-sm text-muted-foreground">
@@ -160,10 +186,11 @@ export function BuyerStep2Pickup({
             </div>
           </div>
 
-          <div className="mt-4 flex items-start gap-2 rounded-lg bg-secondary/60 p-3">
-            <span className="mt-0.5 text-brand">📦</span>
+          <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-secondary/60 p-3">
+            <PackageIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand" />
             <p className="text-sm text-muted-foreground">
-              Package your item securely. The agent will collect it from your registered address — no drop-off needed.
+              Pack your item securely. The agent collects it from your registered address — no
+              drop-off needed.
             </p>
           </div>
         </div>
@@ -171,9 +198,10 @@ export function BuyerStep2Pickup({
 
       {/* Refund notice */}
       <div className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
-        <span className="mt-0.5 text-success">💳</span>
+        <CardIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand" />
         <p className="text-sm text-muted-foreground">
-          Your refund will be initiated once the agent picks up your item. Expect it within 5–7 business days.
+          Your refund is initiated as soon as the agent picks up your item, and typically lands
+          within 5–7 business days.
         </p>
       </div>
 
@@ -181,9 +209,10 @@ export function BuyerStep2Pickup({
         <button
           type="button"
           onClick={() => onDone(agentWindow)}
-          className="rounded-lg bg-brand px-6 py-2.5 text-sm font-semibold text-brand-foreground hover:bg-brand-strong"
+          className="inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-2.5 text-sm font-semibold text-brand-foreground ring-1 ring-brand/50 transition-all hover:bg-brand-strong hover:shadow-[0_0_30px_rgba(234,179,8,0.25)]"
         >
-          Got it →
+          Continue
+          <ArrowRightIcon className="h-4 w-4" />
         </button>
       </div>
     </div>
