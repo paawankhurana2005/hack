@@ -30,12 +30,6 @@ const GRADE_COLOR: Record<'A' | 'B' | 'C', string> = {
   C: 'bg-orange-500/20 text-orange-400',
 };
 
-const MATCH_REASON: Record<MatchedBuyer['matchReason'], string> = {
-  searched: 'Searched this category',
-  wishlisted: 'Wishlisted this item',
-  purchased_similar: 'Bought similar before',
-};
-
 // ─── Pricing tab ──────────────────────────────────────────────────────────────
 function PricingTab({ item, offsetHours }: { item: ExchangeItem; offsetHours: number }) {
   const currentPrice = computeCurrentPrice(item, offsetHours);
@@ -117,6 +111,24 @@ function PricingTab({ item, offsetHours }: { item: ExchangeItem; offsetHours: nu
 }
 
 // ─── Buyers tab ───────────────────────────────────────────────────────────────
+function accountTier(score: number) {
+  if (score >= 0.85) return { label: 'Prime', cls: 'text-brand bg-brand/10' };
+  if (score >= 0.70) return { label: 'Verified', cls: 'text-emerald-400 bg-emerald-500/10' };
+  return { label: 'Standard', cls: 'text-muted-foreground bg-secondary' };
+}
+
+function formatTenure(days?: number): string {
+  if (!days) return '—';
+  if (days < 365) return `${Math.round(days / 30)}mo`;
+  return `${Math.floor(days / 365)}yr`;
+}
+
+const SIGNAL_LABEL: Record<MatchedBuyer['matchReason'], string> = {
+  searched: 'Active search',
+  wishlisted: 'Wishlisted',
+  purchased_similar: 'Prior purchase',
+};
+
 function BuyersTab({ item, offsetHours }: { item: ExchangeItem; offsetHours: number }) {
   const currentPrice = computeCurrentPrice(item, offsetHours);
   const sortedBuyers = [...item.matchedBuyers].sort((a, b) => b.matchScore - a.matchScore);
@@ -135,60 +147,69 @@ function BuyersTab({ item, offsetHours }: { item: ExchangeItem; offsetHours: num
         </div>
       </div>
 
-      {/* Current price context */}
       <p className="text-sm text-muted-foreground">
         All buyers below have been proactively notified about this item at{' '}
         <span className="font-semibold text-foreground">{formatINR(currentPrice)}</span> —{' '}
         before the return was even processed.
       </p>
 
-      {/* Buyer cards */}
+      {/* Buyer rows */}
       <div className="space-y-2">
-        {sortedBuyers.map((buyer, i) => (
-          <div
-            key={buyer.buyerId}
-            className="flex items-center gap-4 rounded-2xl bg-card p-4 ring-1 ring-border"
-          >
-            {/* Rank */}
-            <span className="w-5 text-center text-xs font-bold text-muted-foreground">{i + 1}</span>
+        {sortedBuyers.map((buyer, i) => {
+          const tier = accountTier(buyer.matchScore);
+          return (
+            <div key={buyer.buyerId} className="flex items-start gap-4 rounded-2xl bg-card p-4 ring-1 ring-border">
+              {/* Rank */}
+              <span className="mt-1 w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">{i + 1}</span>
 
-            {/* Avatar */}
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand/15 font-mono text-xs font-bold text-brand">
-              {buyer.avatar}
-            </div>
-
-            {/* Name + reason */}
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-foreground">{buyer.name}</p>
-              <p className="text-xs text-muted-foreground">{MATCH_REASON[buyer.matchReason]}</p>
-            </div>
-
-            {/* Distance */}
-            <div className="text-right">
-              <p className="text-sm font-semibold text-foreground">{buyer.distanceKm} km</p>
-              <p className="text-xs text-muted-foreground">away</p>
-            </div>
-
-            {/* Notified */}
-            <div className="text-right w-24">
-              <span className={`text-xs font-semibold ${buyer.responded ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-                {buyer.responded ? '✓ Responded' : 'Notified'}
-              </span>
-              <p className="text-[10px] text-muted-foreground">{minutesAgo(buyer.notifiedAt)}</p>
-            </div>
-
-            {/* Match score */}
-            <div className="text-right w-14">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-brand transition-all"
-                  style={{ width: `${buyer.matchScore * 100}%` }}
-                />
+              {/* User identity block */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-sm font-bold text-foreground">{buyer.buyerId}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${tier.cls}`}>{tier.label}</span>
+                  <span className={`text-xs font-semibold ${buyer.responded ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                    {buyer.responded ? '✓ Responded' : 'Notified'} · {minutesAgo(buyer.notifiedAt)}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {buyer.city ?? 'Local area'} · {buyer.distanceKm} km away
+                </p>
+                <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+                  {buyer.accountAgeDays !== undefined && (
+                    <span>Member {formatTenure(buyer.accountAgeDays)}</span>
+                  )}
+                  {buyer.totalOrders !== undefined && (
+                    <span className="flex items-center gap-1">
+                      <span className="text-muted-foreground/50">·</span>
+                      {buyer.totalOrders.toLocaleString()} orders
+                    </span>
+                  )}
+                  {buyer.buyerRating !== undefined && (
+                    <span className="flex items-center gap-1">
+                      <span className="text-muted-foreground/50">·</span>
+                      <span className="text-yellow-400">★</span> {buyer.buyerRating.toFixed(1)}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <span className="text-muted-foreground/50">·</span>
+                    {SIGNAL_LABEL[buyer.matchReason]}
+                  </span>
+                </div>
               </div>
-              <p className="mt-1 text-[10px] font-mono text-brand">{Math.round(buyer.matchScore * 100)}%</p>
+
+              {/* Match score */}
+              <div className="w-16 shrink-0 text-right">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full bg-brand transition-all"
+                    style={{ width: `${buyer.matchScore * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[10px] font-mono text-brand">{Math.round(buyer.matchScore * 100)}% match</p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -10,7 +10,6 @@ import {
 } from '@/lib/mocks/return-store';
 import { createLocalRoutingListing } from '@/lib/mocks/exchange-store';
 import { earnSeller } from '@/lib/credits-store';
-import type { ReturnRoutingDecision } from '@reloop/shared';
 import { Card } from '@/components/ui/card';
 
 interface Props {
@@ -24,17 +23,6 @@ const GRADE_STYLE: Record<string, string> = {
   Salvage: 'bg-danger/20 text-danger border-danger/30',
 };
 
-const DECISION_STYLE: Record<
-  ReturnRoutingDecision['decision'],
-  { label: string; cls: string; icon: string }
-> = {
-  local_resale: { label: 'Local Buyer Match', cls: 'bg-success/20 text-success border-success/30', icon: '🏡' },
-  refurbish: { label: 'Local Refurbishment', cls: 'bg-warning/20 text-warning border-warning/30', icon: '🔧' },
-  donate: { label: 'Local Donation', cls: 'bg-secondary text-foreground border-border', icon: '🤝' },
-  recycle: { label: 'Certified Recycling', cls: 'bg-brand/20 text-brand border-brand/30', icon: '♻️' },
-  warehouse: { label: 'Warehouse Return', cls: 'bg-secondary text-muted-foreground border-border', icon: '📦' },
-  return_to_seller: { label: 'Return to Seller', cls: 'bg-brand/20 text-brand border-brand/30', icon: '↩️' },
-};
 
 const STATUS_STYLE: Record<SubmittedReturn['status'], { label: string; cls: string }> = {
   pending_seller_approval: { label: 'Needs your approval', cls: 'bg-warning/20 text-warning' },
@@ -255,10 +243,7 @@ export function SellerReturnDetail({ returnId }: Props) {
   const grading = ret.gradingResult;
   const routing = ret.routingDecision;
   const status = STATUS_STYLE[ret.status];
-  const decisionStyle = routing ? DECISION_STYLE[routing.decision] : null;
   const gradeCls = grading?.grade ? GRADE_STYLE[grading.grade] : 'bg-secondary text-muted-foreground border-border';
-  const isLocal = routing && routing.decision !== 'warehouse' && routing.decision !== 'return_to_seller';
-  const fallbackLabels = routing?.fallbackChain.map((d) => DECISION_STYLE[d]?.label ?? d) ?? [];
   const ecoCredits = computeEcoCredits(ret.category, ret.priceCents);
 
   const isPendingApproval = ret.status === 'pending_seller_approval';
@@ -620,112 +605,6 @@ export function SellerReturnDetail({ returnId }: Props) {
           )}
         </Card>
 
-        {/* ── Intelligent Bridge — only visible after seller approves ── */}
-        {(isSellerApproved || isDealComplete) && <Card>
-          <p className="mb-5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            Intelligent Bridge — routing decision
-          </p>
-
-          {routing && decisionStyle ? (
-            <div className="space-y-5">
-              <div className={`flex items-center gap-3 rounded-xl border px-5 py-4 ${decisionStyle.cls}`}>
-                <span className="text-2xl">{decisionStyle.icon}</span>
-                <span className="text-xl font-bold">{decisionStyle.label}</span>
-              </div>
-
-              {routing.decision === 'local_resale' && routing.nearbyBuyers !== undefined && (
-                <div className="rounded-xl border border-success/30 bg-success/10 p-4 space-y-3">
-                  <p className="font-semibold text-success">
-                    {routing.nearbyBuyers} verified buyers within {routing.radiusKm}km
-                  </p>
-                  {routing.warehouseDistanceKm !== undefined && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg bg-card p-3 text-center">
-                        <p className="text-xs text-muted-foreground">Local route</p>
-                        <p className="mt-1 text-xl font-bold text-success">{routing.radiusKm}km</p>
-                        {routing.localMargin !== undefined && (
-                          <p className="text-xs text-success">+{formatPrice(routing.localMargin)} recovered</p>
-                        )}
-                      </div>
-                      <div className="rounded-lg bg-card p-3 text-center">
-                        <p className="text-xs text-muted-foreground">Warehouse route</p>
-                        <p className="mt-1 text-xl font-bold text-danger">{routing.warehouseDistanceKm}km</p>
-                        {routing.warehouseMargin !== undefined && (
-                          <p className="text-xs text-danger">{formatPrice(Math.abs(routing.warehouseMargin))} loss</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {routing.decision === 'refurbish' && (
-                <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 space-y-2">
-                  <p className="font-semibold text-warning">
-                    Certified refurbishment partner{routing.radiusKm ? ` ${routing.radiusKm}km away` : ' nearby'}
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {routing.localMargin !== undefined && (
-                      <div className="rounded-lg bg-card p-3 text-center">
-                        <p className="text-xs text-muted-foreground">Local margin</p>
-                        <p className="mt-1 text-lg font-bold text-success">+{formatPrice(routing.localMargin)}</p>
-                      </div>
-                    )}
-                    {routing.warehouseMargin !== undefined && (
-                      <div className="rounded-lg bg-card p-3 text-center">
-                        <p className="text-xs text-muted-foreground">Warehouse margin</p>
-                        <p className="mt-1 text-lg font-bold text-danger">−{formatPrice(Math.abs(routing.warehouseMargin))}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {routing.decision === 'donate' && (
-                <div className="rounded-xl border border-border bg-secondary p-4">
-                  <p className="text-sm text-muted-foreground">
-                    Local resale margin below viability threshold. 2 NGO partners nearby accept this category.
-                    Donation avoids {routing.warehouseDistanceKm}km warehouse freight.
-                  </p>
-                </div>
-              )}
-
-              {routing.decision === 'recycle' && (
-                <div className="flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/5 p-4">
-                  <span className="text-xl">♻️</span>
-                  <p className="text-sm text-muted-foreground">Certified local recycler. Zero landfill guaranteed.</p>
-                </div>
-              )}
-
-              <div className="rounded-lg border-l-4 border-border bg-secondary p-4">
-                <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  AI reasoning
-                </p>
-                <p className="text-sm leading-relaxed text-muted-foreground">{routing.reasoning}</p>
-              </div>
-
-              {routing.co2SavedKg > 0 && (
-                <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 px-5 py-3">
-                  <span className="text-xl">🌿</span>
-                  <div>
-                    <p className="font-semibold text-success">{routing.co2SavedKg}kg CO₂ avoided</p>
-                    <p className="text-xs text-muted-foreground">vs. a warehouse round-trip for this item</p>
-                  </div>
-                </div>
-              )}
-
-              {isLocal && fallbackLabels.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  If unmatched in {routing.dwellBudgetHours}h → {fallbackLabels.join(' → ')}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-border bg-secondary p-4">
-              <p className="text-sm text-muted-foreground">Routing decision pending.</p>
-            </div>
-          )}
-        </Card>}
 
         {/* ── Economic summary — only visible after seller approves ── */}
         {(isSellerApproved || isDealComplete) && routing && (routing.localMargin !== undefined || routing.warehouseMargin !== undefined) && (

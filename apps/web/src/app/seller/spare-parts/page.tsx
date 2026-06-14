@@ -31,6 +31,7 @@ interface Product {
   name: string;
   returnId: string;
   imageUrl: string;
+  internalImageUrl?: string;
   category: string;
   grade: 'C' | 'Salvage';
   issue: string;
@@ -47,15 +48,16 @@ const INITIAL_PRODUCTS: Product[] = [
     id: 'sp-q1',
     name: 'Sony WH-1000XM5 Headphones',
     returnId: 'RET-2026-900001',
-    imageUrl: '/catalog/sony-headphones.jpg',
+    imageUrl: '/catalog/wh1000xm5.jpg',
+    internalImageUrl: '/catalog/wh1000xm5-pcb.jpg',
     category: 'Audio',
     grade: 'Salvage',
     issue: 'Left ear cup cracked — internal circuit exposed to moisture',
     aiReasoning:
       'Multimodal scan detected irreparable damage on left ear assembly (73% fractured). Right ear unit, ANC chip, and headband pass functional verification.',
     damageAreas: [
-      { label: 'Left ear crack', x: 3, y: 35, w: 38, h: 38, severity: 'critical' },
-      { label: 'Moisture ingress', x: 6, y: 55, w: 25, h: 15, severity: 'moderate' },
+      { label: 'Driver membrane', x: 20, y: 14, w: 58, h: 64, severity: 'critical' },
+      { label: 'Flex cable — moisture', x: 32, y: 70, w: 34, h: 22, severity: 'moderate' },
     ],
     parts: [
       { id: 'q1p1', name: 'Right Ear Cup Assembly', price: 2800, condition: 'Excellent', confidence: 0.94, status: 'available' },
@@ -66,30 +68,6 @@ const INITIAL_PRODUCTS: Product[] = [
     ],
     status: 'queued',
     totalValue: 6250,
-  },
-  {
-    id: 'sp-q2',
-    name: 'Canon EOS 800D DSLR',
-    returnId: 'RET-2026-900002',
-    imageUrl: '/catalog/canon-camera.jpg',
-    category: 'Camera',
-    grade: 'Salvage',
-    issue: 'Sensor cracked — shutter mechanism permanently jammed',
-    aiReasoning:
-      'Imaging sensor confirmed non-recoverable. EF lens mount, flash unit, LCD, and battery module show no damage. High-value parts extraction viable.',
-    damageAreas: [
-      { label: 'Cracked sensor', x: 30, y: 18, w: 38, h: 38, severity: 'critical' },
-      { label: 'Jammed shutter', x: 35, y: 24, w: 26, h: 22, severity: 'critical' },
-    ],
-    parts: [
-      { id: 'q2p1', name: 'EF Lens Mount Assembly', price: 3100, condition: 'Excellent', confidence: 0.97, status: 'available' },
-      { id: 'q2p2', name: 'Flash Unit + Hot Shoe', price: 1200, condition: 'Good', confidence: 0.90, status: 'available' },
-      { id: 'q2p3', name: 'LP-E17 Battery Pack', price: 850, condition: 'Excellent', confidence: 0.93, status: 'available' },
-      { id: 'q2p4', name: 'LCD Screen (3")', price: 1600, condition: 'Good', confidence: 0.88, status: 'available' },
-      { id: 'q2p5', name: 'Body Cap + Strap', price: 250, condition: 'Excellent', confidence: 0.99, status: 'available' },
-    ],
-    status: 'queued',
-    totalValue: 7000,
   },
   {
     id: 'sp-q3',
@@ -493,20 +471,20 @@ export default function SparePartsPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 divide-x divide-border/60">
+              <div className="grid grid-cols-2 divide-x divide-border/60" style={{ height: 460 }}>
                 {/* Left: Image + damage overlay + revealed parts */}
-                <div className="flex flex-col gap-4 p-5">
+                <div className="flex flex-col gap-4 overflow-y-auto p-5">
                   <div>
                     <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                       Product Image — Damage Detection
                     </p>
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-secondary ring-1 ring-border">
-                      {analyzingProduct.imageUrl ? (
+                    <div className="relative h-40 overflow-hidden rounded-xl bg-secondary ring-1 ring-border">
+                      {(analyzingProduct.internalImageUrl ?? analyzingProduct.imageUrl) ? (
                         <Image
-                          src={analyzingProduct.imageUrl}
-                          alt={analyzingProduct.name}
+                          src={analyzingProduct.internalImageUrl ?? analyzingProduct.imageUrl}
+                          alt={`${analyzingProduct.name} — internal view`}
                           fill
-                          className="object-cover"
+                          className="object-cover object-center"
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-5xl text-muted-foreground">
@@ -539,74 +517,63 @@ export default function SparePartsPage() {
                         />
                       )}
 
-                      {/* Damage area overlays */}
+                      {/* Damage area overlays — corner-bracket detection markers */}
                       {damageVisible &&
-                        analyzingProduct.damageAreas.map((area, i) => (
-                          <div
-                            key={i}
-                            className="pointer-events-none absolute rounded border-2"
-                            style={{
-                              left: `${area.x}%`,
-                              top: `${area.y}%`,
-                              width: `${area.w}%`,
-                              height: `${area.h}%`,
-                              borderColor:
-                                area.severity === 'critical'
-                                  ? 'rgb(239 68 68)'
-                                  : 'rgb(251 146 60)',
-                              backgroundColor:
-                                area.severity === 'critical'
-                                  ? 'rgba(239, 68, 68, 0.15)'
-                                  : 'rgba(251, 146, 60, 0.1)',
-                              animation: 'fade-in 0.5s ease both',
-                              animationDelay: `${i * 300}ms`,
-                            }}
-                          >
-                            <span
-                              className="absolute -top-5 left-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold text-white"
+                        analyzingProduct.damageAreas.map((area, i) => {
+                          const isCritical = area.severity === 'critical';
+                          const color = isCritical ? '#ef4444' : '#fb923c';
+                          return (
+                            <div
+                              key={i}
+                              className="pointer-events-none absolute"
                               style={{
-                                backgroundColor:
-                                  area.severity === 'critical'
-                                    ? 'rgb(239 68 68)'
-                                    : 'rgb(251 146 60)',
+                                left: `${area.x}%`,
+                                top: `${area.y}%`,
+                                width: `${area.w}%`,
+                                height: `${area.h}%`,
+                                animation: 'fade-in 0.5s ease both',
+                                animationDelay: `${i * 400}ms`,
                               }}
                             >
-                              {area.label}
-                            </span>
-                          </div>
-                        ))}
+                              {/* Radial glow fill */}
+                              <div
+                                className="absolute inset-0"
+                                style={{
+                                  background: `radial-gradient(ellipse at 50% 50%, ${isCritical ? 'rgba(239,68,68,0.22)' : 'rgba(251,146,60,0.18)'} 0%, transparent 70%)`,
+                                }}
+                              />
+                              {/* Corner brackets */}
+                              <div className="absolute left-0 top-0 h-3 w-3" style={{ borderTop: `2px solid ${color}`, borderLeft: `2px solid ${color}` }} />
+                              <div className="absolute right-0 top-0 h-3 w-3" style={{ borderTop: `2px solid ${color}`, borderRight: `2px solid ${color}` }} />
+                              <div className="absolute bottom-0 left-0 h-3 w-3" style={{ borderBottom: `2px solid ${color}`, borderLeft: `2px solid ${color}` }} />
+                              <div className="absolute bottom-0 right-0 h-3 w-3" style={{ borderBottom: `2px solid ${color}`, borderRight: `2px solid ${color}` }} />
+                              {/* Centre pulse dot */}
+                              <div
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                                style={{ width: 8, height: 8 }}
+                              >
+                                <span
+                                  className="absolute inset-0 animate-ping rounded-full"
+                                  style={{ backgroundColor: color, opacity: 0.5 }}
+                                />
+                                <span
+                                  className="absolute inset-0 rounded-full"
+                                  style={{ backgroundColor: color, boxShadow: `0 0 6px 2px ${color}60` }}
+                                />
+                              </div>
+                              {/* Label */}
+                              <div
+                                className="absolute -top-5 left-0 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-[9px] font-bold text-white"
+                                style={{ backgroundColor: color }}
+                              >
+                                {area.label}
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
 
-                  {/* Damage legend */}
-                  {damageVisible && analyzingProduct.damageAreas.length > 0 && (
-                    <div
-                      className="flex flex-col gap-1.5"
-                      style={{ animation: 'fade-in 0.4s ease both' }}
-                    >
-                      {analyzingProduct.damageAreas.map((area, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs">
-                          <div
-                            className="size-2.5 rounded-sm"
-                            style={{
-                              backgroundColor:
-                                area.severity === 'critical'
-                                  ? 'rgb(239 68 68)'
-                                  : 'rgb(251 146 60)',
-                            }}
-                          />
-                          <span className="text-muted-foreground">{area.label}</span>
-                          <span
-                            className={`ml-auto font-semibold ${
-                              area.severity === 'critical' ? 'text-red-400' : 'text-orange-400'
-                            }`}
-                          >
-                            {area.severity}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
                   {/* Revealed parts list */}
                   {visiblePartIds.size > 0 && (
@@ -635,7 +602,7 @@ export default function SparePartsPage() {
                 </div>
 
                 {/* Right: Step tracker + log terminal */}
-                <div className="flex flex-col gap-5 p-5">
+                <div className="flex flex-col gap-5 overflow-y-auto p-5">
                   {/* Step tracker */}
                   <div>
                     <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -707,27 +674,30 @@ export default function SparePartsPage() {
                     </div>
                   </div>
 
-                  {/* Complete banner */}
-                  {analysisStep === 'complete' && (
-                    <div
-                      className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-center"
-                      style={{ animation: 'fade-up 0.5s ease both' }}
-                    >
-                      <p className="font-semibold text-green-400">Analysis Complete</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {analyzingProduct.parts.length} parts listed ·{' '}
-                        {formatINR(analyzingProduct.totalValue)} recovered
-                      </p>
-                      <button
-                        onClick={handleViewListed}
-                        className="mt-3 rounded-lg bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground transition-colors hover:bg-brand/90"
-                      >
-                        View Listed Parts →
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
+
+              {/* Complete banner — outside the fixed-height grid so the page never jumps */}
+              {analysisStep === 'complete' && (
+                <div
+                  className="flex items-center justify-between border-t border-green-500/20 bg-green-500/5 px-6 py-4"
+                  style={{ animation: 'fade-up 0.4s ease both' }}
+                >
+                  <div>
+                    <p className="font-semibold text-green-400">✓ Analysis Complete</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {analyzingProduct.parts.length} parts identified ·{' '}
+                      {formatINR(analyzingProduct.totalValue)} recoverable value
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleViewListed}
+                    className="rounded-lg bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground transition-colors hover:bg-brand/90"
+                  >
+                    View Listed Parts →
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -801,9 +771,8 @@ export default function SparePartsPage() {
                       </span>
                       <button
                         onClick={() => startAnalysis(product)}
-                        className="ml-auto flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground transition-colors hover:bg-brand/90"
+                        className="ml-auto rounded-lg bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground transition-colors hover:bg-brand/90"
                       >
-                        <span>🤖</span>
                         Analyze with AI
                       </button>
                     </div>
