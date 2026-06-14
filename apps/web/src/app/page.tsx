@@ -82,6 +82,7 @@ function Hero() {
                   strokeWidth="2"
                   fill="none"
                   strokeLinecap="round"
+                  className="underline-draw"
                 />
               </svg>
             </span>

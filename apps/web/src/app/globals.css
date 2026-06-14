@@ -122,3 +122,15 @@
   0%   { top: -2px; }
   100% { top: 100%; }
 }
+@keyframes underline-draw {
+  0%   { stroke-dashoffset: 210; opacity: 1; }
+  50%  { stroke-dashoffset: 0;   opacity: 1; }
+  75%  { stroke-dashoffset: 0;   opacity: 1; }
+  90%  { stroke-dashoffset: 0;   opacity: 0; }
+  100% { stroke-dashoffset: 210; opacity: 0; }
+}
+.underline-draw {
+  stroke-dasharray: 210;
+  stroke-dashoffset: 210;
+  animation: underline-draw 3.5s ease-in-out infinite;
+}
