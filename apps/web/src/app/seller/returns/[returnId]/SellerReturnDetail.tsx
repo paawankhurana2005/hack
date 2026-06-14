@@ -8,6 +8,7 @@ import {
   completeDeal,
   type SubmittedReturn,
 } from '@/lib/mocks/return-store';
+import { createLocalRoutingListing } from '@/lib/mocks/exchange-store';
 import { earnSeller } from '@/lib/credits-store';
 import type { ReturnRoutingDecision } from '@reloop/shared';
 import { Card } from '@/components/ui/card';
@@ -267,10 +268,27 @@ export function SellerReturnDetail({ returnId }: Props) {
   function handleApprove() {
     if (!ret || ret === 'loading') return;
     const currentRet = ret;
+    const currentGrading = grading;
+    const currentRouting = routing;
     setApproving(true);
     setTimeout(() => {
       const updated = approveReturn(currentRet.returnId);
-      if (updated) setRet(updated);
+      if (updated) {
+        setRet(updated);
+        if (currentRouting?.decision === 'local_resale' && currentGrading?.grade && currentGrading.grade !== 'Salvage') {
+          createLocalRoutingListing({
+            returnId: currentRet.returnId,
+            productName: currentRet.productName,
+            category: currentRet.category,
+            grade: currentGrading.grade as 'A' | 'B' | 'C',
+            priceCents: currentRet.priceCents,
+            nearbyBuyers: currentRouting.nearbyBuyers ?? 4,
+            radiusKm: currentRouting.radiusKm ?? 5,
+            co2SavedKg: currentRouting.co2SavedKg ?? 2.4,
+            distanceSavedKm: currentRouting.warehouseDistanceKm ?? 580,
+          });
+        }
+      }
       setApproving(false);
     }, 600);
   }
@@ -306,120 +324,113 @@ export function SellerReturnDetail({ returnId }: Props) {
           ← Returns queue
         </Link>
 
-        {/* Product photo carousel */}
-        {ret.photoUrls && ret.photoUrls.length > 0 ? (() => {
-          const photos = ret.photoUrls!;
+        {/* Product header — image left, info right (Amazon-style) */}
+        {(() => {
+          const photos = ret.photoUrls ?? [];
           const total = photos.length;
+          const safeIdx = Math.min(photoIdx, total - 1);
           const prev = () => setPhotoIdx((i) => (i - 1 + total) % total);
           const next = () => setPhotoIdx((i) => (i + 1) % total);
-          const safeIdx = Math.min(photoIdx, total - 1);
+
           return (
-            <div className="overflow-hidden rounded-2xl border border-border bg-card">
-              {/* Image frame */}
-              <div className="relative h-56 w-full bg-black/80 sm:h-64">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  key={safeIdx}
-                  src={photos[safeIdx]}
-                  alt={`${ret.productName} — photo ${safeIdx + 1} of ${total}`}
-                  className="h-full w-full object-contain"
-                />
-
-                {/* Prev / Next arrows — only if multiple photos */}
-                {total > 1 && (
+            <div className="flex overflow-hidden rounded-2xl border border-border bg-card">
+              {/* LEFT — image */}
+              <div className="relative w-72 shrink-0 bg-secondary/40">
+                {total > 0 ? (
                   <>
-                    <button
-                      type="button"
-                      onClick={prev}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
-                      aria-label="Previous photo"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      onClick={next}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
-                      aria-label="Next photo"
-                    >
-                      ›
-                    </button>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      key={safeIdx}
+                      src={photos[safeIdx]}
+                      alt={`${ret.productName} — photo ${safeIdx + 1} of ${total}`}
+                      className="h-full min-h-64 w-full object-contain"
+                    />
+                    {total > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={prev}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
+                          aria-label="Previous photo"
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          onClick={next}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
+                          aria-label="Next photo"
+                        >
+                          ›
+                        </button>
+                        <div className="absolute left-3 top-3 rounded-full bg-black/50 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
+                          {safeIdx + 1} / {total}
+                        </div>
+                      </>
+                    )}
+                    {/* Dot indicators */}
+                    {total > 1 && (
+                      <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                        {photos.map((_, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setPhotoIdx(i)}
+                            className={`h-1.5 rounded-full transition-all ${i === safeIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/40 hover:bg-white/70'}`}
+                            aria-label={`Photo ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </>
-                )}
-
-                {/* Grade badge */}
-                {grading?.grade && (
-                  <div className={`absolute right-4 top-4 flex flex-col items-center rounded-xl border-2 px-3 py-1.5 backdrop-blur-sm ${gradeCls}`}>
-                    <span className="font-mono text-[9px] uppercase leading-none opacity-80">Grade</span>
-                    <span className="text-2xl font-bold leading-tight">{grading.grade}</span>
-                  </div>
-                )}
-
-                {/* Photo counter badge */}
-                {total > 1 && (
-                  <div className="absolute left-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                    {safeIdx + 1} / {total}
+                ) : (
+                  <div className="flex h-full min-h-64 w-full items-center justify-center text-5xl text-muted-foreground">
+                    📦
                   </div>
                 )}
               </div>
 
-              {/* Dot indicators + meta row */}
-              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+              {/* RIGHT — product info */}
+              <div className="flex flex-1 flex-col justify-between p-6">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {total} photo{total !== 1 ? 's' : ''} submitted by buyer
+                    Return detail
                   </p>
                   <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                    {ret.returnId} · {formatDateTime(ret.submittedAt)}
+                    {ret.returnId} · {ret.category}
+                  </p>
+                  <h1 className="mt-3 text-2xl font-semibold leading-snug tracking-tight text-foreground">
+                    {ret.productName}
+                  </h1>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {grading?.grade && (
+                      <span className={`rounded-xl border-2 px-3 py-1 text-sm font-bold tracking-wide ${gradeCls}`}>
+                        Grade {grading.grade}
+                      </span>
+                    )}
+                    <span className={`rounded-lg px-3 py-1 text-xs font-semibold ${status.cls}`}>
+                      {status.label}
+                    </span>
+                  </div>
+
+                  <p className="mt-4 text-2xl font-bold text-brand tabular-nums">
+                    {formatPrice(ret.priceCents)}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  {/* Dot indicators */}
-                  {total > 1 && (
-                    <div className="flex gap-1.5">
-                      {photos.map((_, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setPhotoIdx(i)}
-                          className={`h-2 rounded-full transition-all ${i === safeIdx ? 'w-5 bg-brand' : 'w-2 bg-border hover:bg-muted-foreground'}`}
-                          aria-label={`Photo ${i + 1}`}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  <span className={`rounded-lg px-3 py-1 text-xs font-semibold ${status.cls}`}>
-                    {status.label}
-                  </span>
-                  <span className="text-lg font-semibold text-brand">{formatPrice(ret.priceCents)}</span>
-                </div>
-              </div>
 
-              {/* Product name strip */}
-              <div className="border-t border-border px-5 pb-4 pt-3">
-                <h1 className="text-xl font-semibold tracking-tight text-foreground">{ret.productName}</h1>
+                <div className="mt-6 border-t border-border pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    Submitted {formatDateTime(ret.submittedAt)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {total > 0 ? `${total} photo${total !== 1 ? 's' : ''} submitted by buyer` : `${ret.photoCount} photo${ret.photoCount !== 1 ? 's' : ''} — graded in person at pickup`}
+                  </p>
+                </div>
               </div>
             </div>
           );
-        })() : (
-          /* No photo — classic header */
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <span className="font-mono text-xs uppercase tracking-widest text-brand">Return detail</span>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">{ret.productName}</h1>
-              <p className="mt-1 font-mono text-sm text-muted-foreground">{ret.returnId}</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Submitted {formatDateTime(ret.submittedAt)} · {ret.photoCount} photo{ret.photoCount !== 1 ? 's' : ''}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`rounded-lg px-3 py-1 text-xs font-semibold ${status.cls}`}>
-                {status.label}
-              </span>
-              <span className="text-lg font-semibold text-brand">{formatPrice(ret.priceCents)}</span>
-            </div>
-          </div>
-        )}
+        })()}
 
         {/* ── Deal complete celebration ── */}
         {isDealComplete && (
@@ -469,43 +480,26 @@ export function SellerReturnDetail({ returnId }: Props) {
                   Action required
                 </p>
                 <p className="mt-1 text-xl font-bold text-foreground">
-                  Approve local routing for this Grade A item
+                  Approve for local listing
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  AI has matched{' '}
-                  <span className="font-semibold text-foreground">
-                    {routing.nearbyBuyers} verified buyers within {routing.radiusKm}km
-                  </span>{' '}
-                  ready for this item. Approve to route it — no warehouse trip needed.
+                  This item has been AI-graded as{' '}
+                  <span className="font-semibold text-foreground">Grade {grading?.grade}</span>.
+                  Approving creates a local listing — the rescue pipeline will handle pricing and buyer matching. No warehouse trip needed.
                 </p>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl border border-border bg-card p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Nearby buyers</p>
-                    <p className="mt-1 text-lg font-bold text-foreground">{routing.nearbyBuyers}</p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-card p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Radius</p>
-                    <p className="mt-1 text-lg font-bold text-foreground">{routing.radiusKm}km</p>
-                  </div>
+                <div className="mt-4 flex flex-wrap gap-3">
                   {routing.localMargin !== undefined && (
-                    <div className="rounded-xl border border-success/30 bg-success/10 p-3 text-center">
-                      <p className="text-xs text-muted-foreground">Value recovered</p>
+                    <div className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-center">
+                      <p className="text-xs text-muted-foreground">Est. value recovered</p>
                       <p className="mt-1 text-lg font-bold text-success">+{formatPrice(routing.localMargin)}</p>
                     </div>
                   )}
-                  <div className="rounded-xl border border-border bg-card p-3 text-center">
-                    <p className="text-xs text-muted-foreground">CO₂ saved</p>
-                    <p className="mt-1 text-lg font-bold text-foreground">{routing.co2SavedKg}kg</p>
+                  <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
+                    <p className="text-xs text-muted-foreground">CO₂ avoided</p>
+                    <p className="mt-1 text-lg font-bold text-foreground">{routing.co2SavedKg} kg</p>
                   </div>
                 </div>
-
-                {routing.warehouseDistanceKm !== undefined && routing.warehouseMargin !== undefined && (
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    vs. warehouse: {routing.warehouseDistanceKm}km freight,{' '}
-                    {formatPrice(Math.abs(routing.warehouseMargin))} net loss
-                  </p>
-                )}
 
                 <div className="mt-5 flex flex-wrap gap-3">
                   <button
@@ -514,7 +508,7 @@ export function SellerReturnDetail({ returnId }: Props) {
                     onClick={handleApprove}
                     className="flex-1 rounded-xl bg-success px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60 sm:flex-none"
                   >
-                    {approving ? 'Routing…' : 'Approve & Route to Buyer'}
+                    {approving ? 'Creating listing…' : 'Approve for Local Listing'}
                   </button>
                   <button
                     type="button"
@@ -537,16 +531,19 @@ export function SellerReturnDetail({ returnId }: Props) {
                 ✓
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-foreground">Approved — routing to local buyer</p>
+                <p className="font-semibold text-foreground">Local listing created</p>
                 {ret.sellerApprovedAt && (
                   <p className="text-xs text-muted-foreground">
                     Approved {formatDateTime(ret.sellerApprovedAt)}
                   </p>
                 )}
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Amazon is matching this item to{' '}
-                  {routing?.nearbyBuyers ? `${routing.nearbyBuyers} nearby buyers` : 'local buyers'}.
-                  You'll be notified when the deal closes.
+                  The rescue pipeline is now finding a local buyer and adjusting pricing.
+                  Track progress in{' '}
+                  <Link href="/seller/listings" className="font-semibold text-success hover:underline">
+                    My Listings
+                  </Link>
+                  .
                 </p>
               </div>
             </div>
