@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getLocalRoutingListings, type ExchangeItem } from '@/lib/mocks/exchange-store';
 
@@ -22,6 +23,7 @@ interface RegularListing {
   sku: string;
   productName: string;
   category: string;
+  imageUrl: string;
   priceCents: number;
   stock: number;
   unitsSold: number;
@@ -39,6 +41,7 @@ const REGULAR_LISTINGS: RegularListing[] = [
     sku: 'BOAT-AIR-141-BLK',
     productName: 'boAt Airdopes 141 — True Wireless Earbuds (Black)',
     category: 'Electronics',
+    imageUrl: '/catalog/boat-headphones.jpg',
     priceCents: 149900,
     stock: 24,
     unitsSold: 138,
@@ -52,6 +55,7 @@ const REGULAR_LISTINGS: RegularListing[] = [
     sku: 'IPOT-DUO-3L-SS',
     productName: 'Instant Pot Duo 7-in-1 Electric Pressure Cooker (3L)',
     category: 'Kitchen & Home',
+    imageUrl: '/catalog/instant-pot.jpg',
     priceCents: 699900,
     stock: 8,
     unitsSold: 45,
@@ -65,6 +69,7 @@ const REGULAR_LISTINGS: RegularListing[] = [
     sku: 'LEV-511-32x30-BLU',
     productName: "Levi's 511 Slim Fit Jeans — Mid-Wash Blue (32×30)",
     category: 'Apparel',
+    imageUrl: '/catalog/levis-jeans.jpg',
     priceCents: 349900,
     stock: 0,
     unitsSold: 212,
@@ -78,6 +83,7 @@ const REGULAR_LISTINGS: RegularListing[] = [
     sku: 'PHIL-HUE-STARTER-4',
     productName: 'Philips Hue White & Colour Ambiance Starter Kit (4 Bulbs)',
     category: 'Smart Home',
+    imageUrl: '/catalog/philips-hue.jpg',
     priceCents: 1299900,
     stock: 3,
     unitsSold: 19,
@@ -91,6 +97,7 @@ const REGULAR_LISTINGS: RegularListing[] = [
     sku: 'WILD-STONE-ULTRA-100ML',
     productName: 'Wildstone Ultra Aqua Body Perfume (100ml)',
     category: 'Beauty & Grooming',
+    imageUrl: '/catalog/wildstone-perfume.jpg',
     priceCents: 39900,
     stock: 0,
     unitsSold: 604,
@@ -135,12 +142,13 @@ function RegularListingsTable({ listings }: { listings: RegularListing[] }) {
               {/* Product */}
               <div className="min-w-0">
                 <div className="flex items-center gap-3">
-                  {/* Placeholder image box */}
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-lg">
-                    {l.category === 'Electronics' ? '🎧' :
-                     l.category === 'Kitchen & Home' ? '🍲' :
-                     l.category === 'Apparel' ? '👖' :
-                     l.category === 'Smart Home' ? '💡' : '🧴'}
+                  <div className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-secondary ring-1 ring-border">
+                    <Image
+                      src={l.imageUrl}
+                      alt={l.productName}
+                      fill
+                      className="object-cover"
+                    />
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">{l.productName}</p>
