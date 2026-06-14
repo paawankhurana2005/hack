@@ -1,0 +1,32 @@
+# Render Blueprint for the ReLoop API (apps/api).
+# Deploy: Render Dashboard → New → Blueprint → pick this repo. Render reads this
+# file, creates the service, and prompts for the secret env vars marked sync:false.
+services:
+  - type: web
+    name: reloop-api
+    runtime: node
+    plan: free
+    region: singapore # closest to India; change if you prefer
+    rootDir: . # the pnpm workspace root (we filter to the api package)
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: pnpm --filter @reloop/api start:prod
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # NVIDIA-hosted inference key — REQUIRED (config.ts exits without it).
+      # Set this in the Render dashboard; never commit it.
+      - key: NVIDIA_API_KEY
+        sync: false
+      # The deployed web origin (your Vercel URL), for CORS. e.g.
+      # https://reloop.vercel.app  — set after the Vercel deploy is live.
+      - key: WEB_ORIGIN
+        sync: false
+      # Optional model/url overrides (sensible defaults live in config.ts):
+      # - key: NVIDIA_BASE_URL
+      #   value: https://integrate.api.nvidia.com/v1
+      # - key: GRADING_MODEL
+      #   value: meta/llama-3.2-90b-vision-instruct
+      # - key: PRICING_MODEL
+      #   value: meta/llama-3.3-70b-instruct

@@ -66,32 +66,33 @@ export const pegasusListing: CasualListing = {
   market: PEGASUS_MARKET,
 };
 
-// The unsellable case: a well-worn pair. The market wants ₹1,000 but our floor is
-// ₹1,100 — the agent can't profitably reach the market and, with low demand even
-// city-wide, recommends recycling instead of holding it forever.
-const WORN_RUNNERS_MARKET: MarketContext = {
-  comparableCents: 100000, // ₹1,000 — BELOW our floor
+// The unsellable case: a cheap, well-worn pair of wired earphones. The market
+// wants ₹220 but our floor is ₹300 — the agent can't profitably reach the market
+// and, with low demand even city-wide, recommends recycling (e-waste) instead of
+// holding it forever.
+const WORN_EARPHONES_MARKET: MarketContext = {
+  comparableCents: 22000, // ₹220 — BELOW our floor
   localDemand: 'low',
-  holdingCostPerDayCents: 7000, // ₹70/day
+  holdingCostPerDayCents: 2500, // ₹25/day
   baseViewsPerDay: 5,
 };
 
-export const wornRunnersListing: CasualListing = {
+export const wornEarphonesListing: CasualListing = {
   id: 'lst_worn_runners',
-  itemId: 'itm_worn_runners',
-  title: 'Worn Running Shoes · 3 yrs',
-  imageUrl: '/catalog/worn-runners.jpg',
-  listedPrice: inr(180000), // ₹1,800
+  itemId: 'itm_worn_earphones',
+  title: 'Wired Earphones · 4 yrs',
+  imageUrl: '/catalog/earphones.jpg',
+  listedPrice: inr(45000), // ₹450
   status: 'listed',
   views: 4,
   listedAt: '2025-06-09T09:00:00.000Z',
   sellerId: 'user_aarav',
   sellerName: 'Aarav Shah',
-  category: 'sports',
+  category: 'electronics',
   grade: 'poor',
-  floorCents: 110000, // ₹1,100 — lowest sustainable resale
-  retailCents: 450000, // ₹4,500
-  market: WORN_RUNNERS_MARKET,
+  floorCents: 30000, // ₹300 — lowest sustainable resale
+  retailCents: 99900, // ₹999
+  market: WORN_EARPHONES_MARKET,
 };
 
 // Other users' listings — each is a Shop catalog item assigned to a real user, so
@@ -113,7 +114,7 @@ export const watchListing = listingFromShop('shop_watch', 'user_rohan', 'Rohan V
 
 /** Seed listings shown for the demo (newest-feeling first). */
 export const seedListings: CasualListing[] = [
-  wornRunnersListing,
+  wornEarphonesListing,
   pegasusListing,
   sonyListing,
   coachListing,

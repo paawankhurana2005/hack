@@ -19,8 +19,19 @@ export function AppNav() {
   return (
     <div className="border-b border-border/60 bg-card/30 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <nav className="flex items-center gap-6">
-          {tabs.map((t) => {
+        <div className="flex items-center gap-6">
+          <Link href="/" aria-label="ReLoop home" className="group flex items-center gap-2.5">
+            <div className="relative grid size-6 place-items-center rounded-full bg-brand">
+              <div className="size-2.5 rounded-full border-2 border-brand-foreground" />
+              <div className="absolute inset-0 rounded-full bg-brand opacity-50 blur-md transition-opacity group-hover:opacity-90" />
+            </div>
+            <span className="hidden font-semibold tracking-tight text-foreground sm:inline">
+              ReLoop
+            </span>
+          </Link>
+          <span className="h-5 w-px bg-border/60" />
+          <nav className="flex items-center gap-6">
+            {tabs.map((t) => {
             const active = pathname === t.href || pathname.startsWith(`${t.href}/`);
             return (
               <Link
@@ -30,11 +41,12 @@ export function AppNav() {
                   active ? 'text-brand' : 'text-muted-foreground'
                 }`}
               >
-                {t.label}
-              </Link>
-            );
-          })}
-        </nav>
+                  {t.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
         <div className="flex items-center gap-3">
           {account && (
             <span className="hidden items-center gap-2 sm:flex">
