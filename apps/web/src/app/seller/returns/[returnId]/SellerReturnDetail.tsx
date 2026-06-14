@@ -286,6 +286,7 @@ export function SellerReturnDetail({ returnId }: Props) {
             radiusKm: currentRouting.radiusKm ?? 5,
             co2SavedKg: currentRouting.co2SavedKg ?? 2.4,
             distanceSavedKm: currentRouting.warehouseDistanceKm ?? 580,
+            imageUrl: currentRet.photoUrls?.[0],
           });
         }
       }

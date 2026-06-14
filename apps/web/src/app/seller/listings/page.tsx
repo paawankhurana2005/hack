@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { getLocalRoutingListings, type ExchangeItem } from '@/lib/mocks/exchange-store';
+import { getReturnById } from '@/lib/mocks/return-store';
 
 function formatINR(cents: number) {
   return `₹${(cents / 100).toLocaleString('en-IN')}`;
@@ -197,12 +198,25 @@ function LocalRoutingCard({ item }: { item: ExchangeItem }) {
   return (
     <Link
       href={`/seller/listings/${item.returnId}`}
-      className="group flex items-center gap-4 rounded-xl bg-card px-5 py-4 ring-1 ring-border transition-all hover:ring-emerald-500/40 hover:bg-emerald-500/5"
+      className="group flex items-center gap-4 rounded-xl bg-card px-4 py-3 ring-1 ring-border transition-all hover:ring-emerald-500/40 hover:bg-emerald-500/5"
     >
-      {/* Pulse indicator */}
-      <div className="relative shrink-0">
-        <div className="size-3 rounded-full bg-emerald-400" />
-        <div className="absolute inset-0 size-3 animate-ping rounded-full bg-emerald-500/60" />
+      {/* Product image thumbnail */}
+      <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-secondary ring-1 ring-border">
+        {item.imageUrl ? (
+          <Image
+            src={item.imageUrl}
+            alt={item.productName}
+            fill
+            className="object-cover transition-transform duration-200 group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <div className="relative">
+              <div className="size-2.5 rounded-full bg-emerald-400" />
+              <div className="absolute inset-0 size-2.5 animate-ping rounded-full bg-emerald-500/60" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Product info */}
@@ -212,6 +226,7 @@ function LocalRoutingCard({ item }: { item: ExchangeItem }) {
             Grade {item.grade}
           </span>
           <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-400">
+            <span className="size-1 rounded-full bg-emerald-400 animate-pulse" />
             Local Routing
           </span>
           <span className="font-mono text-[10px] text-muted-foreground">{item.returnId}</span>
@@ -247,7 +262,14 @@ export default function ListingsPage() {
   const [localRoutingListings, setLocalRoutingListings] = useState<ExchangeItem[]>([]);
 
   useEffect(() => {
-    setLocalRoutingListings(getLocalRoutingListings());
+    const local = getLocalRoutingListings();
+    const enriched = local.map((item) => {
+      if (item.imageUrl) return item;
+      const ret = getReturnById(item.returnId);
+      const photo = ret?.photoUrls?.[0];
+      return photo ? { ...item, imageUrl: photo } : item;
+    });
+    setLocalRoutingListings(enriched);
   }, []);
 
   const activeRegular = REGULAR_LISTINGS.filter((l) => l.status === 'active').length;

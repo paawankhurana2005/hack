@@ -28,6 +28,7 @@ export interface ExchangeItem {
   source?: 'local_routing';
   co2SavedKg?: number;
   distanceSavedKm?: number;
+  imageUrl?: string;
 }
 
 // Grade multipliers for base price calculation
@@ -126,6 +127,7 @@ export function createLocalRoutingListing(params: {
   radiusKm: number;
   co2SavedKg: number;
   distanceSavedKm: number;
+  imageUrl?: string;
 }): void {
   const item: ExchangeItem = {
     returnId: params.returnId,
@@ -144,6 +146,7 @@ export function createLocalRoutingListing(params: {
     co2SavedKg: params.co2SavedKg,
     distanceSavedKm: params.distanceSavedKm,
     matchedBuyers: generateLocalBuyers(params.nearbyBuyers, params.radiusKm),
+    imageUrl: params.imageUrl,
   };
   saveLocalRoutingListing(item);
 }
@@ -156,6 +159,7 @@ export const EXCHANGE_ITEMS: ExchangeItem[] = [
     returnId: 'RET-2026-800001',
     productName: 'Fire HD 10 Tablet (32GB)',
     category: 'Electronics',
+    imageUrl: '/catalog/fire-tablet.jpg',
     grade: 'A',
     originalPriceCents: 699900,
     basePriceCents: Math.round(699900 * GRADE_MULTIPLIER.A),
@@ -222,6 +226,7 @@ export const EXCHANGE_ITEMS: ExchangeItem[] = [
     returnId: 'RET-2026-EX002',
     productName: 'Sony WH-1000XM5 Headphones',
     category: 'Electronics',
+    imageUrl: '/catalog/wh1000xm5.jpg',
     grade: 'B',
     originalPriceCents: 2999900,
     basePriceCents: Math.round(2999900 * GRADE_MULTIPLIER.B),
@@ -268,6 +273,7 @@ export const EXCHANGE_ITEMS: ExchangeItem[] = [
     returnId: 'RET-2026-EX003',
     productName: 'Samsung Galaxy S24 FE',
     category: 'Electronics',
+    imageUrl: '/catalog/galaxy-phone.jpg',
     grade: 'B',
     originalPriceCents: 4999900,
     basePriceCents: Math.round(4999900 * GRADE_MULTIPLIER.B),

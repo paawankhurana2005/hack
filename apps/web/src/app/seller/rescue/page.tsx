@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   EXCHANGE_ITEMS,
@@ -10,6 +11,7 @@ import {
   getLocalRoutingListings,
   type ExchangeItem,
 } from '@/lib/mocks/exchange-store';
+import { getReturnById } from '@/lib/mocks/return-store';
 
 function formatINR(cents: number) {
   return `₹${(cents / 100).toLocaleString('en-IN')}`;
@@ -94,45 +96,60 @@ function ItemCard({ item, offsetHours }: { item: ExchangeItem; offsetHours: numb
   return (
     <Link
       href={`/seller/rescue/${item.returnId}`}
-      className="group flex flex-col rounded-2xl bg-card ring-1 ring-border transition-all hover:ring-brand/50 hover:shadow-lg hover:shadow-brand/5"
+      className="group flex flex-col rounded-2xl bg-card ring-1 ring-border transition-all hover:ring-brand/50 hover:shadow-lg hover:shadow-brand/5 overflow-hidden"
     >
-      {/* Card top */}
-      <div className="flex items-start justify-between p-5 pb-4">
-        <div className="flex-1 min-w-0 pr-3">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${GRADE_COLOR[item.grade]}`}>
-              Grade {item.grade}
-            </span>
-            {item.source === 'local_routing' && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-400">
-                <span className="size-1 rounded-full bg-emerald-400 animate-pulse" />
-                From return
-              </span>
-            )}
+      {/* Product image */}
+      <div className="relative h-44 w-full bg-secondary">
+        {item.imageUrl ? (
+          <Image
+            src={item.imageUrl}
+            alt={item.productName}
+            fill
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-4xl text-muted-foreground/30">
+            📦
           </div>
-          <p className="mt-2 text-sm font-semibold text-foreground leading-snug">{item.productName}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{item.category}</p>
+        )}
+        {/* Overlaid badges */}
+        <div className="absolute left-3 top-3 flex items-center gap-1.5">
+          <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide backdrop-blur-sm ${GRADE_COLOR[item.grade]}`}>
+            Grade {item.grade}
+          </span>
+          {item.source === 'local_routing' && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
+              <span className="size-1 rounded-full bg-white animate-pulse" />
+              From return
+            </span>
+          )}
         </div>
-        <TimerRing progress={progress} hours={hrs} />
+        {/* Timer ring top-right */}
+        <div className="absolute right-3 top-3">
+          <TimerRing progress={progress} hours={hrs} />
+        </div>
       </div>
 
-      {/* Divider */}
-      <div className="mx-5 border-t border-border" />
+      {/* Card body */}
+      <div className="flex flex-col flex-1 p-4">
+        <p className="text-sm font-semibold text-foreground leading-snug">{item.productName}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{item.category}</p>
 
-      {/* Price */}
-      <div className="px-5 py-4">
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Current ask</p>
-        <p className={`mt-1 text-3xl font-bold tabular-nums ${urgent ? 'text-orange-400' : 'text-foreground'}`}>
-          {formatINR(price)}
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          <span className="line-through">{formatINR(item.originalPriceCents)}</span>
-          <span className="ml-2 text-brand">{discountFromOriginal.toFixed(0)}% off retail</span>
-        </p>
+        {/* Price */}
+        <div className="mt-3">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Current ask</p>
+          <p className={`mt-0.5 text-2xl font-bold tabular-nums ${urgent ? 'text-orange-400' : 'text-foreground'}`}>
+            {formatINR(price)}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            <span className="line-through">{formatINR(item.originalPriceCents)}</span>
+            <span className="ml-2 text-brand">{discountFromOriginal.toFixed(0)}% off retail</span>
+          </p>
+        </div>
       </div>
 
       {/* Footer chips */}
-      <div className="flex items-center gap-2 border-t border-border px-5 py-3">
+      <div className="flex items-center gap-2 border-t border-border px-4 py-3">
         <span className="flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground">
           <span className="size-1.5 rounded-full bg-brand" />
           {item.matchedBuyers.length} buyers nearby
@@ -162,8 +179,15 @@ export default function RescuePage() {
   useEffect(() => {
     const local = getLocalRoutingListings();
     if (local.length === 0) return;
-    const localIds = new Set(local.map((l) => l.returnId));
-    setItems([...local, ...EXCHANGE_ITEMS.filter((i) => !localIds.has(i.returnId))]);
+    // Backfill imageUrl from the return store for any listing created before imageUrl support
+    const enriched = local.map((item) => {
+      if (item.imageUrl) return item;
+      const ret = getReturnById(item.returnId);
+      const photo = ret?.photoUrls?.[0];
+      return photo ? { ...item, imageUrl: photo } : item;
+    });
+    const localIds = new Set(enriched.map((l) => l.returnId));
+    setItems([...enriched, ...EXCHANGE_ITEMS.filter((i) => !localIds.has(i.returnId))]);
   }, []);
 
   const totalBuyers = items.reduce((s, i) => s + i.matchedBuyers.length, 0);
