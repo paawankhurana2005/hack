@@ -22,6 +22,7 @@ function listingFromShop(
   const it = findShopItem(shopId)!;
   return {
     id: it.id,
+    itemId: it.card.itemId,
     title: it.card.title,
     imageUrl: it.imageUrl,
     listedPrice: it.listingPrice,
@@ -49,6 +50,7 @@ const PEGASUS_MARKET: MarketContext = {
 
 export const pegasusListing: CasualListing = {
   id: heroShopItem.id,
+  itemId: heroShopItem.card.itemId,
   title: heroShopItem.card.title,
   imageUrl: heroShopItem.imageUrl,
   listedPrice: heroShopItem.listingPrice, // ₹3,999
@@ -76,6 +78,7 @@ const WORN_RUNNERS_MARKET: MarketContext = {
 
 export const wornRunnersListing: CasualListing = {
   id: 'lst_worn_runners',
+  itemId: 'itm_worn_runners',
   title: 'Worn Running Shoes · 3 yrs',
   imageUrl: '/catalog/worn-runners.jpg',
   listedPrice: inr(180000), // ₹1,800

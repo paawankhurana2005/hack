@@ -3,6 +3,7 @@
 import type { ImpactEstimate, OwnedItem, ProductHealthCard } from '@reloop/shared';
 import { Button } from '@/components/ui/button';
 import { HealthCard } from './health-card';
+import { HealthCardHistory } from './health-card-history';
 
 export function ConfirmedStep({
   item,
@@ -54,8 +55,9 @@ export function ConfirmedStep({
       )}
 
       {card && (
-        <div className="mt-8">
+        <div className="mt-8 space-y-6">
           <HealthCard card={card} originalPrice={item.originalPrice} />
+          <HealthCardHistory card={card} category={item.category} sellerName="You" />
         </div>
       )}
 

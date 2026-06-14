@@ -38,6 +38,7 @@ export const mockRouting: RoutingDecision = {
 export const mockHealthCard: ProductHealthCard = {
   id: 'card_001',
   productId: 'prod_001',
+  itemId: 'itm_001',
   title: 'Wireless Noise-Cancelling Headphones',
   grade: 'good',
   confidence: 0.86,

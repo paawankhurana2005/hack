@@ -1,4 +1,5 @@
 import type { Money, OwnedItem } from '@reloop/shared';
+import { STAGED_ITEM_ID, STAGED_ACQUIRED_AT } from './provenance-seed';
 
 export type { OwnedItem };
 
@@ -22,6 +23,7 @@ export const ownedItems: UserOwnedItem[] = [
   // --- Aarav ---------------------------------------------------------------
   {
     id: 'own_ua_charged',
+    itemId: 'itm_ua_charged',
     ownerId: 'user_aarav',
     title: 'White Court Sneakers',
     category: 'sports',
@@ -35,6 +37,7 @@ export const ownedItems: UserOwnedItem[] = [
   },
   {
     id: 'own_boat_headphones',
+    itemId: 'itm_boat_headphones',
     ownerId: 'user_aarav',
     title: 'Apple AirPods',
     category: 'electronics',
@@ -52,6 +55,7 @@ export const ownedItems: UserOwnedItem[] = [
   // --- Meera ---------------------------------------------------------------
   {
     id: 'own_puma',
+    itemId: 'itm_puma',
     ownerId: 'user_meera',
     title: 'Puma Future Rider Trainers',
     category: 'fashion',
@@ -65,6 +69,7 @@ export const ownedItems: UserOwnedItem[] = [
   },
   {
     id: 'own_canon_camera',
+    itemId: 'itm_canon_camera',
     ownerId: 'user_meera',
     title: 'Apple iPad Mini',
     category: 'electronics',
@@ -78,10 +83,28 @@ export const ownedItems: UserOwnedItem[] = [
     originalListingImages: ['/catalog/canon-camera.jpg'],
     originalSpecs: { Model: 'iPad Mini 2021', Color: 'Starlight', Storage: '64GB' },
   },
+  // The STAGED demo item — Meera bought this through ReLoop (Amazon → Aarav →
+  // Meera). It already carries a populated provenance chain (provenance-seed.ts);
+  // re-listing it on stage appends a SECOND life to that same chain.
+  {
+    id: 'own_meera_ultraboost',
+    itemId: STAGED_ITEM_ID,
+    ownerId: 'user_meera',
+    title: 'Adidas Ultraboost Light',
+    category: 'sports',
+    imageUrl: '/catalog/ultraboost.jpg',
+    purchaseDate: STAGED_ACQUIRED_AT,
+    originalPrice: inr(799900), // ₹7,999 new
+    description: 'Bought second-hand through ReLoop — barely worn since. Passing it on.',
+    returnEligible: false, // a second-life buy → resell, never a return
+    originalListingImages: ['/catalog/ultraboost.jpg'],
+    originalSpecs: { Color: 'Core Black', Size: 'US 9' },
+  },
 
   // --- Rohan ---------------------------------------------------------------
   {
     id: 'own_wildcraft_backpack',
+    itemId: 'itm_wildcraft_backpack',
     ownerId: 'user_rohan',
     title: 'Faux Leather Backpack',
     category: 'fashion',
@@ -95,6 +118,7 @@ export const ownedItems: UserOwnedItem[] = [
   },
   {
     id: 'own_galaxy_a54',
+    itemId: 'itm_galaxy_a54',
     ownerId: 'user_rohan',
     title: 'Oppo A57',
     category: 'electronics',
@@ -112,6 +136,7 @@ export const ownedItems: UserOwnedItem[] = [
   // --- Ananya --------------------------------------------------------------
   {
     id: 'own_nike_revolution',
+    itemId: 'itm_nike_revolution',
     ownerId: 'user_ananya',
     title: 'Nike Baseball Cleats',
     category: 'sports',
@@ -125,6 +150,7 @@ export const ownedItems: UserOwnedItem[] = [
   },
   {
     id: 'own_jbl_tune',
+    itemId: 'itm_jbl_tune',
     ownerId: 'user_ananya',
     title: 'Wireless Earbuds',
     category: 'electronics',

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatMoney } from '@/lib/money';
 import { useRole } from '@/lib/role-context';
 import { getOwnedItems, type UserOwnedItem } from '@/mock/owned-items';
+import { getAcquiredItems } from '@/lib/acquired-store';
 import { getSubmittedReturns, type SubmittedReturn } from '@/lib/mocks/return-store';
 import { getListings } from '@/lib/listings-store';
 import { isSold } from '@/lib/marketplace-store';
@@ -44,7 +45,8 @@ export default function MyItemsPage() {
 
   useEffect(() => {
     if (!accountId) return;
-    setItems(getOwnedItems(accountId));
+    // Static order history + anything bought through ReLoop (re-listable, same itemId).
+    setItems([...getAcquiredItems(accountId), ...getOwnedItems(accountId)]);
     setReturns(getSubmittedReturns());
     setListings(getListings().filter((l) => l.sellerId === accountId));
   }, [accountId]);

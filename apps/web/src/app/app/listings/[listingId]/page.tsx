@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PriceHistoryChart } from '@/components/agent/price-history-chart';
 import { ActivityFeed } from '@/components/agent/activity-feed';
+import { HealthCardHistory } from '@/components/sell/health-card-history';
 import { formatMoney } from '@/lib/money';
 import { findSeedListing } from '@/mock/seed-listings';
 import type { CasualListing } from '@/mock/casual-listings';
@@ -411,6 +412,17 @@ export default function ListingDetailPage() {
 
         <ActivityFeed events={agent.events} thinking={thinking && !(sold || routedDone)} />
       </div>
+
+      {/* This item's lives — the multi-owner provenance lineage */}
+      {listing.card && (
+        <div className="mt-6">
+          <HealthCardHistory
+            card={listing.card}
+            category={listing.category ?? 'other'}
+            sellerName={listing.sellerName ?? 'Owner'}
+          />
+        </div>
+      )}
     </PageShell>
   );
 }

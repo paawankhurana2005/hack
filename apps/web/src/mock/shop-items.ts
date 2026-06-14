@@ -39,6 +39,8 @@ function buildCard(s: Spec): ProductHealthCard {
   return {
     id: `RLP-${s.id.slice(-4).toUpperCase()}`,
     productId: `prod_${s.id}`,
+    // Stable physical-item identity — the key into this item's provenance chain.
+    itemId: `itm_${s.id}`,
     title: s.title,
     grade: s.grade,
     confidence: s.confidence,

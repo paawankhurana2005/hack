@@ -4,6 +4,7 @@
 import type { ConditionGrade, ID, Money } from './common.js';
 import type { GradingResult } from './grading.js';
 import type { PricingResult } from './pricing.js';
+import type { ItemId } from './provenance.js';
 import type { SellItemDraft } from './sell.js';
 
 export interface HealthCardEvent {
@@ -15,6 +16,8 @@ export interface HealthCardEvent {
 export interface ProductHealthCard {
   id: ID;
   productId: ID;
+  /** The physical item this card describes — the key into its provenance chain. */
+  itemId: ItemId;
   title: string;
   grade: ConditionGrade;
   /** Grading confidence, 0..1. */

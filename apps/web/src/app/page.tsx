@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 export default function LandingPage() {
   return (
@@ -16,63 +16,13 @@ export default function LandingPage() {
   );
 }
 
-function useCountUp(target: number, duration = 1800, start = false) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (!start) return;
-    let raf = 0;
-    const t0 = performance.now();
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - t0) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setValue(target * eased);
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, duration, start]);
-  return value;
-}
-
-function useInView<T extends HTMLElement>() {
-  const ref = useRef<T | null>(null);
-  const [seen, setSeen] = useState(false);
-  useEffect(() => {
-    if (!ref.current || seen) return;
-    const io = new IntersectionObserver((entries) => entries[0]?.isIntersecting && setSeen(true), {
-      threshold: 0.3,
-    });
-    io.observe(ref.current);
-    return () => io.disconnect();
-  }, [seen]);
-  return { ref, seen };
-}
-
-function Stat({
-  value,
-  suffix = '',
-  prefix = '',
-  label,
-  fixed = 0,
-}: {
-  value: number;
-  suffix?: string;
-  prefix?: string;
-  label: string;
-  fixed?: number;
-}) {
-  const { ref, seen } = useInView<HTMLDivElement>();
-  const v = useCountUp(value, 1800, seen);
+function Pillar({ title, body }: { title: string; body: string }) {
   return (
-    <div ref={ref}>
-      <div className="mb-2 text-4xl font-semibold tracking-tight tabular-nums text-foreground md:text-5xl">
-        {prefix}
-        {v.toLocaleString('en-US', { minimumFractionDigits: fixed, maximumFractionDigits: fixed })}
-        {suffix}
+    <div className="border-l-2 border-brand/40 pl-5">
+      <div className="mb-2 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+        {title}
       </div>
-      <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-        {label}
-      </div>
+      <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{body}</p>
     </div>
   );
 }
@@ -117,7 +67,7 @@ function Hero() {
               <span className="relative inline-flex size-1.5 rounded-full bg-brand" />
             </span>
             <span className="font-mono text-[11px] uppercase tracking-wider text-brand">
-              Live · Amazon Hackathon Build
+              Live
             </span>
           </div>
 
@@ -139,8 +89,8 @@ function Hero() {
           </h1>
 
           <p className="mx-auto mb-10 max-w-[52ch] text-pretty text-base text-muted-foreground md:text-lg">
-            AI-driven grading, smart redistribution, and instant trust for every Amazon return. Built
-            on NVIDIA NIM.
+            We grade every return at the doorstep, route it to its best second life, and mint a trust
+            card that travels with the item — so nothing of value ever hits a landfill.
           </p>
 
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -152,12 +102,6 @@ function Hero() {
                 →
               </span>
               Try the demo
-            </Link>
-            <Link
-              href="/sell"
-              className="px-6 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Sell an item →
             </Link>
           </div>
         </div>
@@ -209,13 +153,13 @@ function Hero() {
 
         {/* status strip */}
         <div className="mt-16 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          <span>NVIDIA NIM · Online</span>
+          <span>AI Grading</span>
           <span className="text-border">/</span>
-          <span>Llama-3.2-90B-Vision</span>
+          <span>Smart Routing</span>
           <span className="text-border">/</span>
-          <span>Llama-3.3-70B-Instruct</span>
+          <span>Product Health Card</span>
           <span className="text-border">/</span>
-          <span className="text-brand">All systems green</span>
+          <span className="text-brand">Return Prevention</span>
         </div>
       </div>
     </section>
@@ -312,7 +256,7 @@ function PillarBrain() {
     { tag: '01', title: 'Resell', body: 'Instant pricing + Warehouse Deals listing.', meta: 'Est. Recovery', value: '84%', featured: false },
     { tag: '02', title: 'Refurbish', body: 'Repairable flaws → regional centers.', meta: 'Path Logic', value: '≤ B+ grade', featured: true },
     { tag: '03', title: 'Redistribute', body: 'Surplus rerouted to low-stock nodes.', meta: 'LCA Saved', value: '4.2 kg CO₂', featured: false },
-    { tag: '04', title: 'Donate', body: 'Auto-matched with verified non-profits.', meta: 'Tax Credit', value: '$40 avg', featured: false },
+    { tag: '04', title: 'Donate', body: 'Auto-matched with verified non-profits.', meta: 'Tax Credit', value: '₹3,200 avg', featured: false },
   ];
   return (
     <section id="brain" className="relative border-t border-border/50 bg-card/20 py-32">
@@ -376,7 +320,7 @@ function PillarBrain() {
             </div>
             <div className="space-y-3">
               {[
-                ['Retail estimate', '$189.00', 'llama-3.3-70b'],
+                ['Retail estimate', '₹14,999', 'ReLoop AI'],
                 ['Market demand', 'HIGH', '0.91'],
                 ['Condition penalty', '× 0.85', 'grade A'],
                 ['Recency bonus', '× 1.04', '11 mo'],
@@ -396,7 +340,7 @@ function PillarBrain() {
               ))}
               <div className="flex items-center justify-between pt-3">
                 <span className="text-xs font-medium text-foreground">Final listing</span>
-                <span className="text-lg font-semibold text-brand">$167.32</span>
+                <span className="text-lg font-semibold text-brand">₹13,259</span>
               </div>
             </div>
           </div>
@@ -409,7 +353,7 @@ function PillarBrain() {
                 Refurbish → Resell
               </div>
               <p className="text-sm text-muted-foreground">
-                Buff + recert lifts grade A → A+, unlocking $24 in incremental recovery.
+                Buff + recert lifts grade A → A+, unlocking ₹1,900 in incremental recovery.
               </p>
             </div>
             <div className="mt-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -531,17 +475,29 @@ function Impact() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="mb-10 flex items-center justify-between">
           <span className="font-mono text-xs uppercase tracking-widest text-brand">
-            Impact / since v0.1
+            How ReLoop closes the loop
           </span>
           <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            updated · live
+            four pillars
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-12 lg:grid-cols-4">
-          <Stat value={1.2} fixed={1} suffix="M+" label="Items rescued" />
-          <Stat value={420} suffix="k T" label="Landfill diverted" />
-          <Stat value={84} prefix="$" suffix="M" label="Value recovered" />
-          <Stat value={14.2} fixed={1} suffix="%" label="Return efficiency lift" />
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
+          <Pillar
+            title="Grade at the source"
+            body="Multimodal AI scores condition right at the doorstep — before the item ever moves."
+          />
+          <Pillar
+            title="Decide before it moves"
+            body="An explainable engine picks resale, refurbish, donate or recycle from value, cost, demand and carbon."
+          />
+          <Pillar
+            title="Trust that travels"
+            body="A verifiable Product Health Card carries condition, history and authenticity to the next owner."
+          />
+          <Pillar
+            title="Prevent the return"
+            body="Predict returns before they happen and stop the waste at the root."
+          />
         </div>
 
         <div className="relative mt-20 overflow-hidden border-y border-border/60 py-6">

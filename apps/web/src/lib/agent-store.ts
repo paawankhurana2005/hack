@@ -19,11 +19,14 @@ import type { CasualListing, ListingStatus } from '@/mock/casual-listings';
 import { formatMoney } from '@/lib/money';
 import { narrateAgent } from '@/lib/api-client';
 import { earnSeller } from '@/lib/credits-store';
+import { appendEventIfStored } from '@/lib/provenance-store';
 
 const keyFor = (id: string): string => `reloop.agent.${id}`;
 
 export interface AgentState {
   id: string;
+  /** The physical item this listing is for — key into its provenance chain. */
+  itemId: string;
   title: string;
   listedPriceCents: number;
   listedAt: string;
@@ -84,6 +87,7 @@ function buildInitial(listing: CasualListing): AgentState {
   const retail = listing.retailCents ?? Math.round(price / 0.55);
   return {
     id: listing.id,
+    itemId: listing.itemId ?? listing.id,
     title: listing.title,
     listedPriceCents: price,
     listedAt: listing.listedAt,
@@ -209,6 +213,17 @@ export async function tick(id: string): Promise<AgentState | null> {
   if (decision.action === 'reprice' && decision.newPriceCents !== undefined) {
     s.priceCents = decision.newPriceCents;
     s.priceHistory = [...s.priceHistory, { day: s.day, cents: s.priceCents }];
+    // Provenance: one summarised entry per real price change (not per tick).
+    if (s.priceCents !== priceFrom) {
+      appendEventIfStored(s.itemId, {
+        type: 'price_adjusted',
+        at: now,
+        verified: true,
+        fromPrice: inr(priceFrom),
+        toPrice: inr(s.priceCents),
+        reason: decision.diagnosis,
+      });
+    }
   } else if (decision.action === 'widen_radius' && decision.newRadiusKm !== undefined) {
     s.radiusKm = decision.newRadiusKm;
   } else if (decision.action === 'improve_listing') {
@@ -259,6 +274,16 @@ export function setManualPrice(id: string, cents: number): AgentState | null {
   s.priceCents = clamped;
   s.priceHistory = [...s.priceHistory, { day: s.day, cents: clamped }];
   s.paused = true;
+  if (clamped !== from) {
+    appendEventIfStored(s.itemId, {
+      type: 'price_adjusted',
+      at: new Date().toISOString(),
+      verified: true,
+      fromPrice: inr(from),
+      toPrice: inr(clamped),
+      reason: 'Owner set the price manually.',
+    });
+  }
   s.events = [
     ...s.events,
     {

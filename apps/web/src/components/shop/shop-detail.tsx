@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HealthCard } from '@/components/sell/health-card';
+import { HealthCardHistory } from '@/components/sell/health-card-history';
 import { RufusChat } from '@/components/rufus/rufus-chat';
 import { formatMoney } from '@/lib/money';
 import { buyItem, isSold, type PurchaseResult } from '@/lib/marketplace-store';
@@ -167,6 +168,9 @@ export function ShopDetail({ item }: { item: ShopEntry }) {
             Product Health Card
           </p>
           <HealthCard card={card} originalPrice={item.originalPrice} />
+          <div className="mt-6">
+            <HealthCardHistory card={card} category={item.category} sellerName={item.sellerName} />
+          </div>
         </div>
       </div>
 

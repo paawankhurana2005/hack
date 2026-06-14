@@ -5,7 +5,10 @@
 
 import type { Money, ShopItem } from '@reloop/shared';
 import { estimateBuyerImpact, estimateImpact } from '@reloop/shared';
-import { nsKey, readJson, writeJson } from './storage';
+import { currentAccountId, nsKey, readJson, writeJson } from './storage';
+import { getAccount } from './accounts';
+import { appendEvent, deriveChainFromCard } from './provenance-store';
+import { addAcquiredItem } from './acquired-store';
 
 const SOLD_KEY = 'reloop.market.sold'; // global
 const PURCHASES_BASE = 'purchases'; // per-user
@@ -51,14 +54,60 @@ export function buyItem(item: ShopItem, salePriceCents?: number): PurchaseResult
   const seller = estimateImpact(item.category, salePrice);
 
   writeJson(SOLD_KEY, Array.from(new Set([...getSoldIds(), item.id])));
+  const at = new Date().toISOString();
   const purchase: Purchase = {
     id: item.id,
     title: item.card.title,
     price: salePrice,
     buyerCredits: buyer.ecoCredits,
-    at: new Date().toISOString(),
+    at,
   };
   writeJson(nsKey(PURCHASES_BASE), [purchase, ...getPurchases()]);
+
+  // Provenance: the item changes hands. Append the sale + the new ownership to its
+  // chain (append-only — the seller's whole prior life is preserved), then make it
+  // something the BUYER owns and can re-list, carrying the SAME itemId.
+  const buyerId = currentAccountId();
+  const buyerName = getAccount(buyerId)?.name ?? 'A buyer';
+  const fallback = deriveChainFromCard(item.card, {
+    category: item.category,
+    sellerName: item.sellerName,
+  });
+  appendEvent(
+    item.card.itemId,
+    {
+      type: 'sold',
+      at,
+      verified: true,
+      buyerName,
+      price: salePrice,
+      co2SavedKg: buyer.co2SavedKg,
+      ecoCredits: buyer.ecoCredits,
+    },
+    fallback,
+  );
+  appendEvent(
+    item.card.itemId,
+    { type: 'owned', at, verified: true, ownerName: buyerName },
+    fallback,
+  );
+  addAcquiredItem(
+    {
+      id: `acq_${item.id}`,
+      itemId: item.card.itemId,
+      ownerId: buyerId,
+      title: item.card.title,
+      category: item.category,
+      imageUrl: item.imageUrl,
+      purchaseDate: at,
+      originalPrice: item.originalPrice,
+      description: 'Bought through ReLoop — ready to give it another life.',
+      returnEligible: false,
+      originalListingImages: [item.imageUrl],
+      originalSpecs: {},
+    },
+    buyerId,
+  );
 
   return {
     buyerCredits: buyer.ecoCredits,

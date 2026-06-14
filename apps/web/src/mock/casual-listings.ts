@@ -2,6 +2,7 @@ import type {
   ConditionGrade,
   ImpactEstimate,
   ItemCategory,
+  ItemId,
   MarketContext,
   Money,
   ProductHealthCard,
@@ -12,6 +13,8 @@ export type ListingStatus = 'listed' | 'viewed' | 'matched' | 'sold' | 'recycled
 /** A casual second-life listing the user has put up — their lightweight seller identity. */
 export interface CasualListing {
   id: string;
+  /** The physical item behind this listing — the key into its provenance chain. */
+  itemId?: ItemId;
   title: string;
   imageUrl: string;
   listedPrice: Money;

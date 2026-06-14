@@ -127,6 +127,8 @@ function DonutChart() {
       const { Chart, ArcElement, DoughnutController, Tooltip } = await import('chart.js');
       Chart.register(ArcElement, DoughnutController, Tooltip);
       if (!canvasRef.current) return;
+      // Destroy any chart still bound to this canvas (StrictMode double-mount race).
+      Chart.getChart(canvasRef.current)?.destroy();
       const chart = new Chart(canvasRef.current, {
         type: 'doughnut',
         data: {
@@ -162,8 +164,15 @@ function DonutChart() {
       return chart;
     }
     let chartInstance: import('chart.js').Chart | undefined;
-    void init().then((c) => { chartInstance = c; });
-    return () => { chartInstance?.destroy(); };
+    let cancelled = false;
+    void init().then((c) => {
+      chartInstance = c;
+      if (cancelled) chartInstance?.destroy();
+    });
+    return () => {
+      cancelled = true;
+      chartInstance?.destroy();
+    };
   }, []);
 
   return <canvas ref={canvasRef} width={160} height={160} />;

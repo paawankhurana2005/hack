@@ -4,10 +4,13 @@
 // output from photos (see GradingResult).
 
 import type { ID, Money } from './common.js';
+import type { ItemId } from './provenance.js';
 import type { ItemCategory } from './sell.js';
 
 export interface OwnedItem {
   id: ID;
+  /** The stable physical-item identity — the key into the item's provenance chain. */
+  itemId: ItemId;
   title: string;
   category: ItemCategory;
   /** Primary listing thumbnail (a pre-grading fact, not a condition signal). */

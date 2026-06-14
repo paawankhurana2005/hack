@@ -14,6 +14,7 @@ import type { CompressedImage } from '@/lib/image';
 import { ApiRequestError, createHealthCard, gradeItem, priceItem } from '@/lib/api-client';
 import { addListing } from '@/lib/listings-store';
 import { earnSeller } from '@/lib/credits-store';
+import { appendEvent, baseChain } from '@/lib/provenance-store';
 import { useRole } from '@/lib/role-context';
 import { PageShell } from '@/components/layout/page-shell';
 import { DetailStep } from './detail-step';
@@ -99,7 +100,9 @@ export function SellSession({ item }: { item: OwnedItem }) {
       setStage('card');
       try {
         const c = await createHealthCard({ draft, grading: g, pricing: p });
-        setCard(c);
+        // Bind the card to the PHYSICAL item so re-listing appends to the same
+        // provenance chain instead of starting a fresh one.
+        setCard({ ...c, itemId: item.itemId });
       } catch (e) {
         setFailedStage('card');
         setErrorMsg(errText(e, 'We couldn’t assemble the Health Card. Please try again.'));
@@ -124,6 +127,7 @@ export function SellSession({ item }: { item: OwnedItem }) {
     const retailCents = pricing?.estimatedRetail.amountCents ?? Math.round(listed.amountCents / 0.55);
     addListing({
       id: `lst_${Date.now()}`,
+      itemId: item.itemId,
       title: item.title,
       imageUrl: images[0]?.dataUrl ?? item.imageUrl,
       listedPrice: listed,
@@ -152,6 +156,39 @@ export function SellSession({ item }: { item: OwnedItem }) {
     });
     // Seller earns EcoCredits for diverting the item from landfill.
     if (impact) earnSeller(impact.ecoCredits, `Listed ${item.title}`);
+
+    // Provenance: append this life's grade + listing to the item's chain. For a
+    // re-listed item (e.g. the staged demo item) this lands on top of its existing
+    // history — both grades stay. `baseChain` only seeds origin+owned when the
+    // item has no chain yet (a first-ever listing), so nothing is duplicated.
+    const now = new Date().toISOString();
+    const fallback = baseChain(item.itemId, {
+      category: item.category,
+      title: item.title,
+      ownerName: account?.name ?? 'Owner',
+      at: item.purchaseDate,
+    });
+    if (grading) {
+      appendEvent(
+        item.itemId,
+        {
+          type: 'graded',
+          at: grading.gradedAt,
+          verified: card?.authenticityVerified ?? false,
+          grade: grading.grade,
+          confidence: grading.confidence,
+          issues: grading.detectedIssues,
+          referenceMatch: grading.referenceComparison?.authenticityMatch,
+        },
+        fallback,
+      );
+    }
+    appendEvent(
+      item.itemId,
+      { type: 'listed', at: now, verified: true, price: listed },
+      fallback,
+    );
+
     setPhase('confirmed');
   }
 

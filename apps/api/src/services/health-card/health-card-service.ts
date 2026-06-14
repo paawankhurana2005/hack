@@ -35,6 +35,9 @@ export class HealthCardService {
     return {
       id,
       productId: grading.productId,
+      // Default identity; the client overrides this with the physical item's
+      // stable itemId so a re-listed item appends to its existing provenance chain.
+      itemId: grading.productId,
       title: draft.title,
       grade: grading.grade,
       confidence: grading.confidence,

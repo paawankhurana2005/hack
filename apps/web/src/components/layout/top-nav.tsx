@@ -3,13 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const links = [
-  { href: '/app/items', label: 'Home' },
-  { href: '/sell', label: 'Sell' },
-  { href: '/return', label: 'Return' },
-  { href: '/seller', label: 'Seller' },
-];
-
 export function TopNav() {
   const pathname = usePathname();
   // Login is a standalone entry; the user app (/app) and seller dashboard
@@ -29,24 +22,16 @@ export function TopNav() {
             <div className="absolute inset-0 rounded-full bg-brand opacity-50 blur-md transition-opacity group-hover:opacity-90" />
           </div>
           <span className="font-semibold tracking-tight text-foreground">ReLoop</span>
-          <span className="ml-1 rounded-full border border-border/80 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            v0.4
-          </span>
         </Link>
-        <ul className="flex items-center gap-6 text-sm text-muted-foreground">
-          {links.map((l) => {
-            const active = pathname === l.href || pathname.startsWith(`${l.href}/`);
-            return (
-              <li key={l.href}>
-                <Link
-                  href={l.href}
-                  className={`transition-colors hover:text-brand ${active ? 'text-brand' : ''}`}
-                >
-                  {l.label}
-                </Link>
-              </li>
-            );
-          })}
+        <ul className="flex items-center gap-2 text-sm text-muted-foreground sm:gap-4">
+          <li>
+            <Link
+              href="/login"
+              className="rounded-full border border-border/80 px-4 py-1.5 font-medium text-foreground transition hover:border-brand/60 hover:text-brand active:scale-95"
+            >
+              Log in
+            </Link>
+          </li>
           <li>
             <Link
               href="/login"
