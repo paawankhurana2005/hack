@@ -72,3 +72,32 @@ written-spec gate. The loop:
 Scaffolding only. NO real functionality yet — no AI, no backend logic, no real
 data. Frontend uses placeholder screens and mock data. We add features in later
 spec-gated iterations.
+
+## Deployment (production)
+Live URLs:
+- **Web (Vercel):** https://reloop-woad.vercel.app — Next.js app (`apps/web`),
+  Root Directory `apps/web`, Next defaults (no custom build/output overrides).
+- **API (Render):** https://reloop-api-po73.onrender.com — Express (`apps/api`),
+  runs via `tsx` (`start:prod`), built from `render.yaml`. Free tier sleeps after
+  ~15 min idle (first request ~50s cold start).
+
+Both auto-deploy from `main` once Git is connected (Render: yes; Vercel: connect
+the GitHub app in Project → Settings → Git). The two are wired by env vars:
+- Vercel: `NEXT_PUBLIC_API_BASE_URL` = the Render URL (baked in at build time).
+- Render: `NVIDIA_API_KEY` (required — the API exits without it) and `WEB_ORIGIN`
+  = the Vercel URL (CORS). If either URL changes, update the other side and
+  redeploy web (the API URL is compiled into the web bundle).
+
+### Before every push to `main` (so deploys stay green)
+1. `pnpm -r typecheck` — must pass (web, api, shared are all strict, no `any`).
+2. `pnpm --filter web build` — only with the dev server **stopped** (a prod build
+   shares `apps/web/.next` and will break a running `next dev` with a stale-chunk
+   "Cannot find module" error; clear with `rm -rf apps/web/.next`).
+3. If you changed any `package.json` deps, run `pnpm install` and **commit
+   `pnpm-lock.yaml`** — Render/Vercel install with `--frozen-lockfile` and fail on
+   a stale lock.
+4. Keep the API runnable as raw TS: `@reloop/shared` ships as TS source (no build
+   step), so the API must start via `tsx` (`start:prod`), never `node dist`,
+   unless you add a bundler. Don't point `shared`'s `main` at a non-existent dist.
+5. Don't commit secrets — `apps/api/.env` is gitignored; the real key lives only
+   in the Render dashboard.
