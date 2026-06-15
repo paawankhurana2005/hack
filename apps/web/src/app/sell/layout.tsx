@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { StepIndicator } from '@/components/ui/step-indicator';
 import { SellFlowProvider } from './sell-flow-context';
@@ -28,7 +29,19 @@ export default function SellLayout({ children }: { children: React.ReactNode }) 
     <SellFlowProvider>
       <div className="border-b border-border/60 bg-card/30 backdrop-blur">
         <div className="mx-auto max-w-6xl px-6 py-5">
-          <p className="mb-3 font-mono text-xs uppercase tracking-widest text-brand">Sell flow</p>
+          <div className="mb-3 flex items-center gap-4">
+            <Link href="/" aria-label="ReLoop home" className="group flex items-center gap-2.5">
+              <div className="relative grid size-6 place-items-center rounded-full bg-brand">
+                <div className="size-2.5 rounded-full border-2 border-brand-foreground" />
+                <div className="absolute inset-0 rounded-full bg-brand opacity-50 blur-md transition-opacity group-hover:opacity-90" />
+              </div>
+              <span className="hidden font-semibold tracking-tight text-foreground sm:inline">
+                ReLoop
+              </span>
+            </Link>
+            <span className="h-5 w-px bg-border/60" />
+            <p className="font-mono text-xs uppercase tracking-widest text-brand">Sell flow</p>
+          </div>
           <StepIndicator steps={steps.map((s) => s.label)} current={current} />
         </div>
       </div>
