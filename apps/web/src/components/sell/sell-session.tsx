@@ -15,6 +15,7 @@ import { ApiRequestError, createHealthCard, gradeItem, priceItem } from '@/lib/a
 import { addListing } from '@/lib/listings-store';
 import { earnSeller } from '@/lib/credits-store';
 import { appendEvent, baseChain } from '@/lib/provenance-store';
+import { uploadImage } from '@/lib/data-api';
 import { useRole } from '@/lib/role-context';
 import { PageShell } from '@/components/layout/page-shell';
 import { DetailStep } from './detail-step';
@@ -64,6 +65,81 @@ export function SellSession({ item }: { item: OwnedItem }) {
       setFailedStage(null);
       setErrorMsg('');
       const draft = { title: item.title, category: item.category, notes: item.description };
+
+      // DEMO HARDCODE — the Under Armour Charged pair grades to a fixed, scripted
+      // result so the live demo is deterministic: ~5s "scanning", then a Fair
+      // grade and a ₹3,750 price (a few-seasons-old pair). Remove this branch to
+      // restore the real AI grading pipeline for this item.
+      if (item.itemId === 'itm_ua_charged') {
+        setStage('grading');
+        await new Promise((r) => setTimeout(r, 5000)); // 5s on-screen scan
+        const now = new Date().toISOString();
+        const g: GradingResult = {
+          id: `grd_${Date.now()}`,
+          productId: item.itemId,
+          grade: 'fair',
+          confidence: 0.9,
+          detectedIssues: [
+            'Visible creasing across the toe box',
+            'Outsole tread worn down at the heel',
+            'Light discolouration on the white mesh upper',
+          ],
+          summary: 'Well-worn but structurally sound — a few seasons of use, with plenty of life left.',
+          photoUrls: imgs.map((i) => i.dataUrl),
+          referenceComparison: {
+            authenticityMatch: true,
+            authenticityConfidence: 0.96,
+            changedFromOriginal: [
+              'Upper mesh dulled vs factory white',
+              'Midsole compression at the heel strike',
+            ],
+            gradeImpact:
+              'Confirmed genuine Under Armour Charged Assert — the wear is cosmetic, so it grades Fair rather than Good.',
+            specMatches: [
+              { label: 'Color', expected: 'White / Black', observed: 'White / Black', match: true },
+              { label: 'Size', expected: 'US 10', observed: 'US 10', match: true },
+            ],
+            source: 'mock',
+          },
+          gradedAt: now,
+        };
+        setGrading(g);
+
+        setStage('pricing');
+        const p: PricingResult = {
+          id: `prc_${Date.now()}`,
+          productId: item.itemId,
+          grade: 'fair',
+          estimatedRetail: { amountCents: 699900, currency: 'INR' }, // ₹6,999 new
+          suggestedPrice: { amountCents: 375000, currency: 'INR' }, // ₹3,750
+          discountPct: 0.46,
+          demand: 'medium',
+          rationale:
+            'Fair-condition Charged Asserts in this colourway resell around ₹3,500–4,000. ₹3,750 sits mid-band — competitive for a few-seasons-old pair while still recovering strong value.',
+          factors: [
+            { label: 'Condition', value: 'Fair · visible wear' },
+            { label: 'Original retail', value: '₹6,999' },
+            { label: 'Local demand', value: 'Medium' },
+            { label: 'Comparable resale', value: '₹3,500–4,000' },
+          ],
+          pricedAt: now,
+        };
+        setPricing(p);
+
+        setStage('card');
+        try {
+          const c = await createHealthCard({ draft, grading: g, pricing: p });
+          setCard({ ...c, itemId: item.itemId });
+        } catch (e) {
+          setFailedStage('card');
+          setErrorMsg(errText(e, 'We couldn’t assemble the Health Card. Please try again.'));
+          return;
+        }
+        setImpact(estimateImpact(item.category, p.suggestedPrice));
+        setStage('done');
+        setPhase('review');
+        return;
+      }
 
       // 1. Grade (one reliable call; server loops photos sequentially) + reference diff.
       setStage('grading');
@@ -125,6 +201,15 @@ export function SellSession({ item }: { item: OwnedItem }) {
   function onConfirm() {
     const listed = pricing?.suggestedPrice ?? item.originalPrice;
     const retailCents = pricing?.estimatedRetail.amountCents ?? Math.round(listed.amountCents / 0.55);
+
+    // Persist the as-graded photos to S3 (best-effort, fire-and-forget). The listing
+    // already renders the local image, so this genuinely fills the S3 bucket without
+    // ever blocking or breaking the flow.
+    const ts = Date.now();
+    images.forEach((img, i) => {
+      void uploadImage(`grading/${item.itemId}/${ts}-${i}.jpg`, img.dataUrl);
+    });
+
     addListing({
       id: `lst_${Date.now()}`,
       itemId: item.itemId,

@@ -61,8 +61,8 @@ export const SEEDED_RETURNS: SubmittedReturn[] = [
       nearbyBuyers: 8,
       radiusKm: 4,
       warehouseDistanceKm: 580,
-      warehouseMargin: -480,
-      localMargin: 2119,
+      warehouseMargin: -32000,
+      localMargin: 54000,
     },
   },
   {
@@ -94,8 +94,8 @@ export const SEEDED_RETURNS: SubmittedReturn[] = [
       sellerType: '1P',
       fallbackChain: ['donate', 'recycle'],
       warehouseDistanceKm: 580,
-      warehouseMargin: -440,
-      localMargin: 1400,
+      warehouseMargin: -44000,
+      localMargin: 140000,
     },
   },
   {

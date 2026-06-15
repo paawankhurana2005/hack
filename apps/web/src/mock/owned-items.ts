@@ -25,15 +25,15 @@ export const ownedItems: UserOwnedItem[] = [
     id: 'own_ua_charged',
     itemId: 'itm_ua_charged',
     ownerId: 'user_aarav',
-    title: 'White Court Sneakers',
+    title: 'Under Armour Charged Assert',
     category: 'sports',
-    imageUrl: '/catalog/ua-shoes.jpg',
+    imageUrl: '/demo/ua-charged/front.jpg',
     purchaseDate: '2024-02-10',
     originalPrice: inr(699900), // ₹6,999
-    description: 'Everyday sneakers. Replaced with a newer pair.',
+    description: 'Everyday running shoes. Replaced with a newer pair.',
     returnEligible: false, // bought long ago → resell
-    originalListingImages: ['/catalog/ua-shoes.jpg'],
-    originalSpecs: { Color: 'White / Red', Size: 'US 10' },
+    originalListingImages: ['/demo/ua-charged/front.jpg', '/demo/ua-charged/side.jpg', '/demo/ua-charged/sole.jpg'],
+    originalSpecs: { Color: 'White / Black', Size: 'US 10' },
   },
   {
     id: 'own_boat_headphones',

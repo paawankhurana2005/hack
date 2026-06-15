@@ -144,6 +144,11 @@ export default function MyListingsPage() {
                       <Badge tone={chip.tone}>{chip.label}</Badge>
                     </span>
                   )}
+                  {listing.gradedPhotos && listing.gradedPhotos.length > 0 && (
+                    <span className="absolute bottom-3 right-3 rounded-full bg-black/55 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-white backdrop-blur-sm">
+                      📷 {listing.gradedPhotos.length} as-graded
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-1 flex-col p-5">
                   <h2 className="font-semibold tracking-tight text-foreground">{listing.title}</h2>

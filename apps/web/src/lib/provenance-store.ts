@@ -11,6 +11,7 @@ import type {
   ProvenanceEvent,
 } from '@reloop/shared';
 import { readJson, writeJson } from './storage';
+import { pushEvent } from './data-api';
 import { seedChainFor } from '@/mock/provenance-seed';
 
 const KEY = 'reloop.provenance'; // global: { [itemId]: ProvenanceChain }
@@ -101,6 +102,7 @@ export function appendEventIfStored(itemId: ItemId, event: ProvenanceEvent): voi
   const existing = getChain(itemId);
   if (!existing) return;
   writeChain({ ...existing, events: [...existing.events, event] });
+  pushEvent(itemId, event, { category: existing.category, title: existing.title }); // → DynamoDB
 }
 
 /**
@@ -115,5 +117,6 @@ export function appendEvent(
   const chain = ensureStored(itemId, fallback);
   const next: ProvenanceChain = { ...chain, events: [...chain.events, event] };
   writeChain(next);
+  pushEvent(itemId, event, { category: next.category, title: next.title }); // → DynamoDB
   return next;
 }

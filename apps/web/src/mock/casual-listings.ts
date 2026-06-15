@@ -21,6 +21,13 @@ export interface CasualListing {
   status: ListingStatus;
   views?: number;
   listedAt: string; // ISO
+  /**
+   * The original photos the seller uploaded when the item was graded — the
+   * real, as-shot condition photos that back the Product Health Card (as
+   * opposed to `imageUrl`, the clean marketplace image). Shown in the listing's
+   * "as-graded" gallery so a buyer can see exactly what was assessed.
+   */
+  gradedPhotos?: string[];
   /** The account that owns this listing (whose My Listings it shows in). */
   sellerId?: string;
   sellerName?: string;

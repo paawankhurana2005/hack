@@ -9,6 +9,7 @@ import {
   type ProvenanceEvent,
 } from '@reloop/shared';
 import { resolveChain } from '@/lib/provenance-store';
+import { fetchChain, dataApiEnabled } from '@/lib/data-api';
 import { formatMoney } from '@/lib/money';
 
 function when(iso: string): string {
@@ -102,9 +103,24 @@ export function HealthCardHistory({
   sellerName: string;
 }) {
   const [chain, setChain] = useState<ProvenanceChain | null>(null);
+  const [fromAws, setFromAws] = useState(false);
 
   useEffect(() => {
-    setChain(resolveChain(card, { category, sellerName }));
+    let cancelled = false;
+    // Local chain renders instantly (bulletproof); then prefer the DynamoDB ledger
+    // if it has this item — so the trust history is genuinely served from AWS.
+    const local = resolveChain(card, { category, sellerName });
+    setChain(local);
+    setFromAws(false);
+    void fetchChain(card.itemId).then((remote) => {
+      if (!cancelled && remote && remote.events.length >= local.events.length) {
+        setChain(remote);
+        setFromAws(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [card, category, sellerName]);
 
   if (!chain) return null;
@@ -126,6 +142,11 @@ export function HealthCardHistory({
             Everything {chain.title} has been through
           </h3>
         </div>
+        {dataApiEnabled && fromAws && (
+          <span className="shrink-0 rounded-full border border-brand/30 bg-brand/5 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-brand">
+            ● Live · DynamoDB
+          </span>
+        )}
       </div>
 
       {/* Cumulative beat — compounded across the whole life, derived not invented */}

@@ -57,6 +57,9 @@ export const pegasusListing: CasualListing = {
   status: 'listed',
   views: 12,
   listedAt: heroShopItem.card.issuedAt,
+  // Real as-graded photos the seller uploaded (amateur, real-world shots) — the
+  // condition evidence behind the Health Card. Swap these for your own at demo time.
+  gradedPhotos: ['/demo/graded/jordan/1.jpg', '/demo/graded/jordan/2.jpg', '/demo/graded/jordan/3.jpg'],
   sellerId: 'user_aarav',
   sellerName: 'Aarav Shah',
   category: 'sports',
@@ -86,6 +89,7 @@ export const wornEarphonesListing: CasualListing = {
   status: 'listed',
   views: 4,
   listedAt: '2025-06-09T09:00:00.000Z',
+  gradedPhotos: ['/demo/graded/earphones/1.jpg'],
   sellerId: 'user_aarav',
   sellerName: 'Aarav Shah',
   category: 'electronics',

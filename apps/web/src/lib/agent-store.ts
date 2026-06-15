@@ -181,8 +181,18 @@ async function narrate(s: AgentState, d: AgentDecision): Promise<string> {
 
 // --- The tick: one simulated day --------------------------------------------
 
-/** Advance the agent one day. Returns the new state (or null if it can't run). */
-export async function tick(id: string): Promise<AgentState | null> {
+/**
+ * Advance the agent one day. Returns the new state (or null if it can't run).
+ *
+ * `narrateWithLlm` (default true) controls how the day's line is written:
+ * - true  → call the LLM narrator (nice for a single manual step).
+ * - false → use the instant, deterministic narration. Auto-run uses this so the
+ *   cadence is a steady beat instead of jittering on variable network latency.
+ */
+export async function tick(
+  id: string,
+  { narrateWithLlm = true }: { narrateWithLlm?: boolean } = {},
+): Promise<AgentState | null> {
   const s = read(id);
   if (!s || !isAgentActive(s)) return s;
 
@@ -206,7 +216,7 @@ export async function tick(id: string): Promise<AgentState | null> {
   });
 
   const now = new Date().toISOString();
-  const acted = await narrate(s, decision);
+  const acted = narrateWithLlm ? await narrate(s, decision) : fallbackNarration(s, decision);
   const priceFrom = s.priceCents;
 
   // Apply the chosen lever.

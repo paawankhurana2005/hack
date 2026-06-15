@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { PriceHistoryChart } from '@/components/agent/price-history-chart';
 import { ActivityFeed } from '@/components/agent/activity-feed';
 import { HealthCardHistory } from '@/components/sell/health-card-history';
+import { GradedPhotos } from '@/components/listings/graded-photos';
 import { formatMoney } from '@/lib/money';
 import { findSeedListing } from '@/mock/seed-listings';
 import type { CasualListing } from '@/mock/casual-listings';
@@ -83,11 +84,13 @@ export default function ListingDetailPage() {
     }
   }, [id]);
 
-  const advance = useCallback(async () => {
+  const advance = useCallback(async (auto = false) => {
     if (busy.current) return;
     busy.current = true;
     setThinking(true);
-    const next = await tick(id);
+    // Auto-run uses the instant deterministic narration for a steady cadence;
+    // a single manual "Advance 1 day" calls the LLM narrator.
+    const next = await tick(id, { narrateWithLlm: !auto });
     if (next) {
       setAgent({ ...next });
       if (!isAgentActive(next)) setAutoRun(false);
@@ -99,7 +102,7 @@ export default function ListingDetailPage() {
   // Auto-run: schedule the next tick once the previous settles.
   useEffect(() => {
     if (!autoRun || !agent || !isAgentActive(agent) || thinking) return;
-    const t = setTimeout(() => void advance(), TICK_MS);
+    const t = setTimeout(() => void advance(true), TICK_MS);
     return () => clearTimeout(t);
   }, [autoRun, agent, thinking, advance]);
 
@@ -412,6 +415,17 @@ export default function ListingDetailPage() {
 
         <ActivityFeed events={agent.events} thinking={thinking && !(sold || routedDone)} />
       </div>
+
+      {/* As-graded photos — the seller's original condition uploads */}
+      {listing.gradedPhotos && listing.gradedPhotos.length > 0 && (
+        <div className="mt-6">
+          <GradedPhotos
+            photos={listing.gradedPhotos}
+            title={listing.title}
+            grade={listing.grade}
+          />
+        </div>
+      )}
 
       {/* This item's lives — the multi-owner provenance lineage */}
       {listing.card && (
