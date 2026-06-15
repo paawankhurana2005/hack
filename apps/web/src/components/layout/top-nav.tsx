@@ -5,12 +5,16 @@ import { usePathname } from 'next/navigation';
 
 export function TopNav() {
   const pathname = usePathname();
-  // Login is a standalone entry; the user app (/app) and seller dashboard
-  // (/seller) have their own dedicated nav — no global marketing chrome there.
+  // The marketing chrome (with Log in / Get Started) only belongs on the public
+  // landing page. Login is a standalone entry, and every in-app surface — the
+  // user app (/app), seller dashboard (/seller), and the Return (/return) and
+  // Sell (/sell) flows — carries its own dedicated nav.
   if (
     pathname === '/login' ||
     pathname.startsWith('/app') ||
-    pathname.startsWith('/seller')
+    pathname.startsWith('/seller') ||
+    pathname.startsWith('/return') ||
+    pathname.startsWith('/sell')
   )
     return null;
   return (
