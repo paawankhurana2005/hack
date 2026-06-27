@@ -3,18 +3,18 @@
 // admit when it doesn't know. A deterministic fallback keeps it useful offline.
 
 import type { RufusContext, RufusRequest } from '@reloop/shared';
+import { buildCorpus, isGrounded, retrieve } from '@reloop/shared';
 import type { Config } from '../../config.js';
 import { nvidiaChat } from '../nvidia/client.js';
 
 const SYSTEM_PROMPT = `You are Rufus, Amazon's friendly shopping assistant, helping someone consider a
-SECOND-HAND item. Answer their question using ONLY the item's Health Card facts
-provided as JSON. Rules:
+SECOND-HAND item. You are given a SHORT LIST of retrieved facts from the item's
+Product Health Card. Rules:
+- Answer using ONLY the retrieved facts. Never invent specs, prices, or claims.
 - Be concise and conversational — 1 to 2 short sentences, max ~40 words.
-- Be honest about condition and any noted issues; never invent specs or claims.
 - If the facts don't cover the question, say you don't have that detail on the
-  Health Card and suggest what is known.
-- You may reason lightly (e.g. a "good"-grade item is fine for everyday use), but
-  ground it in the facts. No markdown, no bullet lists.`;
+  Health Card and mention what IS known.
+- No markdown, no bullet lists.`;
 
 function inr(n: number | undefined): string {
   return n === undefined ? '—' : `₹${Math.round(n).toLocaleString('en-IN')}`;
@@ -37,22 +37,30 @@ export function fallbackAnswer(ctx: RufusContext): string {
 }
 
 export async function answerRufus(cfg: Config, req: RufusRequest): Promise<string> {
-  const userMsg = JSON.stringify({
-    question: req.question,
-    healthCard: req.context,
-  });
+  // 1. Retrieve only the Health-Card facts relevant to the question (RAG).
+  const corpus = buildCorpus(req.context);
+  const retrieved = retrieve(req.question, corpus, 4);
+  if (retrieved.length === 0) return fallbackAnswer(req.context); // nothing relevant
+
+  const facts = retrieved.map((c) => `- ${c.text}`).join('\n');
   try {
+    // 2. Ground the answer in ONLY the retrieved facts.
     const text = await nvidiaChat(cfg, {
       model: cfg.PRICING_MODEL,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userMsg },
+        {
+          role: 'user',
+          content: `Question: ${req.question}\n\nRetrieved Health Card facts (use ONLY these):\n${facts}`,
+        },
       ],
       maxTokens: 140,
-      temperature: 0.4,
+      temperature: 0.3,
     });
     const cleaned = text.trim().replace(/^["']|["']$/g, '');
-    return cleaned || fallbackAnswer(req.context);
+    // 3. Hallucination check: reject answers that assert numbers not in the context.
+    if (!cleaned || !isGrounded(cleaned, facts)) return fallbackAnswer(req.context);
+    return cleaned;
   } catch {
     return fallbackAnswer(req.context);
   }

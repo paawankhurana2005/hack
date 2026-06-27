@@ -1,28 +1,41 @@
 // NVIDIA-hosted VLM provider (OpenAI-compatible chat API).
-// Sends one item photo + a condition-assessment prompt and parses the model's
-// JSON back into a VlmAssessment. Defensive throughout: a misbehaving model must
-// never crash the server or fabricate a silent grade.
+// Sends one item photo + a CATEGORY-CONDITIONED condition-assessment prompt and
+// parses the model's structured JSON into a VlmAssessment. Defensive throughout: a
+// misbehaving model must never crash the server or fabricate a silent grade. The
+// model perceives (grade, structured issues, capture quality); all aggregation and
+// calibration happens deterministically downstream.
 
-import type { ConditionGrade } from '@reloop/shared';
+import type { ConditionGrade, DetectedIssue, IssueSeverity, PhotoQuality } from '@reloop/shared';
+import { rubricFor } from '@reloop/shared';
 import type { Config } from '../../config.js';
 import { extractJson, nvidiaChat, type ChatContentPart } from '../nvidia/client.js';
 import type { VlmAssessment, VlmImageInput, VlmProvider } from './types.js';
 
 const GRADES: readonly ConditionGrade[] = ['new', 'like-new', 'good', 'fair', 'poor'];
+const SEVERITIES: readonly IssueSeverity[] = ['minor', 'moderate', 'severe'];
+const QUALITIES: readonly PhotoQuality[] = ['clear', 'blurry', 'dark', 'occluded'];
 
-const SYSTEM_PROMPT = `You are ReLoop's product condition grader ("the eyes").
-You assess the physical condition of a used item from photos so it can be resold.
+function buildSystemPrompt(issueTypes: string[], regions: string[]): string {
+  return `You are ReLoop's product condition grader ("the eyes").
+You assess the physical condition of a used item from a photo so it can be resold.
 Be objective and specific about visible wear.
 
-Respond with ONLY a JSON object, no prose and no markdown fences, of the form:
+Classify each visible flaw using these issue types where they fit: ${issueTypes.join(', ')}.
+Localize each flaw to one of these regions: ${regions.join(', ')}.
+Also judge the PHOTO's capture quality so we know if we can trust the assessment.
+
+Respond with ONLY a JSON object, no prose and no markdown fences:
 {
   "grade": one of "new" | "like-new" | "good" | "fair" | "poor",
   "confidence": number between 0 and 1,
-  "detectedIssues": array of short strings describing visible flaws (empty if none),
+  "issues": array of { "type": short string, "severity": "minor"|"moderate"|"severe", "region": short string },
+  "photoQuality": one of "clear" | "blurry" | "dark" | "occluded",
   "summary": one concise plain-English sentence describing overall condition
 }
 Grade meaning: "new" = unused/pristine, "like-new" = barely used no visible wear,
-"good" = light wear, "fair" = clear wear but functional, "poor" = heavy damage.`;
+"good" = light wear, "fair" = clear wear but functional, "poor" = heavy damage.
+Use [] for issues when none are visible.`;
+}
 
 function buildUserContent(input: VlmImageInput): ChatContentPart[] {
   const { draft, imageBase64 } = input;
@@ -59,17 +72,53 @@ function normalizeConfidence(value: unknown, grade: ConditionGrade): number {
   return coarse[grade];
 }
 
-function normalizeIssues(value: unknown): string[] {
+function normalizeSeverity(value: unknown): IssueSeverity {
+  const v = String(value).toLowerCase().trim();
+  return SEVERITIES.find((s) => s === v) ?? 'moderate';
+}
+
+function normalizeQuality(value: unknown): PhotoQuality {
+  const v = String(value).toLowerCase().trim();
+  return QUALITIES.find((q) => q === v) ?? 'clear';
+}
+
+/** Parse the model's `issues` array into structured defects, tolerant of shape. */
+function normalizeIssues(value: unknown): DetectedIssue[] {
   if (!Array.isArray(value)) return [];
-  return value.map((v) => String(v).trim()).filter((s) => s.length > 0).slice(0, 12);
+  const out: DetectedIssue[] = [];
+  for (const raw of value) {
+    if (typeof raw === 'string') {
+      const t = raw.trim();
+      if (t) out.push({ type: t, severity: 'moderate', region: 'unspecified' });
+    } else if (raw && typeof raw === 'object') {
+      const o = raw as Record<string, unknown>;
+      const type = typeof o.type === 'string' ? o.type.trim() : '';
+      if (type) {
+        out.push({
+          type,
+          severity: normalizeSeverity(o.severity),
+          region: typeof o.region === 'string' && o.region.trim() ? o.region.trim() : 'unspecified',
+        });
+      }
+    }
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+/** Human string for back-compat detectedIssues[]: "screen scratch (severe, screen)". */
+export function issueToString(i: DetectedIssue): string {
+  const where = i.region && i.region !== 'unspecified' ? `, ${i.region}` : '';
+  return `${i.type} (${i.severity}${where})`;
 }
 
 export class NvidiaVlmProvider implements VlmProvider {
   constructor(private readonly cfg: Config) {}
 
   async assessImage(input: VlmImageInput): Promise<VlmAssessment> {
+    const rubric = rubricFor(input.draft.category);
     const messages = [
-      { role: 'system' as const, content: SYSTEM_PROMPT },
+      { role: 'system' as const, content: buildSystemPrompt(rubric.issueTypes, rubric.regions) },
       { role: 'user' as const, content: buildUserContent(input) },
     ];
 
@@ -83,8 +132,7 @@ export class NvidiaVlmProvider implements VlmProvider {
               ...messages,
               {
                 role: 'user' as const,
-                content:
-                  'Respond with ONLY the JSON object described — no prose, no markdown.',
+                content: 'Respond with ONLY the JSON object described — no prose, no markdown.',
               },
             ];
       lastContent = await nvidiaChat(this.cfg, {
@@ -103,10 +151,13 @@ export class NvidiaVlmProvider implements VlmProvider {
     try {
       const raw = extractJson(content);
       const grade = normalizeGrade(raw.grade);
+      const structuredIssues = normalizeIssues(raw.issues);
       return {
         grade,
         confidence: normalizeConfidence(raw.confidence, grade),
-        detectedIssues: normalizeIssues(raw.detectedIssues),
+        structuredIssues,
+        detectedIssues: structuredIssues.map(issueToString),
+        photoQuality: normalizeQuality(raw.photoQuality),
         summary:
           typeof raw.summary === 'string' && raw.summary.trim()
             ? raw.summary.trim()

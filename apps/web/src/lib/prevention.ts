@@ -5,14 +5,88 @@
 // the ReturnRiskPrediction contract (in @reloop/shared) stays the same.
 
 import type { ReturnRiskLevel, ReturnRiskPrediction } from '@reloop/shared';
-import { findStoreProduct } from '@/mock/store-products';
+import {
+  confidenceFor,
+  featuresFor,
+  predictReturnProb,
+  reasonDistribution,
+  riskLevelFor,
+} from '@reloop/shared';
+import { findStoreProduct, type StoreProduct } from '@/mock/store-products';
 
-/** The predicted return risk for one variant of a product, or null if unknown. */
+/** Predicted return for one sized variant, computed by the real classifier. */
+function predictVariant(product: StoreProduct, variant: string): ReturnRiskPrediction | null {
+  const sizes = product.sizes;
+  if (!sizes || sizes.length < 2) return null;
+  const idx = sizes.indexOf(variant);
+  if (idx === -1) return null;
+
+  const probFor = (sizeIndex: number): number =>
+    predictReturnProb(
+      featuresFor({
+        category: product.category,
+        sizeIndex,
+        sizeCount: sizes.length,
+        priceCents: product.price.amountCents,
+        rating: product.rating,
+        ratingCount: product.ratingCount,
+      }),
+    );
+
+  const prob = probFor(idx);
+  const features = featuresFor({
+    category: product.category,
+    sizeIndex: idx,
+    sizeCount: sizes.length,
+    priceCents: product.price.amountCents,
+    rating: product.rating,
+    ratingCount: product.ratingCount,
+  });
+
+  // Cross-variant nudge: the lowest-risk size, if meaningfully safer than this one.
+  let bestIdx = idx;
+  let bestProb = prob;
+  sizes.forEach((_, i) => {
+    const p = probFor(i);
+    if (p < bestProb) {
+      bestProb = p;
+      bestIdx = i;
+    }
+  });
+  const recommendation =
+    bestIdx !== idx && prob - bestProb >= 0.05
+      ? {
+          variantLabel: `Size ${sizes[bestIdx]!}`,
+          returnRate: bestProb,
+          rationale: `Most returns of size ${variant} are fit-related — size ${sizes[bestIdx]!} comes back less often.`,
+        }
+      : undefined;
+
+  return {
+    variantLabel: `Size ${variant}`,
+    riskLevel: riskLevelFor(prob),
+    returnRate: prob,
+    confidence: confidenceFor(product.ratingCount),
+    reasons: reasonDistribution(features).slice(0, 3),
+    ...(recommendation ? { recommendation } : {}),
+  };
+}
+
+/**
+ * Predicted return risk for one variant. Curated authored predictions (real
+ * historical labels for the hero product) take precedence; otherwise the real
+ * classifier generalizes prevention to every other sized product. Returns null when
+ * there's no variant to reason about.
+ */
 export function getReturnRisk(
   productId: string,
   variant: string,
 ): ReturnRiskPrediction | null {
-  return findStoreProduct(productId)?.predictions?.[variant] ?? null;
+  const product = findStoreProduct(productId);
+  if (!product) return null;
+  const authored = product.predictions?.[variant];
+  if (authored) return authored;
+  return predictVariant(product, variant);
 }
 
 /** Tailwind-friendly tone tokens per risk level — drives the panel's colour. */

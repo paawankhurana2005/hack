@@ -1,6 +1,7 @@
 // @reloop/shared — the single source of truth for ReLoop data contracts.
 export * from './common.js';
 export * from './grading.js';
+export * from './grading-rubric.js';
 export * from './routing.js';
 export * from './health-card.js';
 export * from './sell.js';
@@ -14,3 +15,16 @@ export * from './impact.js';
 export * from './shop.js';
 export * from './agent.js';
 export * from './rufus.js';
+export * from './pipeline.js';
+export * from './features.js';
+export * from './idempotency.js';
+export * from './ml/gbdt.js';
+export * from './ml/logreg.js';
+export * from './pricing-model.js';
+export * from './routing-ev.js';
+export * from './return-risk-model.js';
+export * from './flywheel.js';
+export * from './rufus-rag.js';
+export * from './review.js';
+export * from './monitor.js';
+export * from './pii.js';

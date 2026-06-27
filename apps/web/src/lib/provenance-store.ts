@@ -33,6 +33,19 @@ export function getChain(itemId: ItemId): ProvenanceChain | null {
   return readAll()[itemId] ?? null;
 }
 
+/** Every stored provenance chain — the raw material for the training flywheel. */
+export function getAllChains(): ProvenanceChain[] {
+  return Object.values(readAll());
+}
+
+/** True if `event` duplicates the chain's most recent event (same type + at) — the
+ *  signature of a retry / cold-start re-fire. Idempotency guard so we never append
+ *  the same verified event twice. */
+function isDuplicateOfLast(events: ProvenanceEvent[], event: ProvenanceEvent): boolean {
+  const last = events[events.length - 1];
+  return last != null && last.type === event.type && last.at === event.at;
+}
+
 /** Build a sensible single-life chain from a card when no chain exists yet:
  *  origin (Amazon) → owned (current seller) → graded → listed. Honest and minimal
  *  — every item really was sold new by Amazon and graded before listing. */
@@ -101,6 +114,7 @@ function ensureStored(itemId: ItemId, fallback: ProvenanceChain): ProvenanceChai
 export function appendEventIfStored(itemId: ItemId, event: ProvenanceEvent): void {
   const existing = getChain(itemId);
   if (!existing) return;
+  if (isDuplicateOfLast(existing.events, event)) return; // idempotent: skip re-fire
   writeChain({ ...existing, events: [...existing.events, event] });
   pushEvent(itemId, event, { category: existing.category, title: existing.title }); // → DynamoDB
 }
@@ -115,6 +129,7 @@ export function appendEvent(
   fallback: ProvenanceChain,
 ): ProvenanceChain {
   const chain = ensureStored(itemId, fallback);
+  if (isDuplicateOfLast(chain.events, event)) return chain; // idempotent: skip re-fire
   const next: ProvenanceChain = { ...chain, events: [...chain.events, event] };
   writeChain(next);
   pushEvent(itemId, event, { category: next.category, title: next.title }); // → DynamoDB

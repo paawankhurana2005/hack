@@ -4,7 +4,8 @@
 
 import type { DemandLevel, ItemCategory } from '@reloop/shared';
 import type { Config } from '../../config.js';
-import { extractJson, nvidiaChat } from '../nvidia/client.js';
+import { extractJson } from '../nvidia/client.js';
+import { callModel } from '../../lib/model-call.js';
 import type { MarketEstimate, MarketEstimateInput, MarketProvider } from './types.js';
 
 const SYSTEM_PROMPT = `You are ReLoop's resale market analyst for the INDIAN market.
@@ -25,7 +26,8 @@ Respond with ONLY a JSON object, no prose and no markdown fences:
 const DEMANDS: readonly DemandLevel[] = ['low', 'medium', 'high'];
 
 // Last-resort retail estimate (INR) when the model can't price a generic item.
-const CATEGORY_DEFAULT_INR: Record<ItemCategory, number> = {
+// Exported so the Sell pipeline's price-stage fallback reuses the same anchors.
+export const CATEGORY_DEFAULT_INR: Record<ItemCategory, number> = {
   electronics: 12_000,
   home: 5_000,
   fashion: 4_000,
@@ -56,50 +58,38 @@ export class NvidiaMarketProvider implements MarketProvider {
       (detectedIssues.length ? ` Noted wear: ${detectedIssues.join(', ')}.` : '') +
       ' Give the typical new retail price and resale demand.';
 
-    const messages = [
-      { role: 'system' as const, content: SYSTEM_PROMPT },
-      { role: 'user' as const, content: userMsg },
-    ];
-
-    // Try twice; the model sometimes returns 0 or prose for generic titles.
-    let demand: DemandLevel = 'medium';
-    let note = '';
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const reqMessages =
-        attempt === 0
-          ? messages
-          : [
-              ...messages,
-              {
-                role: 'user' as const,
-                content:
-                  'Return ONLY the JSON with a positive estimatedRetailInr (never 0), based on the category if unsure.',
-              },
-            ];
-      try {
-        const content = await nvidiaChat(this.cfg, {
-          model: this.cfg.PRICING_MODEL,
-          messages: reqMessages,
-          maxTokens: 256,
-        });
+    // Routed through the single model-call choke point: timeout + retry-with-nudge
+    // (the model sometimes returns 0 or prose for generic titles) + a REQUIRED
+    // deterministic category fallback so pricing always produces a usable estimate.
+    const { value } = await callModel<MarketEstimate>(this.cfg, {
+      request: {
+        model: this.cfg.PRICING_MODEL,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userMsg },
+        ],
+        maxTokens: 256,
+      },
+      retries: 1,
+      nudge:
+        'Return ONLY the JSON with a positive estimatedRetailInr (never 0), based on the category if unsure.',
+      parse: (content) => {
         const raw = extractJson(content);
-        demand = normalizeDemand(raw.demand);
-        note = typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim() : note;
         const inr = parseInr(raw.estimatedRetailInr);
-        if (inr !== null) {
-          return { estimatedRetailCents: Math.round(inr * 100), demand, note };
-        }
-      } catch {
-        // fall through to retry / category fallback
-      }
-    }
-
-    // Category fallback so pricing always produces a usable estimate.
-    const fallback = CATEGORY_DEFAULT_INR[draft.category];
-    return {
-      estimatedRetailCents: fallback * 100,
-      demand,
-      note: note || `Estimated from the ${draft.category} category.`,
-    };
+        if (inr === null) throw new Error('model returned a non-positive retail estimate');
+        const note = typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim() : '';
+        return {
+          estimatedRetailCents: Math.round(inr * 100),
+          demand: normalizeDemand(raw.demand),
+          note: note || `Typical retail for ${draft.category}.`,
+        };
+      },
+      fallback: () => ({
+        estimatedRetailCents: CATEGORY_DEFAULT_INR[draft.category] * 100,
+        demand: 'medium' as DemandLevel,
+        note: `Estimated from the ${draft.category} category.`,
+      }),
+    });
+    return value;
   }
 }

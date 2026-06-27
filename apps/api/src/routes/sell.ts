@@ -6,6 +6,7 @@ import type { ApiError } from '@reloop/shared';
 import type { GradingService } from '../services/grading/grading-service.js';
 import type { PricingService } from '../services/pricing/pricing-service.js';
 import type { HealthCardService } from '../services/health-card/health-card-service.js';
+import { runSellPipeline } from '../services/pipeline/sell-pipeline.js';
 
 const MAX_IMAGES = 4;
 // ~2.6MB of base64 ≈ ~2MB binary per image; generous upper bound before we reject.
@@ -43,12 +44,44 @@ const gradeSchema = z.object({
     .min(1, 'at least one image is required')
     .max(MAX_IMAGES, `at most ${MAX_IMAGES} images`),
   reference: referenceSchema.optional(),
+  requestKey: z.string().max(120).optional(),
 });
+
+const severityEnum = z.enum(['minor', 'moderate', 'severe']);
+const structuredIssueSchema = z.object({
+  type: z.string().trim().max(120),
+  severity: severityEnum,
+  region: z.string().trim().max(60),
+});
+const priceReferenceSchema = z.object({
+  originalRetailCents: z.number().nonnegative(),
+  purchaseDate: z.string().max(40).optional(),
+  discontinued: z.boolean().optional(),
+});
+
+// Phase 2 feature inputs are additive + optional, so older callers still validate.
+const priceFeatureFields = {
+  requestKey: z.string().max(120).optional(),
+  reference: priceReferenceSchema.optional(),
+  structuredIssues: z.array(structuredIssueSchema).max(20).optional(),
+  completeness: z.number().min(0).max(1).optional(),
+  authenticityConfidence: z.number().min(0).max(1).optional(),
+  nearbyBuyers: z.number().int().nonnegative().optional(),
+};
 
 const priceSchema = z.object({
   draft: draftSchema,
   grade: gradeEnum,
   detectedIssues: z.array(z.string().trim().max(200)).max(20).default([]),
+  ...priceFeatureFields,
+});
+
+// Pipeline accepts the grade payload plus the pricing feature inputs (so the
+// orchestrated flow can anchor pricing to the base reference too).
+const pipelineSchema = gradeSchema.extend({
+  priceReference: priceReferenceSchema.optional(),
+  completeness: z.number().min(0).max(1).optional(),
+  nearbyBuyers: z.number().int().nonnegative().optional(),
 });
 
 // Full result shapes the client echoes back to assemble the health card.
@@ -140,6 +173,20 @@ export function createSellRouter(
     // Pure assembly — cannot fail on an external call.
     const card = healthCard.build(parsed.data);
     return res.json(card);
+  });
+
+  // Additive: the whole grade→price→health-card flow as one orchestrated pipeline
+  // with per-stage timeouts + deterministic fallbacks. Always 200 (degrades to
+  // fallbacks rather than failing); the response carries the stage trace so the
+  // caller can see what fell back. The individual endpoints above are unchanged.
+  router.post('/pipeline', async (req, res) => {
+    const parsed = pipelineSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const message = parsed.error.issues.map((i) => i.message).join('; ');
+      return res.status(400).json(apiError('invalid_request', message));
+    }
+    const result = await runSellPipeline({ grading, pricing, healthCard }, parsed.data);
+    return res.json(result);
   });
 
   return router;

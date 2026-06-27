@@ -21,6 +21,10 @@ const contextSchema = z.object({
   ecoCredits: z.number().optional(),
   sellerName: z.string().max(120).optional(),
   specs: z.record(z.string().max(120)).optional(),
+  priorQa: z
+    .array(z.object({ q: z.string().max(400), a: z.string().max(600) }))
+    .max(10)
+    .optional(),
 });
 
 const schema = z.object({

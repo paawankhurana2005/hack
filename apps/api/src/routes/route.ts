@@ -127,6 +127,13 @@ export async function routeHandler(req: Request, res: Response): Promise<void> {
       dwellBudgetHours: computed.dwellBudgetHours,
       sellerType: computed.sellerType,
       fallbackChain: computed.fallbackChain,
+      // Phase 3: the glass-box EV optimization + real freight comparison.
+      evBreakdown: computed.evBreakdown,
+      localMargin: computed.localMargin,
+      warehouseMargin: computed.warehouseMargin,
+      warehouseDistanceKm: computed.warehouseDistanceKm,
+      nearbyBuyers: computed.nearbyBuyers,
+      radiusKm: computed.radiusKm,
     };
 
     res.json(result);

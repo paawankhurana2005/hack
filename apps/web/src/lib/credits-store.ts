@@ -14,6 +14,7 @@ export interface CreditEntry {
   label: string;
   at: string; // ISO
   code?: string; // voucher code (redeem only)
+  key?: string; // idempotency key — a retry/re-fire with the same key is ignored
 }
 
 export interface VoucherTier {
@@ -53,16 +54,25 @@ export function getBalance(): number {
   return getActivity().reduce((b, e) => (e.kind === 'earn' ? b + e.amount : b - e.amount), 0);
 }
 
-/** Credit the signed-in user (e.g. for listing an item). */
-export function earnSeller(amount: number, label: string): void {
-  earnFor(undefined, amount, label);
+/** Credit the signed-in user (e.g. for listing an item). `key` makes it idempotent. */
+export function earnSeller(amount: number, label: string, key?: string): void {
+  earnFor(undefined, amount, label, key);
 }
 
-/** Credit a SPECIFIC account — used when one user's purchase pays another user. */
-export function earnFor(accountId: string | undefined, amount: number, label: string): void {
+/** Credit a SPECIFIC account — used when one user's purchase pays another user.
+ *  When `key` is supplied, a repeat earn with the same key is ignored (so a retry or
+ *  cold-start re-fire never double-credits). */
+export function earnFor(
+  accountId: string | undefined,
+  amount: number,
+  label: string,
+  key?: string,
+): void {
   if (amount <= 0) return;
+  const ledger = readLedger(accountId);
+  if (key && ledger.some((e) => e.key === key)) return; // idempotent: already credited
   writeLedger(
-    [{ kind: 'earn', amount, label, at: new Date().toISOString() }, ...readLedger(accountId)],
+    [{ kind: 'earn', amount, label, at: new Date().toISOString(), ...(key ? { key } : {}) }, ...ledger],
     accountId,
   );
 }

@@ -6,7 +6,9 @@
 
 import type {
   ConditionGrade,
+  DetectedIssue,
   GradeReference,
+  PhotoQuality,
   ReferenceComparison,
   SellItemDraft,
 } from '@reloop/shared';
@@ -14,8 +16,12 @@ import type {
 /** Per-image, model-derived assessment. */
 export interface VlmAssessment {
   grade: ConditionGrade;
-  confidence: number; // 0..1
+  confidence: number; // 0..1 (raw, pre-calibration)
   detectedIssues: string[];
+  /** Structured, localized defects (Phase 1). Flattened into detectedIssues too. */
+  structuredIssues: DetectedIssue[];
+  /** Capture quality of this photo (Phase 1). */
+  photoQuality: PhotoQuality;
   summary: string;
 }
 
@@ -36,13 +42,15 @@ export interface ReferenceInput {
   grade: ConditionGrade;
   detectedIssues: string[];
   reference: GradeReference;
+  /** The user's primary photo (base64, no data: prefix) — lets a real VLM look. */
+  primaryImageBase64?: string;
 }
 
 /**
- * Diffs the user's item against its original listing. A real implementation would
- * run a visual diff over the original photos; the mock derives the comparison
- * deterministically from the grade + specs. Either way the contract is identical.
+ * Diffs the user's item against its original listing. The VLM comparator grounds
+ * an authenticity signal in the model + the original specs; the mock derives it
+ * deterministically. Async so a real model call fits the same contract.
  */
 export interface ReferenceComparator {
-  compare(input: ReferenceInput): ReferenceComparison;
+  compare(input: ReferenceInput): Promise<ReferenceComparison>;
 }

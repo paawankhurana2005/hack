@@ -136,6 +136,22 @@ const PRODUCTS: StoreProduct[] = [
     sizes: ['7', '8', '9', '10', '11'],
     predictions: J1_PREDICTIONS,
   },
+  {
+    // No authored predictions — the real return-risk classifier fills these in,
+    // extending Prevention beyond the hero product (Phase 4).
+    id: 'store_adidas_ultraboost',
+    title: 'Adidas Ultraboost Light',
+    brand: 'Adidas',
+    category: 'fashion',
+    group: 'Footwear',
+    imageUrl: '/catalog/pegasus.jpg',
+    price: inr(1599500), // ₹15,995
+    rating: 4.3,
+    ratingCount: 1870,
+    description:
+      'Lightweight responsive running shoe with BOOST cushioning and a Primeknit upper. Runs slightly narrow.',
+    sizes: ['6', '7', '8', '9', '10', '11'],
+  },
 
   // --- Phones --------------------------------------------------------------
   {

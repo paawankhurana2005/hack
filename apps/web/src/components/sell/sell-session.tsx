@@ -12,8 +12,10 @@ import {
 } from '@reloop/shared';
 import type { CompressedImage } from '@/lib/image';
 import { ApiRequestError, createHealthCard, gradeItem, priceItem } from '@/lib/api-client';
+import { reviewDecision } from '@reloop/shared';
 import { addListing } from '@/lib/listings-store';
 import { earnSeller } from '@/lib/credits-store';
+import { enqueueReview } from '@/lib/review-queue';
 import { appendEvent, baseChain } from '@/lib/provenance-store';
 import { uploadImage } from '@/lib/data-api';
 import { useRole } from '@/lib/role-context';
@@ -160,11 +162,22 @@ export function SellSession({ item }: { item: OwnedItem }) {
         return;
       }
 
-      // 2. Price (logic decides, LLM narrates).
+      // 2. Price — anchored to the original Amazon listing (base reference) so the
+      //    resale-ratio model can price from real condition/age/demand features.
       setStage('pricing');
       let p: PricingResult;
       try {
-        p = await priceItem({ draft, grade: g.grade, detectedIssues: g.detectedIssues });
+        p = await priceItem({
+          draft,
+          grade: g.grade,
+          detectedIssues: g.detectedIssues,
+          reference: {
+            originalRetailCents: item.originalPrice.amountCents,
+            purchaseDate: item.purchaseDate,
+          },
+          structuredIssues: g.structuredIssues,
+          authenticityConfidence: g.referenceComparison?.authenticityConfidence,
+        });
         setPricing(p);
       } catch (e) {
         setFailedStage('pricing');
@@ -239,8 +252,27 @@ export function SellSession({ item }: { item: OwnedItem }) {
         baseViewsPerDay: 6,
       },
     });
-    // Seller earns EcoCredits for diverting the item from landfill.
-    if (impact) earnSeller(impact.ecoCredits, `Listed ${item.title}`);
+    // Seller earns EcoCredits for diverting the item from landfill. Idempotent on the
+    // physical item + listing price so a retry / re-render never double-credits.
+    if (impact) earnSeller(impact.ecoCredits, `Listed ${item.title}`, `list:${item.itemId}:${listed.amountCents}`);
+
+    // Human-in-the-loop: if the AI wasn't confident (or the item is risky), queue it
+    // for review rather than trusting the grade outright.
+    const review = reviewDecision({
+      calibratedConfidence: grading?.confidence,
+      valueCents: listed.amountCents,
+      authenticityMatch: grading?.referenceComparison?.authenticityMatch,
+    });
+    if (review.needsReview) {
+      enqueueReview({
+        id: `rev:${item.itemId}`,
+        itemId: item.itemId,
+        title: item.title,
+        reasons: review.reasons,
+        proposedGrade: grading?.grade,
+        proposedPriceCents: listed.amountCents,
+      });
+    }
 
     // Provenance: append this life's grade + listing to the item's chain. For a
     // re-listed item (e.g. the staged demo item) this lands on top of its existing

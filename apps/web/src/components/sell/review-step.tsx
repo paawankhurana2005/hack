@@ -23,6 +23,12 @@ const gradeTone = {
   poor: 'danger',
 } as const;
 
+const severityTone = {
+  minor: 'accent',
+  moderate: 'warning',
+  severe: 'danger',
+} as const;
+
 export function ReviewStep({
   item,
   grading,
@@ -58,6 +64,37 @@ export function ReviewStep({
         </div>
         <p className="mt-4 text-lg text-foreground">{grading.summary}</p>
       </Panel>
+
+      {/* a2. Abstain / capture guidance (Phase 1: closed-loop, glass-box) */}
+      {(grading.needsReview || (grading.captureGuidance?.length ?? 0) > 0) && (
+        <Card>
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-amber-400">
+              {grading.needsReview ? 'Low confidence · flagged for review' : 'Improve the photos'}
+            </p>
+            {typeof grading.qualityScore === 'number' && (
+              <Badge tone={grading.qualityScore < 0.6 ? 'warning' : 'accent'}>
+                Photo quality {(grading.qualityScore * 100).toFixed(0)}%
+              </Badge>
+            )}
+          </div>
+          {(grading.captureGuidance?.length ?? 0) > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {grading.captureGuidance!.map((g) => (
+                <li key={g} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-amber-400" />
+                  {g}
+                </li>
+              ))}
+            </ul>
+          )}
+          {grading.needsReview && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              This grade is below our confidence bar — a person will double-check it before it goes live.
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* b. Reference comparison */}
       {ref ? (
@@ -156,20 +193,40 @@ export function ReviewStep({
         </Card>
       )}
 
-      {/* c. Detected issues */}
-      {grading.detectedIssues.length > 0 && (
+      {/* c. Detected issues — structured (with severity) when available */}
+      {(grading.structuredIssues?.length ?? grading.detectedIssues.length) > 0 && (
         <Card>
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             Detected issues
           </p>
-          <ul className="mt-2 space-y-1.5">
-            {grading.detectedIssues.map((issue) => (
-              <li key={issue} className="flex items-start gap-2 text-sm text-muted-foreground">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand" />
-                {issue}
-              </li>
-            ))}
-          </ul>
+          {grading.structuredIssues && grading.structuredIssues.length > 0 ? (
+            <ul className="mt-2 space-y-2">
+              {grading.structuredIssues.map((issue) => (
+                <li
+                  key={`${issue.type}-${issue.region}`}
+                  className="flex items-center justify-between gap-3 text-sm text-muted-foreground"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="size-1.5 shrink-0 rounded-full bg-brand" />
+                    {issue.type}
+                    {issue.region !== 'unspecified' && (
+                      <span className="text-xs text-muted-foreground/70">· {issue.region}</span>
+                    )}
+                  </span>
+                  <Badge tone={severityTone[issue.severity]}>{issue.severity}</Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="mt-2 space-y-1.5">
+              {grading.detectedIssues.map((issue) => (
+                <li key={issue} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand" />
+                  {issue}
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       )}
 
@@ -206,6 +263,52 @@ export function ReviewStep({
           </div>
         </Panel>
       </div>
+
+      {/* d2. Price ↔ time-to-sell tradeoff (Phase 2: the model output) */}
+      {pricing.sellThroughCurve && pricing.sellThroughCurve.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
+              Price ↔ time-to-sell
+            </p>
+            {pricing.modelSource && (
+              <Badge tone={pricing.modelSource === 'gbdt' ? 'accent' : 'neutral'}>
+                {pricing.modelSource === 'gbdt' ? 'model-predicted' : 'policy fallback'}
+              </Badge>
+            )}
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {pricing.sellThroughCurve.map((pt) => (
+              <div
+                key={pt.label}
+                className={`rounded-xl p-3 ring-1 ${
+                  pt.label === 'recommended' ? 'bg-brand/10 ring-brand/40' : 'ring-border'
+                }`}
+              >
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {pt.label}
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
+                  {formatMoney({ amountCents: pt.priceCents, currency: 'INR' })}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  ~{pt.expectedDays} days · {Math.round(pt.sellThroughProb * 100)}% in 30d
+                </p>
+              </div>
+            ))}
+          </div>
+          {pricing.priceLow && pricing.priceHigh && (
+            <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Predicted band {formatMoney(pricing.priceLow)} – {formatMoney(pricing.priceHigh)}
+            </p>
+          )}
+          {pricing.belowFloor && (
+            <p className="mt-2 text-sm text-amber-400">
+              Resale value is below the salvage floor — routing (donate/recycle) may recover more.
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* e. Health Card preview (showpiece) */}
       <div>

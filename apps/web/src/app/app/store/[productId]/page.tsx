@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ReturnRiskPanel } from '@/components/store/return-risk-panel';
 import { formatMoney } from '@/lib/money';
+import { getReturnRisk } from '@/lib/prevention';
 import { findStoreProduct } from '@/mock/store-products';
 
 export default function StoreProductPage() {
@@ -34,12 +35,14 @@ export default function StoreProductPage() {
   }
 
   const sized = !!product.sizes?.length;
-  const prediction = size && product.predictions ? product.predictions[size] : null;
+  // Real classifier (authored labels take precedence) — extends prevention to every
+  // sized product, not just the hero shoe.
+  const prediction = size ? getReturnRisk(product.id, size) : null;
 
   // Map a recommendation's label (e.g. "Size 9") back to its size key.
   function switchTo(variantLabel: string) {
     const match = product!.sizes?.find(
-      (s) => product!.predictions?.[s]?.variantLabel === variantLabel,
+      (s) => getReturnRisk(product!.id, s)?.variantLabel === variantLabel,
     );
     if (match) {
       setSize(match);

@@ -33,6 +33,8 @@ export interface GradeRequest {
   imagesBase64: string[];
   /** When present, grading also produces a ReferenceComparison. */
   reference?: GradeReference;
+  /** Idempotency key (see @reloop/shared stableKey) — retries reuse the same key. */
+  requestKey?: string;
 }
 
 /** Standard API error envelope returned by apps/api on failure. */

@@ -44,6 +44,24 @@ export interface ReturnRoutingDecision {
   nearbyBuyers?: number;          // verified buyers found within radiusKm
   radiusKm?: number;              // search radius used
   warehouseDistanceKm?: number;   // distance to nearest warehouse (shows what we avoided)
+  // Phase 3: per-path expected-value breakdown (the glass-box optimization).
+  evBreakdown?: RoutingEvBreakdown;
+}
+
+/** A single path's expected value + signed term contributions (paise). */
+export interface RoutingPathEv {
+  path: ReturnRoutingDecision['decision'];
+  evCents: number;
+  viable: boolean;
+  terms: { label: string; valueCents: number }[];
+}
+
+/** The EV optimization, surfaced for on-screen explanation. */
+export interface RoutingEvBreakdown {
+  /** Set when a hard constraint forced the path (EV skipped). */
+  hardRule?: string;
+  chosen: ReturnRoutingDecision['decision'];
+  paths: RoutingPathEv[];
 }
 
 export interface RoutingInput {

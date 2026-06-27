@@ -1,7 +1,13 @@
 'use client';
 
-import { useEffect, useState, type ComponentType, type SVGProps } from 'react';
-import type { ReturnGradingResult, ReturnRoutingDecision, ReturnReason } from '@reloop/shared';
+import { useEffect, useMemo, useState, type ComponentType, type SVGProps } from 'react';
+import type {
+  ReturnGradingResult,
+  ReturnRoutingDecision,
+  ReturnReason,
+  RoutingEvProfile,
+} from '@reloop/shared';
+import { evByPath } from '@reloop/shared';
 import { mockGradeItem, mockRouteItem } from '@/lib/mocks/return-flow';
 import { saveReturn, generateReturnId } from '@/lib/mocks/return-store';
 import { Card } from '@/components/ui/card';
@@ -53,6 +59,8 @@ export function BuyerStep2Pickup({
 }: Props) {
   const [phase, setPhase] = useState<Phase>('grading');
   const [agentWindow] = useState(computeAgentWindow);
+  const [routing, setRouting] = useState<ReturnRoutingDecision | null>(null);
+  const [grade, setGrade] = useState<ReturnGradingResult['grade']>('B');
 
   useEffect(() => {
     void (async () => {
@@ -60,6 +68,7 @@ export function BuyerStep2Pickup({
       if (photos.length > 0) {
         try {
           gradingResult = await mockGradeItem(reason, photos, 'high_confidence');
+          if (gradingResult) setGrade(gradingResult.grade);
         } catch {
           // continue
         }
@@ -72,6 +81,7 @@ export function BuyerStep2Pickup({
       let routingDecision: ReturnRoutingDecision | null = null;
       try {
         routingDecision = await mockRouteItem(gradingResult, reason, sku, 'local_resale');
+        setRouting(routingDecision);
       } catch {
         // continue
       }
@@ -104,6 +114,37 @@ export function BuyerStep2Pickup({
   }, []);
 
   const currentIdx = PHASE_ORDER.indexOf(phase);
+
+  // Glass-box EV breakdown for the chosen path — the Intelligent Bridge "money shot".
+  // Logic decides (the shared EV engine); inputs are grounded in this order's value.
+  const evPaths = useMemo(() => {
+    if (!routing) return null;
+    const clearingPriceCents = Math.round(priceCents * 0.6); // resale clearing proxy
+    const profile: RoutingEvProfile = {
+      grade,
+      reason,
+      sellerType: routing.sellerType,
+      sellerOptedIn: routing.sellerType === '1P',
+      authenticityMatch: true,
+      functionallyVerifiable: true,
+      clearingPriceCents,
+      localHandlingCents: Math.round(clearingPriceCents * 0.15),
+      nearbyBuyers: routing.nearbyBuyers ?? 5,
+      radiusKm: routing.radiusKm ?? 4,
+      warehouseDistanceKm: routing.warehouseDistanceKm ?? 580,
+    };
+    return evByPath(profile);
+  }, [routing, priceCents, reason, grade]);
+
+  const PATH_LABEL: Record<ReturnRoutingDecision['decision'], string> = {
+    local_resale: 'Resell locally',
+    refurbish: 'Refurbish',
+    donate: 'Donate',
+    recycle: 'Recycle',
+    warehouse: 'Warehouse',
+    return_to_seller: 'Return to seller',
+  };
+  const inr = (paise: number) => `₹${Math.round(paise / 100).toLocaleString('en-IN')}`;
 
   if (phase !== 'ready') {
     return (
@@ -195,6 +236,58 @@ export function BuyerStep2Pickup({
           </div>
         </div>
       </Card>
+
+      {/* Intelligent Bridge — glass-box EV breakdown (logic decides, model narrates) */}
+      {routing && evPaths && (
+        <Card>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
+            Intelligent Bridge · why {PATH_LABEL[routing.decision]}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            We compared the expected value of every path — recovered value minus handling,
+            freight, and carbon. The best one wins.
+          </p>
+          <div className="mt-4 space-y-2">
+            {[...evPaths]
+              .sort((a, b) => b.evCents - a.evCents)
+              .map((p) => {
+                const isChosen = p.path === routing.decision;
+                return (
+                  <div
+                    key={p.path}
+                    className={`flex items-center justify-between rounded-lg px-3 py-2 ${
+                      isChosen ? 'bg-brand/10 ring-1 ring-brand/40' : 'bg-secondary/50'
+                    } ${p.viable ? '' : 'opacity-50'}`}
+                  >
+                    <span className="flex items-center gap-2 text-sm text-foreground">
+                      {isChosen && <CheckIcon className="h-4 w-4 text-brand" />}
+                      {PATH_LABEL[p.path]}
+                      {!p.viable && (
+                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                          n/a
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={`font-mono text-sm tabular-nums ${
+                        p.evCents >= 0 ? 'text-foreground' : 'text-danger'
+                      }`}
+                    >
+                      {p.evCents >= 0 ? '+' : '−'}
+                      {inr(p.evCents)}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+          {routing.warehouseDistanceKm !== undefined && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Local route vs a {routing.warehouseDistanceKm}km warehouse round-trip
+              {routing.co2SavedKg > 0 && ` · ${routing.co2SavedKg}kg CO₂ saved`}.
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Refund notice */}
       <div className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">

@@ -8,6 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "start:prod": "tsx src/index.ts",
+    "eval": "tsx src/eval/run.ts",
+    "test:edge": "tsx src/eval/edge-cases.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

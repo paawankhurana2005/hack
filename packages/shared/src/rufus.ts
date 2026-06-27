@@ -20,6 +20,8 @@ export interface RufusContext {
   ecoCredits?: number;
   sellerName?: string;
   specs?: Record<string, string>;
+  /** Prior turns in this conversation — retrievable context for follow-ups (RAG). */
+  priorQa?: { q: string; a: string }[];
 }
 
 export interface RufusRequest {

@@ -1,45 +1,85 @@
-// Orchestrates grading: assess each photo (one model call per image, in
-// parallel) then aggregate into a single GradingResult. The per-image grade is
-// model-driven; the aggregation is deterministic and explainable (glass-box):
-// overall condition is bounded by the most-worn angle, and issues are the union
-// across angles — so more angles catch more, which is the whole point of grading
-// at the source.
+// Orchestrates grading: assess each photo (one model call per image) then aggregate
+// into a single GradingResult. The per-image perception is model-driven; the
+// aggregation, calibration, and abstain decision are deterministic and explainable
+// (glass-box): overall condition is bounded by the most-worn angle, structured
+// issues are the de-duplicated union (worst severity wins), confidence is calibrated
+// before the abstain check, and poor/thin photos produce closed-loop capture guidance
+// instead of a confident grade on bad input. More angles catch more — by design.
 
 import { randomUUID } from 'node:crypto';
-import type { ConditionGrade, GradeRequest, GradingResult } from '@reloop/shared';
+import type { ConditionGrade, DetectedIssue, GradeRequest, GradingResult, PhotoQuality } from '@reloop/shared';
+import {
+  ABSTAIN_THRESHOLD,
+  calibrateConfidence,
+  needsReview as isAbstain,
+  photoQualityScore,
+  severityToOrdinal,
+} from '@reloop/shared';
 import type { ReferenceComparator, VlmAssessment, VlmProvider } from './types.js';
+import { issueToString } from './nvidia-provider.js';
 
 // Most-worn first → best last; index doubles as severity ordinal.
 const SEVERITY: readonly ConditionGrade[] = ['poor', 'fair', 'good', 'like-new', 'new'];
 
-function aggregate(assessments: VlmAssessment[]): VlmAssessment {
+// Worst capture quality wins for the merged angle (lowest score = most problematic).
+function worstQuality(qualities: PhotoQuality[]): PhotoQuality {
+  return qualities.reduce((acc, q) => (photoQualityScore(q) < photoQualityScore(acc) ? q : acc));
+}
+
+/** Union structured issues across angles; same type+region keeps the worst severity. */
+function mergeStructuredIssues(assessments: VlmAssessment[]): DetectedIssue[] {
+  const byKey = new Map<string, DetectedIssue>();
+  for (const a of assessments) {
+    for (const issue of a.structuredIssues) {
+      const key = `${issue.type.toLowerCase()}|${issue.region.toLowerCase()}`;
+      const existing = byKey.get(key);
+      if (!existing || severityToOrdinal(issue.severity) > severityToOrdinal(existing.severity)) {
+        byKey.set(key, issue);
+      }
+    }
+  }
+  return [...byKey.values()].slice(0, 12);
+}
+
+// Exported so the eval harness measures the EXACT worst-angle aggregation the
+// service ships (no logic duplication / drift).
+export function aggregate(assessments: VlmAssessment[]): VlmAssessment {
   // Overall grade = the most-worn angle (lowest severity ordinal).
   const worst = assessments.reduce((acc, a) =>
     SEVERITY.indexOf(a.grade) < SEVERITY.indexOf(acc.grade) ? a : acc,
   );
 
-  // Union of issues across all angles, de-duplicated (case-insensitive).
-  const seen = new Set<string>();
-  const detectedIssues: string[] = [];
-  for (const a of assessments) {
-    for (const issue of a.detectedIssues) {
-      const key = issue.toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        detectedIssues.push(issue);
-      }
-    }
-  }
-
+  const structuredIssues = mergeStructuredIssues(assessments);
   const confidence =
     assessments.reduce((sum, a) => sum + a.confidence, 0) / assessments.length;
 
   return {
     grade: worst.grade,
     confidence,
-    detectedIssues: detectedIssues.slice(0, 12),
+    structuredIssues,
+    detectedIssues: structuredIssues.map(issueToString),
+    photoQuality: worstQuality(assessments.map((a) => a.photoQuality)),
     summary: worst.summary,
   };
+}
+
+/** Deterministic, closed-loop asks when the photos can't support a reliable grade. */
+function captureGuidanceFor(
+  assessments: VlmAssessment[],
+  qualityScore: number,
+  abstaining: boolean,
+): string[] {
+  const guidance: string[] = [];
+  if (qualityScore < 0.6) {
+    guidance.push('Add a clearer, well-lit photo — the current shots are blurry, dark, or obstructed.');
+  }
+  if (assessments.length < 2) {
+    guidance.push('Add more angles (front, back, sides) so the grade reflects the whole item.');
+  }
+  if (abstaining && guidance.length === 0) {
+    guidance.push('Confidence is low — a sharper close-up of any wear would firm up the grade.');
+  }
+  return guidance;
 }
 
 export class GradingService {
@@ -70,14 +110,22 @@ export class GradingService {
     const merged = aggregate(assessments);
     const productId = `prod_${randomUUID()}`;
 
-    // Diff against the original listing when a reference was provided (glass-box,
-    // mockable behind ReferenceComparator).
+    // Calibrate the raw confidence, then decide abstain (deterministic, glass-box).
+    const calibratedConfidence = calibrateConfidence(merged.confidence);
+    const needsReview = isAbstain(calibratedConfidence);
+    const qualityScore =
+      assessments.reduce((sum, a) => sum + photoQualityScore(a.photoQuality), 0) / assessments.length;
+    const captureGuidance = captureGuidanceFor(assessments, qualityScore, needsReview);
+
+    // Diff against the original listing when a reference was provided (real VLM
+    // comparator with a deterministic mock fallback, behind ReferenceComparator).
     const referenceComparison = req.reference
-      ? this.referenceComparator.compare({
+      ? await this.referenceComparator.compare({
           draft: req.draft,
           grade: merged.grade,
           detectedIssues: merged.detectedIssues,
           reference: req.reference,
+          primaryImageBase64: req.imagesBase64[0],
         })
       : undefined;
 
@@ -85,13 +133,19 @@ export class GradingService {
       id: `grade_${randomUUID()}`,
       productId,
       grade: merged.grade,
-      confidence: merged.confidence,
+      confidence: calibratedConfidence,
       detectedIssues: merged.detectedIssues,
+      structuredIssues: merged.structuredIssues,
       summary: merged.summary,
       ...(referenceComparison ? { referenceComparison } : {}),
-      // Echo thumbnails so the client can render what was graded.
       photoUrls: req.imagesBase64.map((b64) => `data:image/jpeg;base64,${b64}`),
+      qualityScore,
+      needsReview,
+      ...(captureGuidance.length ? { captureGuidance } : {}),
       gradedAt: new Date().toISOString(),
     };
   }
 }
+
+// Re-export so callers needing the abstain band don't reach into shared directly.
+export { ABSTAIN_THRESHOLD };
