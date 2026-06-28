@@ -5,3 +5,6 @@ __pycache__/
 runs/
 *.pt
 eval_report.json
+
+# local datasets (Kaputt etc.)
+data/

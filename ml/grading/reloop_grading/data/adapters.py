@@ -148,3 +148,75 @@ def mvtec_samples(cfg: DataConfig, data_root: Optional[str]) -> list[UnifiedSamp
 def visa_samples(cfg: DataConfig, data_root: Optional[str]) -> list[UnifiedSample]:
     return _anomaly_dataset_samples(data_root or "", "visa", cfg.visa_samples,
                                     good_keywords=("good", "normal"))
+
+
+# --- Kaputt: Amazon Science retail-logistics defect dataset ------------------
+def kaputt_samples(cfg: DataConfig) -> list[UnifiedSample]:
+    """Reads the Kaputt sample-data layout: query/reference parquet annotations +
+    item crops + masks. Query items carry real defect_types + a major_defect flag
+    (→ defect head + grade via severity); reference items are clean examples.
+    item_identifier links query↔reference (the real reference-vs-returned pairing)."""
+    root = cfg.kaputt_root
+    if not root or not os.path.isdir(root):
+        return []
+    try:
+        import pandas as pd
+    except Exception:
+        print("[kaputt] pandas/pyarrow not installed — skipping")
+        return []
+
+    def _img(rel: str) -> Optional[str]:
+        p = os.path.join(root, rel)
+        return p if os.path.exists(p) else None
+
+    out: list[UnifiedSample] = []
+    qp = os.path.join(root, "query-sample.parquet")
+    if os.path.exists(qp):
+        q = pd.read_parquet(qp)
+        for _, row in q.iterrows():
+            img = _img(row.get("query_crop", "")) or _img(row.get("query_image", ""))
+            if not img:
+                continue
+            if bool(row.get("defect")):
+                major = bool(row.get("major_defect"))
+                sev = 0.85 if major else 0.55
+                damage = 0.8 if major else 0.4
+                types = [normalize_defect(t.strip())
+                         for t in str(row.get("defect_types") or "").split(",") if t.strip()]
+                defects = [(t, sev) for t in dict.fromkeys(types)] or [("deformation", sev)]
+                out.append(UnifiedSample(
+                    image_path=img, source="kaputt",
+                    grade=grade_from_damage(damage), damage_score=damage, defects=defects,
+                    has_grade=True, has_damage=True, has_defect=True,
+                    group_id=str(row.get("item_identifier") or ""),
+                ))
+            else:
+                out.append(UnifiedSample(
+                    image_path=img, source="kaputt",
+                    grade="new", damage_score=0.0, defects=[],
+                    has_grade=True, has_damage=True, has_defect=True,
+                    group_id=str(row.get("item_identifier") or ""),
+                ))
+            if len(out) >= cfg.kaputt_samples:
+                break
+
+    # reference items = clean examples of the same goods (balance + reference side)
+    rp = os.path.join(root, "reference-sample.parquet")
+    if os.path.exists(rp):
+        ref = pd.read_parquet(rp)
+        ref_cap = max(1, cfg.kaputt_samples // 2)
+        added = 0
+        for _, row in ref.iterrows():
+            img = _img(row.get("reference_crop", "")) or _img(row.get("reference_image", ""))
+            if not img:
+                continue
+            out.append(UnifiedSample(
+                image_path=img, source="kaputt",
+                grade="new", damage_score=0.0, defects=[],
+                has_grade=True, has_damage=True, has_defect=True,
+                group_id=str(row.get("item_identifier") or ""),
+            ))
+            added += 1
+            if added >= ref_cap:
+                break
+    return out

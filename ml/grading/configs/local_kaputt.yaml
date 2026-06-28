@@ -1,0 +1,24 @@
+# Local run WITH Kaputt (real Amazon retail-logistics defects) + ABO + synthetic.
+backbone:
+  name: facebook/dinov2-base
+  image_size: 224
+  unfreeze_last_n_blocks: 0
+data:
+  abo_samples: 400
+  synthetic_per_clean: 3
+  kaputt_root: data/kaputt
+  kaputt_samples: 300
+  val_fraction: 0.2
+  use_sources: [abo, synthetic, kaputt]
+loss:
+  grade: 1.0
+  defect: 0.7
+  severity: 0.5
+  damage: 0.5
+  confidence: 0.3
+  consistency: 0.0
+train:
+  epochs: 40
+  batch_size: 16
+  lr_heads: 0.001
+  out_dir: runs/local_kaputt

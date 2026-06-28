@@ -31,6 +31,10 @@ class DataConfig:
     mvtec_samples: int = 120
     visa_samples: int = 120
     synthetic_per_clean: int = 2         # synthetic-damaged variants per clean image
+    # Kaputt (Amazon retail-logistics defect dataset) — local path to the extracted
+    # sample-data dir (contains query-sample.parquet + reference-sample.parquet + data/).
+    kaputt_root: str = ""
+    kaputt_samples: int = 400
     val_fraction: float = 0.2
     num_workers: int = 0
     use_sources: tuple[str, ...] = ("abo", "synthetic", "mvtec", "visa", "sop")

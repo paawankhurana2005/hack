@@ -129,6 +129,8 @@ def build_datasets(cfg: Config, data_root: Optional[str] = None):
         samples += A.mvtec_samples(dcfg, data_root)
     if "visa" in sources:
         samples += A.visa_samples(dcfg, data_root)
+    if "kaputt" in sources:
+        samples += A.kaputt_samples(dcfg)
 
     sop: list[UnifiedSample] = A.sop_samples(dcfg) if "sop" in sources else []
 

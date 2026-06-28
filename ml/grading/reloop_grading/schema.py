@@ -92,6 +92,9 @@ _DEFECT_KEYWORDS: tuple[tuple[str, str], ...] = (
     ("bent", "deformation"), ("fold", "deformation"), ("deform", "deformation"),
     ("stretch", "deformation"), ("misplaced", "deformation"), ("squeeze", "deformation"),
     ("deflat", "deformation"), ("imprint", "deformation"), ("crease", "deformation"),
+    # Kaputt (Amazon retail-logistics) defect vocabulary
+    ("actuation", "deformation"), ("penetrat", "tear"), ("deconstruct", "crack"),
+    ("superficial", "scratch"), ("unit", "missing_part"),
 )
 
 

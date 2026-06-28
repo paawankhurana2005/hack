@@ -13,9 +13,11 @@ data:
   sop_samples: 200                   # viewpoint-invariance pairs
   mvtec_samples: 800
   visa_samples: 800
+  kaputt_root: datasets/kaputt_mini  # real Amazon retail-logistics defects (ships in the repo)
+  kaputt_samples: 300
   val_fraction: 0.2
   num_workers: 2
-  use_sources: [abo, synthetic, sop, mvtec, visa]
+  use_sources: [abo, synthetic, sop, kaputt, mvtec, visa]
 
 loss:
   grade: 1.0
