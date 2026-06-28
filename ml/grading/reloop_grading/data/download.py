@@ -75,25 +75,47 @@ def hf_pull_images(
         rows.extend(batch)
         off += len(batch)
 
-    manifest: list[dict] = []
-    results: list[tuple[str, Optional[str]]] = []
+    # collect download tasks, then fetch in parallel (the one-at-a-time loop was the
+    # bottleneck — a 16-way pool turns minutes of sequential HTTPS into seconds).
+    tasks: list[tuple[int, str, str, Optional[str]]] = []
     for i, r in enumerate(rows[:n]):
         row = r.get("row", {})
         srcs = _row_srcs(row)
         if not srcs:
             continue
         fname = f"{i:05d}.jpg"
-        fpath = os.path.join(dest, fname)
+        tasks.append((i, srcs[0], os.path.join(dest, fname), _row_group_id(row)))
+
+    def _grab(t):
+        i, src, fpath, gid = t
         if not os.path.exists(fpath):
             try:
                 with open(fpath, "wb") as f:
-                    f.write(_fetch(srcs[0]))
+                    f.write(_fetch(src, timeout=30))
             except Exception as e:
                 print(f"[download] image {i} failed: {e}")
-                continue
-        gid = _row_group_id(row)
-        manifest.append({"file": fname, "group": gid})
-        results.append((fpath, gid))
+                return None
+        return (i, fpath, gid)
+
+    from concurrent.futures import ThreadPoolExecutor
+    done = 0
+    got: dict[int, tuple[str, Optional[str]]] = {}
+    with ThreadPoolExecutor(max_workers=16) as ex:
+        for res in ex.map(_grab, tasks):
+            if res is not None:
+                idx, fpath, gid = res
+                got[idx] = (fpath, gid)
+            done += 1
+            if done % 200 == 0:
+                print(f"[download] {subdir}: {done}/{len(tasks)} fetched")
+
+    manifest: list[dict] = []
+    results: list[tuple[str, Optional[str]]] = []
+    for i, _src, fpath, _gid in tasks:
+        if i in got:
+            fp, gid = got[i]
+            manifest.append({"file": os.path.basename(fp), "group": gid})
+            results.append((fp, gid))
 
     with open(manifest_path, "w") as f:
         json.dump(manifest, f)

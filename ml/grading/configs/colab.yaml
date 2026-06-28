@@ -8,9 +8,9 @@ backbone:
   unfreeze_last_n_blocks: 4          # fine-tune the last 4 transformer blocks on GPU
 
 data:
-  abo_samples: 1500
-  synthetic_per_clean: 4             # 1500 clean + 6000 damaged
-  sop_samples: 400                   # viewpoint-invariance pairs
+  abo_samples: 1000
+  synthetic_per_clean: 3             # 1000 clean + 3000 damaged
+  sop_samples: 200                   # viewpoint-invariance pairs
   mvtec_samples: 800
   visa_samples: 800
   val_fraction: 0.2
