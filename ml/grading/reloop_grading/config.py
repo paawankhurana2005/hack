@@ -35,6 +35,10 @@ class DataConfig:
     # sample-data dir (contains query-sample.parquet + reference-sample.parquet + data/).
     kaputt_root: str = ""
     kaputt_samples: int = 400
+    # Sneakers (ipogorelov/sneakers) — REAL in-domain shoes. Each clean shoe also
+    # spawns `sneakers_per_clean` synthetic-damaged variants with exact defect labels.
+    sneakers_samples: int = 800          # clean real sneaker images to pull
+    sneakers_per_clean: int = 3          # synthetic-damaged variants per clean shoe
     val_fraction: float = 0.2
     num_workers: int = 0
     use_sources: tuple[str, ...] = ("abo", "synthetic", "mvtec", "visa", "sop")

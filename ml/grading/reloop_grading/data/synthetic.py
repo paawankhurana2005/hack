@@ -32,13 +32,27 @@ def _rng(seed: int) -> random.Random:
     return random.Random(seed)
 
 
+# Products sit center-frame in catalog/marketplace photos; scattering defects across
+# the whole image lands them on the BACKGROUND (wall, box, prop), which mislabels the
+# example. These helpers pull damage toward the central product region so a "stain" /
+# "dirt" actually marks the item. Triangular bias = denser near the middle.
+_PRODUCT_MARGIN = 0.16  # keep defects within the central ~68% of each axis
+
+
+def _cxy(w: int, h: int, rng: random.Random) -> tuple[int, int]:
+    def axis(n: int) -> int:
+        lo, hi = int(n * _PRODUCT_MARGIN), int(n * (1.0 - _PRODUCT_MARGIN))
+        return int(rng.triangular(lo, hi, (lo + hi) / 2))
+    return axis(w), axis(h)
+
+
 def _scratch(img: Image.Image, sev: float, rng: random.Random) -> Image.Image:
     d = ImageDraw.Draw(img, "RGBA")
     w, h = img.size
     n = 1 + int(sev * 5)
     for _ in range(n):
-        x0, y0 = rng.randint(0, w), rng.randint(0, h)
-        x1, y1 = x0 + rng.randint(-w // 3, w // 3), y0 + rng.randint(-h // 3, h // 3)
+        x0, y0 = _cxy(w, h, rng)
+        x1, y1 = x0 + rng.randint(-w // 4, w // 4), y0 + rng.randint(-h // 4, h // 4)
         width = max(1, int(1 + sev * 3))
         shade = int(120 + 80 * rng.random())
         d.line([(x0, y0), (x1, y1)], fill=(shade, shade, shade, int(120 + 120 * sev)), width=width)
@@ -48,7 +62,7 @@ def _scratch(img: Image.Image, sev: float, rng: random.Random) -> Image.Image:
 def _crack(img: Image.Image, sev: float, rng: random.Random) -> Image.Image:
     d = ImageDraw.Draw(img, "RGBA")
     w, h = img.size
-    x, y = rng.randint(w // 4, 3 * w // 4), rng.randint(h // 4, 3 * h // 4)
+    x, y = _cxy(w, h, rng)
     segs = 4 + int(sev * 10)
     for _ in range(segs):
         nx, ny = x + rng.randint(-40, 40), y + rng.randint(-40, 40)
@@ -60,7 +74,8 @@ def _crack(img: Image.Image, sev: float, rng: random.Random) -> Image.Image:
 def _dent(img: Image.Image, sev: float, rng: random.Random) -> Image.Image:
     w, h = img.size
     r = int(min(w, h) * (0.08 + 0.18 * sev))
-    cx, cy = rng.randint(r, w - r), rng.randint(r, h - r)
+    cx, cy = _cxy(w, h, rng)
+    cx, cy = max(r, min(w - r, cx)), max(r, min(h - r, cy))
     patch = img.crop((cx - r, cy - r, cx + r, cy + r)).filter(ImageFilter.GaussianBlur(2 + 4 * sev))
     overlay = Image.new("RGBA", patch.size, (0, 0, 0, int(80 * sev)))
     patch = Image.alpha_composite(patch.convert("RGBA"), overlay).convert("RGB")
@@ -73,7 +88,8 @@ def _stain(img: Image.Image, sev: float, rng: random.Random) -> Image.Image:
     d = ImageDraw.Draw(overlay)
     w, h = img.size
     r = int(min(w, h) * (0.06 + 0.16 * sev))
-    cx, cy = rng.randint(r, w - r), rng.randint(r, h - r)
+    cx, cy = _cxy(w, h, rng)
+    cx, cy = max(r, min(w - r, cx)), max(r, min(h - r, cy))
     col = (rng.randint(60, 120), rng.randint(40, 90), rng.randint(20, 60), int(90 + 120 * sev))
     d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=col)
     overlay = overlay.filter(ImageFilter.GaussianBlur(3))
@@ -84,7 +100,7 @@ def _contamination(img: Image.Image, sev: float, rng: random.Random) -> Image.Im
     d = ImageDraw.Draw(img, "RGBA")
     w, h = img.size
     for _ in range(int(20 + sev * 120)):
-        x, y = rng.randint(0, w), rng.randint(0, h)
+        x, y = _cxy(w, h, rng)
         rr = rng.randint(1, max(2, int(2 + sev * 4)))
         g = rng.randint(20, 90)
         d.ellipse([x, y, x + rr, y + rr], fill=(g, g, g, int(120 + 100 * sev)))

@@ -3,6 +3,7 @@ version (it flows into the provenance chain downstream), so a re-grade is audita
 from __future__ import annotations
 
 import os
+import time
 from typing import Optional
 
 import torch
@@ -14,6 +15,18 @@ from .model import GradingModel
 def save_checkpoint(model: GradingModel, cfg: Config, path: str,
                     extra: Optional[dict] = None) -> str:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    # Never clobber a prior run's weights: if a checkpoint already lives at this path,
+    # archive it as <name>.<timestamp>.pt before writing. `grading_model.pt` stays the
+    # stable "latest" name (serve.py + the Colab->Drive copy cell rely on it), but the
+    # previous weights are always recoverable.
+    if os.path.exists(path):
+        root, ext = os.path.splitext(path)
+        backup = f"{root}.{time.strftime('%Y%m%d-%H%M%S')}{ext}"
+        try:
+            os.replace(path, backup)
+            print(f"[registry] archived previous checkpoint -> {backup}")
+        except OSError as e:
+            print(f"[registry] could not archive previous checkpoint ({e}); overwriting")
     torch.save({
         "state_dict": model.state_dict(),
         "config": cfg.to_dict(),

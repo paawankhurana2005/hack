@@ -13,3 +13,6 @@ pandas>=2.0
 pyarrow>=14.0
 # Optional: progress + plotting for eval report
 tqdm>=4.66
+
+# inference server (serve.py)
+flask>=3.0

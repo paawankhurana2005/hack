@@ -1,0 +1,47 @@
+# Sneaker-domain fine-tune. Fixes the gap that made the model grade a visibly worn,
+# dirty shoe "fair / no visible defects": it had NEVER seen a sneaker in training
+# (only ABO catalog, synthetic-on-catalog, and Kaputt packaged goods).
+#
+# This run adds REAL sneaker photos (ipogorelov/sneakers) as in-domain anchors, plus
+# synthetic damage applied ON the shoe (center-biased) for exact defect labels across
+# the whole condition spectrum. Backbone tail is unfrozen so it becomes damage-SENSITIVE
+# (the frozen backbone is invariant to subtle wear — that was the ceiling).
+#
+# Run:  python -m reloop_grading.train --config configs/sneakers.yaml
+# (MVTec/VisA are pulled only if you pass --data-root ./data; they skip cleanly otherwise.)
+
+backbone:
+  name: facebook/dinov2-base
+  image_size: 224
+  unfreeze_last_n_blocks: 4          # damage-sensitivity comes from unfreezing the tail
+
+data:
+  abo_samples: 800                   # generic catalog breadth (clean references)
+  synthetic_per_clean: 2             # 800 clean + 1600 synthetic-on-catalog
+  sop_samples: 150                   # viewpoint-invariance pairs (consistency loss)
+  kaputt_root: datasets/kaputt_mini  # real Amazon retail-logistics defects
+  kaputt_samples: 300
+  sneakers_samples: 1500             # REAL sneakers (in-domain anchors)
+  sneakers_per_clean: 3              # +4500 synthetic-damaged shoes w/ exact labels
+  mvtec_samples: 600
+  visa_samples: 600
+  val_fraction: 0.2
+  num_workers: 2
+  use_sources: [abo, synthetic, sneakers, kaputt, sop, mvtec, visa]
+
+loss:
+  grade: 1.0
+  defect: 0.9                        # bumped — the defect head was the weak link
+  severity: 0.5
+  damage: 0.5
+  confidence: 0.3
+  consistency: 0.3
+
+train:
+  epochs: 15
+  batch_size: 64
+  lr_heads: 0.001
+  lr_backbone: 0.00001
+  warmup_frozen_epochs: 3            # heads-only first, then unfreeze the tail
+  device: auto                       # -> cuda on Colab / mps on M1
+  out_dir: runs/sneakers

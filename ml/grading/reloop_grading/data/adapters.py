@@ -16,7 +16,7 @@ from PIL import Image
 from ..config import DataConfig
 from ..schema import normalize_defect, grade_from_damage
 from .sample import UnifiedSample
-from .download import hf_pull_images
+from .download import hf_pull_images, sneaker_pull_images
 from .synthetic import DamageGenerator
 
 
@@ -58,6 +58,52 @@ def synthetic_samples(cfg: DataConfig, clean_paths: list[str]) -> list[UnifiedSa
                 grade=ex.grade, damage_score=ex.damage_score,
                 defects=[(ex.defect_type, ex.severity)],
                 has_grade=True, has_damage=True, has_defect=True,
+            ))
+            k += 1
+    return out
+
+
+# --- Sneakers: REAL in-domain shoes (clean anchors + synthetic damage) -------
+def sneakers_samples(cfg: DataConfig) -> list[UnifiedSample]:
+    """Real sneaker photos (ipogorelov/sneakers) as the in-domain base the grader
+    was missing. Each clean shoe becomes:
+      • one CLEAN anchor (grade=new, empty defect vector) — teaches "good shoe → no defects"
+      • `sneakers_per_clean` SYNTHETIC-damaged variants with EXACT (grade, defect, severity)
+        labels — scuff→scratch, dirt→contamination, stain, fade→wear. This is the signal
+        that fixes the defect head's blindness to a worn/dirty shoe.
+    group_id = brand/model so a shoe's clean<->damaged views pair up for the
+    embedding comparator (and SOP-style consistency)."""
+    pulled = sneaker_pull_images(cfg.sneakers_samples, cfg.cache_dir, "sneakers")
+    if not pulled:
+        return []
+    gen = DamageGenerator(base_seed=7000 + cfg.sneakers_per_clean)
+    dest = os.path.join(cfg.cache_dir, "sneakers_synth")
+    os.makedirs(dest, exist_ok=True)
+    out: list[UnifiedSample] = []
+    k = 0
+    for cpath, gid in pulled:
+        # clean anchor
+        out.append(UnifiedSample(
+            image_path=cpath, source="sneakers",
+            grade="new", damage_score=0.0, defects=[],
+            has_grade=True, has_damage=True, has_defect=True,
+            group_id=gid or cpath,
+        ))
+        try:
+            clean = Image.open(cpath).convert("RGB")
+        except Exception:
+            continue
+        for _ in range(cfg.sneakers_per_clean):
+            ex = gen.generate(clean, k)
+            fpath = os.path.join(dest, f"{k:06d}_{ex.defect_type}.jpg")
+            if not os.path.exists(fpath):
+                ex.image.save(fpath, quality=88)
+            out.append(UnifiedSample(
+                image_path=fpath, source="sneakers",
+                grade=ex.grade, damage_score=ex.damage_score,
+                defects=[(ex.defect_type, ex.severity)],
+                has_grade=True, has_damage=True, has_defect=True,
+                group_id=gid or cpath,
             ))
             k += 1
     return out

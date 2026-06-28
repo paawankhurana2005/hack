@@ -131,6 +131,12 @@ def build_datasets(cfg: Config, data_root: Optional[str] = None):
         samples += A.visa_samples(dcfg, data_root)
     if "kaputt" in sources:
         samples += A.kaputt_samples(dcfg)
+    if "sneakers" in sources:
+        # Sneakers feed the SUPERVISED heads only. They are deliberately kept OUT of the
+        # consistency pairing below: clean<->damaged variants share a brand/model id, and
+        # the consistency loss pulls same-group embeddings TOGETHER — which would teach
+        # damage-invariance, the exact blindness we're fixing. We want them separated.
+        samples += A.sneakers_samples(dcfg)
 
     sop: list[UnifiedSample] = A.sop_samples(dcfg) if "sop" in sources else []
 

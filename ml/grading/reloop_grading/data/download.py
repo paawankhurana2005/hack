@@ -120,3 +120,84 @@ def hf_pull_images(
     with open(manifest_path, "w") as f:
         json.dump(manifest, f)
     return results
+
+
+# --- ipogorelov/sneakers: real sneaker photos (brand/model) packed as parquet ---
+# Unlike ABO/SOP (image URLs via the rows API), this dataset stores raw JPEG bytes
+# inside parquet batches. We pull whole batches, decode the bytes, and cache JPGs —
+# giving the grader REAL, in-domain sneaker images (the ABO/synthetic gap that made
+# the model blind to shoe wear). group_id = "brand/model" so clean<->damaged variants
+# of the same shoe form the embedding-comparator pairs.
+_SNEAKER_REPO = "ipogorelov/sneakers"
+_SNEAKER_RESOLVE = "https://huggingface.co/datasets/{repo}/resolve/main/{file}"
+_SNEAKER_TREE = "https://huggingface.co/api/datasets/{repo}/tree/main"
+
+
+def sneaker_pull_images(n: int, cache_dir: str, subdir: str = "sneakers") -> list[tuple[str, Optional[str]]]:
+    """Download up to `n` real sneaker images from ipogorelov/sneakers (parquet batches).
+    Returns [(local_jpg_path, "brand/model"), ...]; cached + idempotent across runs."""
+    dest = os.path.join(cache_dir, subdir)
+    os.makedirs(dest, exist_ok=True)
+    manifest_path = os.path.join(dest, "manifest.json")
+    if os.path.exists(manifest_path):
+        try:
+            man = json.loads(open(manifest_path).read())
+            if len(man) >= n:
+                return [(os.path.join(dest, e["file"]), e.get("group")) for e in man[:n]]
+        except Exception:
+            pass
+
+    try:
+        import io
+        import pandas as pd
+    except Exception:
+        print("[sneakers] pandas/pyarrow not installed — skipping")
+        return []
+
+    # list parquet batches in the repo (dataset_batch_*.parquet)
+    try:
+        tree = json.loads(_fetch(_SNEAKER_TREE.format(repo=_SNEAKER_REPO)))
+        batches = sorted(e["path"] for e in tree
+                         if e.get("path", "").endswith(".parquet"))
+    except Exception as e:
+        print(f"[sneakers] tree listing failed: {e}")
+        return []
+
+    manifest: list[dict] = []
+    results: list[tuple[str, Optional[str]]] = []
+    idx = 0
+    for bfile in batches:
+        if len(results) >= n:
+            break
+        try:
+            raw = _fetch(_SNEAKER_RESOLVE.format(repo=_SNEAKER_REPO, file=bfile), timeout=180)
+            df = pd.read_parquet(io.BytesIO(raw))
+        except Exception as e:
+            print(f"[sneakers] batch {bfile} failed: {e}")
+            continue
+        for _, row in df.iterrows():
+            if len(results) >= n:
+                break
+            img = row.get("image")
+            if isinstance(img, dict) and "bytes" in img:
+                img = img["bytes"]
+            if img is None:
+                continue
+            data = bytes(img) if not isinstance(img, (bytes, bytearray)) else img
+            fname = f"{idx:06d}.jpg"
+            fpath = os.path.join(dest, fname)
+            if not os.path.exists(fpath):
+                try:
+                    with open(fpath, "wb") as f:
+                        f.write(data)
+                except Exception:
+                    continue
+            gid = f"{row.get('brand', '')}/{row.get('model', '')}".strip("/")
+            manifest.append({"file": fname, "group": gid})
+            results.append((fpath, gid))
+            idx += 1
+        print(f"[sneakers] {len(results)}/{n} images ({bfile})")
+
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f)
+    return results
