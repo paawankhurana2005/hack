@@ -83,7 +83,12 @@ class Config:
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "Config":
         def sub(cls, key):
-            return cls(**{**asdict(cls()), **(d.get(key) or {})})
+            base = asdict(cls())
+            # Only accept keys this dataclass actually defines, so a checkpoint saved
+            # with a different config schema (added/removed fields across versions) still
+            # loads instead of crashing with "unexpected keyword argument".
+            incoming = {k: v for k, v in (d.get(key) or {}).items() if k in base}
+            return cls(**{**base, **incoming})
         return Config(
             backbone=sub(BackboneConfig, "backbone"),
             head=sub(HeadConfig, "head"),
