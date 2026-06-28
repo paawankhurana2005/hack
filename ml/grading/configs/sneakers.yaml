@@ -44,4 +44,4 @@ train:
   lr_backbone: 0.00001
   warmup_frozen_epochs: 3            # heads-only first, then unfreeze the tail
   device: auto                       # -> cuda on Colab / mps on M1
-  out_dir: runs/sneakers
+  out_dir: runs/colab
