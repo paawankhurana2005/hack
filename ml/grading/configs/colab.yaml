@@ -1,0 +1,35 @@
+# Colab / free-GPU run. Unfreezes the DINOv2 tail (real fine-tune), uses the full
+# train.py path (backbone-in-loop) so SOP viewpoint-invariance consistency is active,
+# and pulls more data. Add MVTec/VisA real defects via --data-root ./data.
+
+backbone:
+  name: facebook/dinov2-base
+  image_size: 224
+  unfreeze_last_n_blocks: 4          # fine-tune the last 4 transformer blocks on GPU
+
+data:
+  abo_samples: 1500
+  synthetic_per_clean: 4             # 1500 clean + 6000 damaged
+  sop_samples: 400                   # viewpoint-invariance pairs
+  mvtec_samples: 800
+  visa_samples: 800
+  val_fraction: 0.2
+  num_workers: 2
+  use_sources: [abo, synthetic, sop, mvtec, visa]
+
+loss:
+  grade: 1.0
+  defect: 0.7
+  severity: 0.5
+  damage: 0.5
+  confidence: 0.3
+  consistency: 0.3                   # SOP — active because backbone is in the loop
+
+train:
+  epochs: 15
+  batch_size: 64
+  lr_heads: 0.001
+  lr_backbone: 0.00001
+  warmup_frozen_epochs: 3            # heads-only first, then unfreeze the tail
+  device: auto                       # -> cuda on Colab
+  out_dir: runs/colab

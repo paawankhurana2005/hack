@@ -1,0 +1,12 @@
+# Core ML
+torch>=2.2
+torchvision>=0.17
+transformers>=4.40          # DINOv2 backbone (facebook/dinov2-base)
+# Data / images
+pillow>=10.0
+numpy>=1.24
+# Metrics + config
+scikit-learn>=1.3           # F1, confusion matrix, calibration
+pyyaml>=6.0
+# Optional: progress + plotting for eval report
+tqdm>=4.66

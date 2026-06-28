@@ -1,0 +1,29 @@
+# Real LOCAL run (M1, frozen backbone + cached embeddings).
+# Sources: ABO (clean/reference) + synthetic damage (graded spectrum + defects).
+# MVTec/VisA excluded here (not downloaded locally) — add via --data-root on Colab.
+
+backbone:
+  name: facebook/dinov2-base
+  image_size: 224
+  unfreeze_last_n_blocks: 0        # frozen → cached-head fast path
+
+data:
+  abo_samples: 600
+  synthetic_per_clean: 4           # 600 clean + 2400 damaged = 3000 samples
+  val_fraction: 0.2
+  use_sources: [abo, synthetic]
+
+loss:
+  grade: 1.0
+  defect: 0.7
+  severity: 0.5
+  damage: 0.5
+  confidence: 0.3
+  consistency: 0.0                 # SOP consistency needs backbone-in-loop (Colab)
+
+train:
+  epochs: 60
+  batch_size: 16                   # safe for 8GB MPS during the one-time embed
+  lr_heads: 0.001
+  weight_decay: 0.0001
+  out_dir: runs/local_full

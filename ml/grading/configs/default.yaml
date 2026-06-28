@@ -1,0 +1,30 @@
+# Default training config. Mirrors reloop_grading/config.py dataclasses.
+# Override any subset; unspecified keys fall back to dataclass defaults.
+
+backbone:
+  name: facebook/dinov2-base
+  image_size: 224
+  unfreeze_last_n_blocks: 0      # bump to 2-4 for a second-stage fine-tune
+
+data:
+  abo_samples: 200
+  sop_samples: 120
+  mvtec_samples: 120
+  visa_samples: 120
+  synthetic_per_clean: 2
+  use_sources: [abo, synthetic, mvtec, visa, sop]
+
+loss:
+  grade: 1.0
+  defect: 0.7
+  severity: 0.5
+  damage: 0.5
+  confidence: 0.3
+  consistency: 0.3
+
+train:
+  epochs: 8
+  batch_size: 16
+  lr_heads: 0.001
+  warmup_frozen_epochs: 2
+  out_dir: runs/grading

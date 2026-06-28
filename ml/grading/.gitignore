@@ -1,0 +1,7 @@
+# caches, downloaded sample data, checkpoints, reports
+__pycache__/
+*.pyc
+.cache/
+runs/
+*.pt
+eval_report.json
