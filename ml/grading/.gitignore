@@ -6,5 +6,6 @@ runs/
 *.pt
 eval_report.json
 
-# local datasets (Kaputt etc.)
-data/
+# local full dataset copies (only the grading-root data/ dir, NOT nested data/ dirs
+# like the committed datasets/kaputt_mini/data crops)
+/data/
