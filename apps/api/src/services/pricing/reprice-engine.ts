@@ -151,6 +151,33 @@ export class RepriceEngine {
       decisionId: randomUUID(),
       arm: choice.chosenArm,
     });
+
+    // Structured "thinking" log — one JSON line per decision. On AWS this lands in
+    // CloudWatch verbatim, so every reprice is auditable: what the model saw, what it
+    // predicted per arm, which arm the bandit chose, and which guardrails fired.
+    // eslint-disable-next-line no-console
+    console.log(
+      JSON.stringify({
+        tag: 'pricing.decide',
+        listingId: req.listingId,
+        event: req.event.type,
+        bucket: `${bucket.category}/${bucket.gradeKey}`,
+        anchor: Math.round(anchor),
+        currentPrice: Math.round(currentPrice),
+        chosenArm: choice.chosenArm,
+        predictedRewards: Object.fromEntries(
+          Object.entries(rewards).map(([k, v]) => [k, Math.round(v)]),
+        ),
+        rawPrice: Math.round(rawPrice),
+        finalPrice: guard.finalPrice,
+        floor,
+        ceiling: decision.ceiling,
+        shouldReroute: guard.shouldReroute,
+        guardrails: guard.guardrailsApplied.filter((g) => g.triggered).map((g) => g.rule),
+        modelVersion: this.modelVersion,
+        reason: decision.reason,
+      }),
+    );
     return decision;
   }
 

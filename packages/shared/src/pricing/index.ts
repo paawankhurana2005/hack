@@ -4,3 +4,4 @@ export * from './arms.js';
 export * from './types.js';
 export * from './reward.js';
 export * from './guardrails.js';
+export * from './events.js';

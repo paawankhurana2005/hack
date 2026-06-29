@@ -6,10 +6,12 @@
 import {
   decideAgentAction,
   estimateRouteImpact,
+  isSignificant,
   simulateDailyViews,
   type AgentDecision,
   type AgentEvent,
   type ConditionGrade,
+  type DemandEvent,
   type DemandEventType,
   type ImpactEstimate,
   type ItemCategory,
@@ -49,6 +51,8 @@ export interface AgentState {
   status: ListingStatus;
   routeRecommendation?: RouteRecommendation;
   ctx: MarketContext;
+  /** Last day the agent actually ran a pricing decision (for the heartbeat cadence). */
+  lastRepriceDay?: number;
 }
 
 const inr = (cents: number) => ({ amountCents: cents, currency: 'INR' as const });
@@ -116,6 +120,7 @@ function buildInitial(listing: CasualListing): AgentState {
     paused: false,
     status: listing.status === 'listed' ? 'listed' : listing.status,
     ctx: deriveContext(listing),
+    lastRepriceDay: 0,
   };
 }
 
@@ -188,19 +193,51 @@ async function narrate(s: AgentState, d: AgentDecision): Promise<string> {
 // escalation. Returns an AgentDecision the existing tick machinery already knows how to
 // apply — or null if the API is unreachable, so tick() falls back to the local engine.
 
-function engineEventType(day: number): DemandEventType {
-  return [3, 7, 14, 21].includes(day) ? 'dwell_threshold' : 'heartbeat';
+// Heartbeat cadence: when nothing significant happens, the agent still re-checks the
+// price only every few days (the staleness backstop) — NOT every day. Events can trigger
+// a reprice sooner.
+const HEARTBEAT_DAYS = 3;
+
+// Deterministic per-(listing, day) RNG so the same day always yields the same market
+// event — stable across re-renders and reproducible after a Reset.
+function dayRandom(id: string, day: number): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i += 1) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  let a = (h ^ Math.imul(day + 1, 2654435761)) >>> 0;
+  a = Math.imul(a ^ (a >>> 15), 1 | a);
+  a = (a + Math.imul(a ^ (a >>> 7), 61 | a)) ^ a;
+  return ((a ^ (a >>> 14)) >>> 0) / 4294967296;
+}
+
+/** Simulate the day's candidate market event. Most days produce a quiet `heartbeat`
+ *  (insignificant on its own); occasionally a real event the filter will let through. */
+function simulateDayEvent(s: AgentState, viewsToday: number): DemandEvent {
+  const now = new Date().toISOString();
+  const base = (type: DemandEventType, payload: Record<string, unknown>): DemandEvent => ({
+    type,
+    listingId: s.id,
+    timestamp: now,
+    payload,
+  });
+  if ([3, 7, 14, 21].includes(s.day)) return base('dwell_threshold', { daysOnMarket: s.day });
+  const r = dayRandom(s.id, s.day);
+  const comparable = Math.round(s.ctx.comparableCents / 100);
+  if (r < 0.1) return base('comp_listed', { price: Math.round(comparable * (0.85 + r)) }); // undercuts
+  if (r < 0.16) return base('comp_sold', {});
+  if (r < 0.26) return base('view_velocity_drop', { currentVelocity: viewsToday });
+  return base('heartbeat', { daysOnMarket: s.day });
 }
 
 async function decideViaEngine(
   s: AgentState,
+  event: DemandEvent,
 ): Promise<{ decision: AgentDecision; acted: string } | null> {
   const anchor = Math.round(s.ctx.comparableCents / 100);
   const floor = Math.round(s.floorCents / 100);
   const req: PricingDecideRequest = {
     listingId: s.id,
     currentPrice: Math.round(s.priceCents / 100),
-    event: { type: engineEventType(s.day), payload: { daysOnMarket: s.day } },
+    event: { type: event.type, payload: event.payload },
     state: {
       category: s.category,
       gradeKey: s.grade,
@@ -282,14 +319,48 @@ export async function tick(
   if (!s || !isAgentActive(s)) return s;
 
   s.day += 1;
-  s.views += simulateDailyViews(s.priceCents, s.ctx);
+  const viewsToday = simulateDailyViews(s.priceCents, s.ctx);
+  s.views += viewsToday;
   s.holdingCostAccruedCents += s.ctx.holdingCostPerDayCents;
 
   const now = new Date().toISOString();
 
-  // Price brain = the spec-014 dynamic-pricing engine. On API failure, fall back to the
-  // local deterministic engine so the demo never breaks.
-  const viaEngine = await decideViaEngine(s);
+  // --- Trigger gate: reprice ONLY on a significant event or the heartbeat cadence ------
+  // Most days the agent just watches and holds — it does not touch the price daily. This
+  // is the same filter the API uses (shared @reloop/shared), so web + server agree.
+  const event = simulateDayEvent(s, viewsToday);
+  const filterCtx = {
+    compMedianPrice: Math.round(s.ctx.comparableCents / 100),
+    amazonNewPrice: Math.round(s.retailCents / 100),
+    viewVelocity24h: Math.max(1, s.ctx.baseViewsPerDay),
+  };
+  const significantEvent = event.type !== 'heartbeat' && isSignificant(event, filterCtx);
+  const heartbeatDue = s.day - (s.lastRepriceDay ?? 0) >= HEARTBEAT_DAYS;
+
+  if (!significantEvent && !heartbeatDue) {
+    // HOLD — watch the market, accrue views, log the reasoning, leave the price alone.
+    s.events = [
+      ...s.events,
+      {
+        day: s.day,
+        phase: 'acted',
+        action: 'hold',
+        text: `Watching — ${viewsToday} ${viewsToday === 1 ? 'view' : 'views'} today, comparable ${formatMoney(
+          inr(s.ctx.comparableCents),
+        )}, no significant change. Holding at ${formatMoney(inr(s.priceCents))}.`,
+        at: now,
+      },
+    ];
+    write(s);
+    return s;
+  }
+
+  // A reason to act → run the price brain (engine), or the local fallback if the API is down.
+  const triggerEvent: DemandEvent = significantEvent
+    ? event
+    : { ...event, type: 'heartbeat' };
+  s.lastRepriceDay = s.day;
+  const viaEngine = await decideViaEngine(s, triggerEvent);
   let decision: AgentDecision;
   let acted: string;
   if (viaEngine) {
