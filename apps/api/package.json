@@ -10,6 +10,7 @@
     "start:prod": "tsx src/index.ts",
     "eval": "tsx src/eval/run.ts",
     "test:edge": "tsx src/eval/edge-cases.ts",
+    "reprice:trace": "tsx src/scripts/reprice-trace.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

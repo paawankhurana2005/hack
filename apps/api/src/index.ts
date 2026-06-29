@@ -6,10 +6,15 @@ import cors from 'cors';
 import { config } from './config.js';
 import { MOCK_MODE } from './lib/env.js';
 import { NvidiaVlmProvider } from './services/grading/nvidia-provider.js';
+import { LocalModelProvider } from './services/grading/local-model-provider.js';
 import { GradingService } from './services/grading/grading-service.js';
+import type { VlmProvider } from './services/grading/types.js';
 import { VlmReferenceComparator } from './services/grading/vlm-reference-comparator.js';
 import { NvidiaMarketProvider } from './services/pricing/nvidia-market-provider.js';
 import { PricingService } from './services/pricing/pricing-service.js';
+import { RepriceEngine } from './services/pricing/reprice-engine.js';
+import { HeuristicRewardModel, HttpRewardModel } from './services/pricing/reward-model.js';
+import { createPricingRouter } from './routes/pricing.js';
 import { HealthCardService } from './services/health-card/health-card-service.js';
 import { createSellRouter } from './routes/sell.js';
 import { createAgentRouter } from './routes/agent.js';
@@ -38,13 +43,30 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', mockMode: MOCK_MODE });
 });
 
+// GRADER=local routes grading to OUR trained model (ml/grading/serve.py) instead of
+// the hosted VLM. Reference comparison stays on the VLM comparator (the local model's
+// embedding-diff is exposed via serve.py separately).
+const gradingProvider: VlmProvider =
+  process.env.GRADER === 'local'
+    ? new LocalModelProvider(process.env.LOCAL_GRADER_URL ?? 'http://127.0.0.1:8000')
+    : new NvidiaVlmProvider(config);
 const gradingService = new GradingService(
-  new NvidiaVlmProvider(config),
+  gradingProvider,
   new VlmReferenceComparator(config),
 );
 const pricingService = new PricingService(new NvidiaMarketProvider(config));
 const healthCardService = new HealthCardService();
+
+// Dynamic reprice engine (spec 014). PRICING_MODEL_URL → the trained XGBoost server
+// (ml/pricing); unset → the deterministic in-process reward model (runs with no Python).
+const pricingModelUrl = process.env.PRICING_MODEL_URL;
+const repriceEngine = new RepriceEngine(
+  pricingModelUrl ? new HttpRewardModel(pricingModelUrl) : new HeuristicRewardModel(),
+  pricingModelUrl ? 'xgboost-http' : 'heuristic-v1',
+);
+
 app.use('/api/sell', createSellRouter(gradingService, pricingService, healthCardService));
+app.use('/api/pricing', createPricingRouter(repriceEngine));
 app.use('/api/agent', createAgentRouter(config));
 app.use('/api/rufus', createRufusRouter(config));
 

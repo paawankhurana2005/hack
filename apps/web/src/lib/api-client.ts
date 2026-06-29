@@ -5,11 +5,14 @@ import type {
   AgentNarrateRequest,
   AgentNarrateResponse,
   ApiError,
+  DemandEventType,
   GradeRequest,
   GradingResult,
   HealthCardRequest,
   PriceRequest,
+  PricingDecision,
   PricingResult,
+  PricingStateVector,
   ProductHealthCard,
   RufusRequest,
   RufusResponse,
@@ -72,6 +75,22 @@ export function gradeItem(req: GradeRequest): Promise<GradingResult> {
 
 export function priceItem(req: PriceRequest): Promise<PricingResult> {
   return postJson<PriceRequest, PricingResult>('/api/sell/price', req);
+}
+
+/** Minimum fields the dynamic reprice engine needs; the rest are server-defaulted. */
+export type PricingDecideRequest = {
+  listingId: string;
+  event: { type: DemandEventType; payload?: Record<string, unknown> };
+  state: Pick<
+    PricingStateVector,
+    'category' | 'gradeKey' | 'compMedianPrice' | 'amazonNewPrice' | 'sellerFloor' | 'routeElsewhereValue'
+  > &
+    Partial<PricingStateVector>;
+};
+
+/** Dynamic-pricing engine (spec 014): an event → a clamped, narrated price. */
+export function decidePricing(req: PricingDecideRequest): Promise<PricingDecision> {
+  return postJson<PricingDecideRequest, PricingDecision>('/api/pricing/decide', req);
 }
 
 export function narrateAgent(req: AgentNarrateRequest): Promise<AgentNarrateResponse> {
