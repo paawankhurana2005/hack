@@ -80,6 +80,8 @@ export function priceItem(req: PriceRequest): Promise<PricingResult> {
 /** Minimum fields the dynamic reprice engine needs; the rest are server-defaulted. */
 export type PricingDecideRequest = {
   listingId: string;
+  /** The listing's real current price (₹) so step-caps are correct per call. */
+  currentPrice?: number;
   event: { type: DemandEventType; payload?: Record<string, unknown> };
   state: Pick<
     PricingStateVector,

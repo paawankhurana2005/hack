@@ -32,6 +32,7 @@ const stateSchema = z
 
 const decideSchema = z.object({
   listingId: z.string().min(1),
+  currentPrice: z.number().positive().optional(),
   event: z.object({
     type: eventTypeEnum,
     payload: z.record(z.unknown()).default({}),
@@ -61,10 +62,11 @@ export function createPricingRouter(engine: RepriceEngine): Router {
       res.status(400).json({ error: parsed.error.flatten() });
       return;
     }
-    const { listingId, event, state } = parsed.data;
+    const { listingId, currentPrice, event, state } = parsed.data;
     void engine
       .decide({
         listingId,
+        ...(currentPrice !== undefined ? { currentPrice } : {}),
         event: { type: event.type, listingId, timestamp: new Date().toISOString(), payload: event.payload },
         state,
       })

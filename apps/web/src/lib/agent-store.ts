@@ -10,14 +10,16 @@ import {
   type AgentDecision,
   type AgentEvent,
   type ConditionGrade,
+  type DemandEventType,
   type ImpactEstimate,
   type ItemCategory,
   type MarketContext,
+  type PricingDecision,
   type RouteRecommendation,
 } from '@reloop/shared';
 import type { CasualListing, ListingStatus } from '@/mock/casual-listings';
 import { formatMoney } from '@/lib/money';
-import { narrateAgent } from '@/lib/api-client';
+import { decidePricing, narrateAgent, type PricingDecideRequest } from '@/lib/api-client';
 import { earnSeller } from '@/lib/credits-store';
 import { appendEventIfStored } from '@/lib/provenance-store';
 
@@ -179,6 +181,89 @@ async function narrate(s: AgentState, d: AgentDecision): Promise<string> {
   }
 }
 
+// --- Spec-014 dynamic-pricing engine as the price brain ----------------------
+// Each tick asks the dynamic reprice engine (/api/pricing/decide) for the next price:
+// XGBoost (or the deterministic fallback model) predicts reward per arm, a Thompson
+// bandit picks one, guardrails clamp it. Its floor→reroute signal becomes the recycle
+// escalation. Returns an AgentDecision the existing tick machinery already knows how to
+// apply — or null if the API is unreachable, so tick() falls back to the local engine.
+
+function engineEventType(day: number): DemandEventType {
+  return [3, 7, 14, 21].includes(day) ? 'dwell_threshold' : 'heartbeat';
+}
+
+async function decideViaEngine(
+  s: AgentState,
+): Promise<{ decision: AgentDecision; acted: string } | null> {
+  const anchor = Math.round(s.ctx.comparableCents / 100);
+  const floor = Math.round(s.floorCents / 100);
+  const req: PricingDecideRequest = {
+    listingId: s.id,
+    currentPrice: Math.round(s.priceCents / 100),
+    event: { type: engineEventType(s.day), payload: { daysOnMarket: s.day } },
+    state: {
+      category: s.category,
+      gradeKey: s.grade,
+      compMedianPrice: anchor,
+      amazonNewPrice: Math.round(s.retailCents / 100),
+      sellerFloor: floor,
+      routeElsewhereValue: Math.round(floor * 0.6), // salvage < floor, so floor governs
+      numReprices: s.priceHistory.length - 1,
+      daysOnMarket: s.day,
+      viewVelocity24h: Math.max(1, Math.round(s.views / Math.max(1, s.day))),
+      compMinPrice: Math.round(anchor * 0.85),
+    },
+  };
+
+  let pd: PricingDecision;
+  try {
+    pd = await decidePricing(req);
+  } catch {
+    return null; // API down → caller uses the local deterministic engine
+  }
+
+  const anchorCents = Math.round(pd.anchorPrice * 100);
+  const marginCents = Math.round(pd.expectedMargin * 100);
+  const firedRules = pd.guardrailsApplied.filter((g) => g.triggered).map((g) => g.rule);
+  const factors = [
+    { label: 'Local median', value: formatMoney(inr(anchorCents)) },
+    { label: 'Chosen lever', value: `${pd.chosenArm}× median` },
+    { label: 'Expected margin', value: formatMoney(inr(marginCents)) },
+    ...(firedRules.length ? [{ label: 'Guardrails', value: firedRules.join(', ') }] : []),
+  ];
+
+  // Floor hit → the market sits below what we can sustainably sell for → recycle.
+  if (firedRules.includes('hard_floor')) {
+    const acted = `The market sits below your ${formatMoney(
+      inr(s.floorCents),
+    )} floor — resale isn't viable, so I recommend recycling to recover value instead of letting it sit.`;
+    return {
+      decision: { action: 'escalate_route', routeRecommendation: 'recycle', diagnosis: pd.reason, factors, confidence: 0.9 },
+      acted,
+    };
+  }
+
+  const finalCents = Math.round(pd.finalPrice * 100);
+  const diagnosis = `Reward model favoured ${pd.chosenArm}× the ${formatMoney(
+    inr(anchorCents),
+  )} local median (expected margin ${formatMoney(inr(marginCents))}).`;
+  if (finalCents !== s.priceCents) {
+    // Narrate the REAL move (the agent knows from→to); the engine supplied the "why".
+    const verb = finalCents < s.priceCents ? 'Lowered' : 'Raised';
+    const capped = firedRules.includes('max_step_change') ? ' (capped to one step)' : '';
+    const acted = `${verb} from ${formatMoney(inr(s.priceCents))} to ${formatMoney(
+      inr(finalCents),
+    )}${capped} — the reward model picked ${pd.chosenArm}× the ${formatMoney(
+      inr(anchorCents),
+    )} local median, still clear of the ${formatMoney(inr(s.floorCents))} floor.`;
+    return { decision: { action: 'reprice', newPriceCents: finalCents, diagnosis, factors, confidence: 0.85 }, acted };
+  }
+  const acted = `Holding at ${formatMoney(
+    inr(s.priceCents),
+  )} — that's already where the reward model wants it for this market.`;
+  return { decision: { action: 'hold', diagnosis, factors, confidence: 0.7 }, acted };
+}
+
 // --- The tick: one simulated day --------------------------------------------
 
 /**
@@ -200,23 +285,33 @@ export async function tick(
   s.views += simulateDailyViews(s.priceCents, s.ctx);
   s.holdingCostAccruedCents += s.ctx.holdingCostPerDayCents;
 
-  const decision = decideAgentAction({
-    day: s.day,
-    priceCents: s.priceCents,
-    floorCents: s.floorCents,
-    retailCents: s.retailCents,
-    grade: s.grade,
-    category: s.category,
-    views: s.views,
-    offers: s.offers,
-    radiusKm: s.radiusKm,
-    holdingCostAccruedCents: s.holdingCostAccruedCents,
-    hasImproved: s.hasImproved,
-    ctx: s.ctx,
-  });
-
   const now = new Date().toISOString();
-  const acted = narrateWithLlm ? await narrate(s, decision) : fallbackNarration(s, decision);
+
+  // Price brain = the spec-014 dynamic-pricing engine. On API failure, fall back to the
+  // local deterministic engine so the demo never breaks.
+  const viaEngine = await decideViaEngine(s);
+  let decision: AgentDecision;
+  let acted: string;
+  if (viaEngine) {
+    decision = viaEngine.decision;
+    acted = viaEngine.acted;
+  } else {
+    decision = decideAgentAction({
+      day: s.day,
+      priceCents: s.priceCents,
+      floorCents: s.floorCents,
+      retailCents: s.retailCents,
+      grade: s.grade,
+      category: s.category,
+      views: s.views,
+      offers: s.offers,
+      radiusKm: s.radiusKm,
+      holdingCostAccruedCents: s.holdingCostAccruedCents,
+      hasImproved: s.hasImproved,
+      ctx: s.ctx,
+    });
+    acted = narrateWithLlm ? await narrate(s, decision) : fallbackNarration(s, decision);
+  }
   const priceFrom = s.priceCents;
 
   // Apply the chosen lever.

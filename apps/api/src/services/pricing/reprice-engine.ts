@@ -33,6 +33,9 @@ const GRADE_ORDINAL: Record<PricingStateVector['gradeKey'], number> = {
 export interface RepriceRequest {
   listingId: string;
   event: DemandEvent;
+  /** The listing's real current price (₹). Lets step-caps work per call instead of
+   *  relying on the engine's in-memory last decision. Falls back to that, then anchor. */
+  currentPrice?: number;
   state: Partial<PricingStateVector> &
     Pick<PricingStateVector, 'category' | 'gradeKey' | 'compMedianPrice' | 'amazonNewPrice' | 'sellerFloor' | 'routeElsewhereValue'>;
 }
@@ -108,8 +111,12 @@ export class RepriceEngine {
     const ceiling = state.amazonNewPrice * 0.95;
 
     const prior = this.lastByListing.get(req.listingId);
-    const isFirstListing = req.event.type === 'initial_listing' || (!prior && state.numReprices === 0);
-    const currentPrice = prior?.finalPrice ?? anchor;
+    // If the caller tells us the current price, this is a reprice, not a first listing
+    // (so the per-step cap applies) — unless the event itself is the initial listing.
+    const isFirstListing =
+      req.event.type === 'initial_listing' ||
+      (req.currentPrice === undefined && !prior && state.numReprices === 0);
+    const currentPrice = req.currentPrice ?? prior?.finalPrice ?? anchor;
 
     const { rewards, curve } = await this.model.predict(state, anchor);
     const choice = this.bandit.decide(bucket, rewards, anchor, floor, ceiling);
