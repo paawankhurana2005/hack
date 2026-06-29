@@ -7,6 +7,7 @@
 
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import type { ApiError } from '@reloop/shared';
 import { getDb, isMongoConfigured } from '../lib/mongo.js';
@@ -66,7 +67,8 @@ export function createAuthRouter(): Router {
         .collection<SeedAccount>(COLLECTION)
         .findOne({ handle }, { projection: { _id: 0 } });
 
-      if (!account || account.password !== password) {
+      const passwordOk = account ? await bcrypt.compare(password, account.password) : false;
+      if (!account || !passwordOk) {
         return res.status(401).json(apiError('invalid_credentials', 'Incorrect username or password'));
       }
 

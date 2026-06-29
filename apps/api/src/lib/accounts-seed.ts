@@ -3,6 +3,7 @@
 // shown on the login screen on purpose — not real secrets, stored in plaintext.
 
 import type { Db } from 'mongodb';
+import bcrypt from 'bcryptjs';
 
 export type AccountKind = 'user' | 'seller';
 
@@ -108,11 +109,16 @@ export function ensureSeeded(db: Db): Promise<void> {
     seedPromise = (async () => {
       const col = db.collection<SeedAccount>(COLLECTION);
       await col.createIndex({ handle: 1 }, { unique: true });
-      await Promise.all(
-        DEMO_ACCOUNTS.map((acc) =>
-          col.updateOne({ id: acc.id }, { $set: acc }, { upsert: true }),
-        ),
-      );
+      for (const acc of DEMO_ACCOUNTS) {
+        const existing = await col.findOne({ id: acc.id });
+        // Store a bcrypt hash, never plaintext. Existing already-hashed docs are
+        // left as-is (idempotent); legacy plaintext docs are migrated to a hash.
+        const alreadyHashed = existing?.password?.startsWith('$2') ?? false;
+        const password = alreadyHashed
+          ? (existing as SeedAccount).password
+          : await bcrypt.hash(acc.password, 10);
+        await col.updateOne({ id: acc.id }, { $set: { ...acc, password } }, { upsert: true });
+      }
     })().catch((err) => {
       // Reset so a transient failure can be retried on the next request.
       seedPromise = null;

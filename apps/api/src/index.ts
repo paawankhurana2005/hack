@@ -3,6 +3,8 @@
 
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 import { MOCK_MODE } from './lib/env.js';
 import { NvidiaVlmProvider } from './services/grading/nvidia-provider.js';
@@ -22,6 +24,19 @@ import { healthCardHandler } from './routes/health-card.js';
 
 const app = express();
 
+// Behind Render's proxy (and similar) — so the rate limiter sees the real client
+// IP, not the proxy's.
+app.set('trust proxy', 1);
+
+// Security headers. CSP is off (this is a JSON API, not an HTML app) and CORP is
+// cross-origin so the browser-side web app can still read responses.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
+
 // Allow the configured web origin, plus any localhost port in dev (so the web
 // dev server's port doesn't have to match WEB_ORIGIN exactly).
 app.use(
@@ -35,6 +50,18 @@ app.use(
 );
 // Base64 images make for large bodies; raise the JSON limit accordingly.
 app.use(express.json({ limit: '20mb' }));
+
+// Generous per-IP rate limit on the API surface — absorbs abuse/runaway clients
+// without tripping a normal user (the data sync is debounced to ~1 req/s).
+app.use(
+  '/api',
+  rateLimit({
+    windowMs: 60_000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }),
+);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', mockMode: MOCK_MODE });
