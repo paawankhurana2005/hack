@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 import { MOCK_MODE } from './lib/env.js';
+import { requestLogger, log } from './lib/logger.js';
 import { NvidiaVlmProvider } from './services/grading/nvidia-provider.js';
 import { GradingService } from './services/grading/grading-service.js';
 import { MockReferenceComparator } from './services/grading/mock-reference-comparator.js';
@@ -27,6 +28,9 @@ const app = express();
 // Behind Render's proxy (and similar) — so the rate limiter sees the real client
 // IP, not the proxy's.
 app.set('trust proxy', 1);
+
+// Request tracing + structured access logs (assigns X-Request-Id).
+app.use(requestLogger);
 
 // Security headers. CSP is off (this is a JSON API, not an HTML app) and CORP is
 // cross-origin so the browser-side web app can still read responses.
@@ -84,10 +88,8 @@ app.post('/api/route', (req, res) => { void routeHandler(req, res); });
 app.post('/api/health-card', (req, res) => { void healthCardHandler(req, res); });
 
 app.listen(config.PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`[reloop/api] listening on http://localhost:${config.PORT}`);
+  log('info', 'api listening', { port: config.PORT, mockMode: MOCK_MODE });
   if (MOCK_MODE) {
-    // eslint-disable-next-line no-console
-    console.warn('[reloop/api] NVIDIA_API_KEY not set — running in mock mode');
+    log('warn', 'NVIDIA_API_KEY not set — running in mock mode');
   }
 });

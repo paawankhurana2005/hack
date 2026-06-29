@@ -39,13 +39,24 @@ function isApiError(value: unknown): value is ApiError {
   );
 }
 
+// Hard ceiling on any single request so a hung/slow API can never freeze the UI.
+const REQUEST_TIMEOUT_MS = 30_000;
+
+function withTimeout(): { signal: AbortSignal; done: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return { signal: controller.signal, done: () => clearTimeout(timer) };
+}
+
 async function postJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
   let res: Response;
+  const t = withTimeout();
   try {
     res = await fetch(`${BASE_URL}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: t.signal,
     });
   } catch {
     throw new ApiRequestError(
@@ -53,6 +64,8 @@ async function postJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
       'network_error',
       0,
     );
+  } finally {
+    t.done();
   }
 
   const data: unknown = await res.json().catch(() => null);
@@ -69,14 +82,17 @@ async function postJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
 
 async function getJson<TRes>(path: string): Promise<TRes> {
   let res: Response;
+  const t = withTimeout();
   try {
-    res = await fetch(`${BASE_URL}${path}`);
+    res = await fetch(`${BASE_URL}${path}`, { signal: t.signal });
   } catch {
     throw new ApiRequestError(
       'Could not reach the ReLoop service. Is the API running?',
       'network_error',
       0,
     );
+  } finally {
+    t.done();
   }
 
   const data: unknown = await res.json().catch(() => null);
