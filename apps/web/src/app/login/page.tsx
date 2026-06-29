@@ -3,21 +3,58 @@
 import { useState } from 'react';
 import { useRole } from '@/lib/role-context';
 import { ACCOUNTS, findAccountByHandle } from '@/lib/accounts';
+import { login as apiLogin } from '@/lib/api-client';
+import { ApiRequestError } from '@/lib/api-client';
 import { Eyebrow, GridBackdrop } from '@/components/ui/section';
 
 export default function LoginPage() {
   const { setAccount } = useRole();
-  const [value, setValue] = useState('');
+  const [handle, setHandle] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const account = findAccountByHandle(value);
-    if (!account) {
-      setError(`No account “${value.trim()}”. Try a username below.`);
+    setError('');
+
+    const typed = handle.trim();
+    if (!typed) {
+      setError('Enter a username.');
       return;
     }
-    setAccount(account.id);
+
+    setBusy(true);
+    try {
+      // Primary path: validate username + password against MongoDB.
+      const account = await apiLogin(typed, password);
+      await setAccount(account.id);
+      return;
+    } catch (err) {
+      // If the auth DB isn't reachable (not configured / API down), fall back to
+      // the local handle lookup so the demo never hard-breaks.
+      const code = err instanceof ApiRequestError ? err.code : 'unknown_error';
+      if (code === 'auth_unavailable' || code === 'network_error') {
+        const account = findAccountByHandle(typed);
+        if (account) {
+          await setAccount(account.id);
+          return;
+        }
+        setError(`No account “${typed}”. Try a username below.`);
+      } else if (code === 'invalid_credentials') {
+        setError('Incorrect username or password.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Could not sign in.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function pickHandle(h: string) {
+    setHandle(h);
+    setPassword(`${h}123`);
+    setError('');
   }
 
   const users = ACCOUNTS.filter((a) => a.kind === 'user');
@@ -44,34 +81,51 @@ export default function LoginPage() {
           Who are you?
         </h1>
         <p className="mx-auto mt-3 max-w-sm text-pretty text-muted-foreground">
-          No password needed. Type a username to open that profile.
+          Sign in with a demo username and password. Pick an account below to fill them in.
         </p>
 
-        <form onSubmit={submit} className="mt-8">
+        <form onSubmit={submit} className="mt-8 space-y-3">
           <div className="flex items-center gap-2 rounded-xl bg-card p-2 ring-1 ring-border focus-within:ring-brand/50">
             <span className="pl-2 font-mono text-sm text-muted-foreground">@</span>
             <input
               autoFocus
-              value={value}
+              value={handle}
               onChange={(e) => {
-                setValue(e.target.value);
+                setHandle(e.target.value);
                 setError('');
               }}
               placeholder="username"
+              autoComplete="username"
+              className="flex-1 bg-transparent py-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl bg-card p-2 ring-1 ring-border focus-within:ring-brand/50">
+            <span className="pl-2 font-mono text-sm text-muted-foreground">·</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError('');
+              }}
+              placeholder="password"
+              autoComplete="current-password"
               className="flex-1 bg-transparent py-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
             />
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-lg bg-brand py-2 pl-2 pr-4 text-sm font-medium text-brand-foreground ring-1 ring-brand/50 transition hover:shadow-[0_0_30px_rgba(234,179,8,0.25)] active:scale-95"
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand py-2 pl-2 pr-4 text-sm font-medium text-brand-foreground ring-1 ring-brand/50 transition hover:shadow-[0_0_30px_rgba(234,179,8,0.25)] active:scale-95 disabled:opacity-60"
             >
               <span className="grid size-6 place-items-center rounded bg-brand-foreground/10">→</span>
-              Enter
+              {busy ? 'Signing in…' : 'Enter'}
             </button>
           </div>
-          {error && <p className="mt-2 text-left text-xs text-destructive">{error}</p>}
+          {error && <p className="text-left text-xs text-destructive">{error}</p>}
         </form>
 
-        {/* Available handles — click to fill */}
+        {/* Available accounts — click to fill username + password */}
         <div className="mt-8 space-y-3 text-left">
           <div>
             <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-brand">Shoppers</p>
@@ -80,7 +134,7 @@ export default function LoginPage() {
                 <button
                   key={a.id}
                   type="button"
-                  onClick={() => setAccount(a.id)}
+                  onClick={() => pickHandle(a.handle)}
                   className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-brand hover:text-brand"
                 >
                   {a.handle}
@@ -96,7 +150,7 @@ export default function LoginPage() {
                 <button
                   key={a.id}
                   type="button"
-                  onClick={() => setAccount(a.id)}
+                  onClick={() => pickHandle(a.handle)}
                   className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-brand hover:text-brand"
                 >
                   {a.handle}
@@ -105,6 +159,9 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
+          <p className="pt-1 font-mono text-[10px] text-muted-foreground/60">
+            Password for each demo account is the username + “123” (e.g. aarav / aarav123).
+          </p>
         </div>
       </div>
     </div>

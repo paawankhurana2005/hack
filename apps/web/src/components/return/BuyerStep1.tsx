@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import type { MockOrder, ReturnReason } from '@reloop/shared';
+import { compressFile } from '@/lib/image';
 import { Card } from '@/components/ui/card';
 import { ProductThumb } from './ProductThumb';
 import { CameraIcon, CheckIcon, ArrowRightIcon } from './icons';
@@ -39,20 +40,18 @@ export function BuyerStep1({ order, onSubmit }: Props) {
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function addFiles(files: FileList | null) {
+  async function addFiles(files: FileList | null) {
     if (!files) return;
     const remaining = MAX_PHOTOS - photos.length;
     const toAdd = Array.from(files).slice(0, remaining);
-    void Promise.all(
-      toAdd.map(
-        (f) =>
-          new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target?.result as string);
-            reader.readAsDataURL(f);
-          }),
-      ),
-    ).then((dataUrls) => setPhotos((prev) => [...prev, ...dataUrls]));
+    // Compress to a small base64 JPEG (≤~160KB) so photos fit localStorage's
+    // quota and sync to the cloud — raw camera files are far too large to persist.
+    const results = await Promise.allSettled(toAdd.map((f) => compressFile(f)));
+    const dataUrls: string[] = [];
+    for (const r of results) {
+      if (r.status === 'fulfilled') dataUrls.push(r.value.dataUrl);
+    }
+    if (dataUrls.length > 0) setPhotos((prev) => [...prev, ...dataUrls]);
   }
 
   function removePhoto(idx: number) {
@@ -135,7 +134,7 @@ export function BuyerStep1({ order, onSubmit }: Props) {
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
-            if (!full) addFiles(e.dataTransfer.files);
+            if (!full) void addFiles(e.dataTransfer.files);
           }}
           onClick={() => !full && fileInputRef.current?.click()}
           onKeyDown={(e) => {
@@ -169,7 +168,7 @@ export function BuyerStep1({ order, onSubmit }: Props) {
             multiple
             accept="image/*"
             className="hidden"
-            onChange={(e) => addFiles(e.target.files)}
+            onChange={(e) => void addFiles(e.target.files)}
           />
         </div>
 

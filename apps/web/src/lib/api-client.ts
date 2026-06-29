@@ -14,6 +14,7 @@ import type {
   RufusRequest,
   RufusResponse,
 } from '@reloop/shared';
+import type { Account } from './accounts';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
@@ -64,6 +65,45 @@ async function postJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
   }
 
   return data as TRes;
+}
+
+async function getJson<TRes>(path: string): Promise<TRes> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`);
+  } catch {
+    throw new ApiRequestError(
+      'Could not reach the ReLoop service. Is the API running?',
+      'network_error',
+      0,
+    );
+  }
+
+  const data: unknown = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    if (isApiError(data)) {
+      throw new ApiRequestError(data.error.message, data.error.code, res.status);
+    }
+    throw new ApiRequestError('Request failed.', 'unknown_error', res.status);
+  }
+
+  return data as TRes;
+}
+
+/** List the demo accounts (no passwords) for the login screen. */
+export function listAccounts(): Promise<Account[]> {
+  return getJson<Account[]>('/api/auth/accounts');
+}
+
+/** Validate a handle + password against MongoDB. Throws ApiRequestError on
+ *  bad credentials (401) or when the auth DB is unavailable (503). */
+export async function login(handle: string, password: string): Promise<Account> {
+  const res = await postJson<{ handle: string; password: string }, { account: Account; token: string }>(
+    '/api/auth/login',
+    { handle, password },
+  );
+  return res.account;
 }
 
 export function gradeItem(req: GradeRequest): Promise<GradingResult> {
