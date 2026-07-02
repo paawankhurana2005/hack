@@ -9,14 +9,17 @@ import type {
   GradeRequest,
   GradingResult,
   HealthCardRequest,
+  PriceBreakdown,
   PriceRequest,
   PricingDecision,
   PricingResult,
   PricingStateVector,
   ProductHealthCard,
+  ReturnRecordInput,
   RufusRequest,
   RufusResponse,
 } from '@reloop/shared';
+import type { Account } from './accounts';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
@@ -41,13 +44,24 @@ function isApiError(value: unknown): value is ApiError {
   );
 }
 
+// Hard ceiling on any single request so a hung/slow API can never freeze the UI.
+const REQUEST_TIMEOUT_MS = 30_000;
+
+function withTimeout(): { signal: AbortSignal; done: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return { signal: controller.signal, done: () => clearTimeout(timer) };
+}
+
 async function postJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
   let res: Response;
+  const t = withTimeout();
   try {
     res = await fetch(`${BASE_URL}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: t.signal,
     });
   } catch {
     throw new ApiRequestError(
@@ -55,6 +69,8 @@ async function postJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
       'network_error',
       0,
     );
+  } finally {
+    t.done();
   }
 
   const data: unknown = await res.json().catch(() => null);
@@ -67,6 +83,48 @@ async function postJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
   }
 
   return data as TRes;
+}
+
+async function getJson<TRes>(path: string): Promise<TRes> {
+  let res: Response;
+  const t = withTimeout();
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { signal: t.signal });
+  } catch {
+    throw new ApiRequestError(
+      'Could not reach the ReLoop service. Is the API running?',
+      'network_error',
+      0,
+    );
+  } finally {
+    t.done();
+  }
+
+  const data: unknown = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    if (isApiError(data)) {
+      throw new ApiRequestError(data.error.message, data.error.code, res.status);
+    }
+    throw new ApiRequestError('Request failed.', 'unknown_error', res.status);
+  }
+
+  return data as TRes;
+}
+
+/** List the demo accounts (no passwords) for the login screen. */
+export function listAccounts(): Promise<Account[]> {
+  return getJson<Account[]>('/api/auth/accounts');
+}
+
+/** Validate a handle + password against MongoDB. Throws ApiRequestError on
+ *  bad credentials (401) or when the auth DB is unavailable (503). */
+export async function login(handle: string, password: string): Promise<Account> {
+  const res = await postJson<{ handle: string; password: string }, { account: Account; token: string }>(
+    '/api/auth/login',
+    { handle, password },
+  );
+  return res.account;
 }
 
 export function gradeItem(req: GradeRequest): Promise<GradingResult> {
@@ -101,6 +159,18 @@ export function narrateAgent(req: AgentNarrateRequest): Promise<AgentNarrateResp
 
 export function askRufus(req: RufusRequest): Promise<RufusResponse> {
   return postJson<RufusRequest, RufusResponse>('/api/rufus/ask', req);
+}
+
+/** Upsert the structured return record so the pricing engine can price it.
+ *  Called when a seller approves a return for local routing. */
+export function upsertReturnRecord(req: ReturnRecordInput): Promise<{ ok: boolean; returnId: string }> {
+  return postJson<ReturnRecordInput, { ok: boolean; returnId: string }>('/api/returns', req);
+}
+
+/** Fetch the live, dynamic price breakdown for a return from the pricing engine.
+ *  (/api/return-pricing — /api/pricing is the spec-014 reprice engine.) */
+export function getPricing(returnId: string): Promise<PriceBreakdown> {
+  return getJson<PriceBreakdown>(`/api/return-pricing/${encodeURIComponent(returnId)}`);
 }
 
 export function createHealthCard(req: HealthCardRequest): Promise<ProductHealthCard> {

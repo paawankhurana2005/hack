@@ -12,6 +12,7 @@ import {
   type ExchangeItem,
 } from '@/lib/mocks/exchange-store';
 import { getReturnById } from '@/lib/mocks/return-store';
+import { getPricing } from '@/lib/api-client';
 
 function formatINR(cents: number) {
   return `₹${(cents / 100).toLocaleString('en-IN')}`;
@@ -85,8 +86,19 @@ const STATUS_LABEL: Record<ExchangeItem['status'], string> = {
   deal_pending: 'Deal pending',
 };
 
-function ItemCard({ item, offsetHours }: { item: ExchangeItem; offsetHours: number }) {
-  const price = computeCurrentPrice(item, offsetHours);
+function ItemCard({
+  item,
+  offsetHours,
+  enginePriceRupees,
+}: {
+  item: ExchangeItem;
+  offsetHours: number;
+  enginePriceRupees?: number;
+}) {
+  // Prefer the live engine price; fall back to the local estimate if the API/
+  // record isn't available for this item.
+  const price =
+    enginePriceRupees != null ? Math.round(enginePriceRupees * 100) : computeCurrentPrice(item, offsetHours);
   const progress = rescueProgress(item, offsetHours);
   const hrs = hoursRemaining(item, offsetHours);
   const urgent = progress > 0.75;
@@ -175,6 +187,29 @@ function ItemCard({ item, offsetHours }: { item: ExchangeItem; offsetHours: numb
 export default function RescuePage() {
   const { offsetHours, setOffsetHours, ticking, setTicking, reset } = useOffsetHours();
   const [items, setItems] = useState<ExchangeItem[]>(EXCHANGE_ITEMS);
+  const [enginePrices, setEnginePrices] = useState<Record<string, number>>({});
+
+  // Fetch the live engine price for every card. Best-effort per item — any that
+  // lack a priced record just fall back to the local estimate.
+  useEffect(() => {
+    let active = true;
+    Promise.all(
+      items.map(async (it) => {
+        try {
+          const b = await getPricing(it.returnId);
+          return [it.returnId, b.finalPrice] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((pairs) => {
+      if (!active) return;
+      const map: Record<string, number> = {};
+      for (const p of pairs) if (p) map[p[0]] = p[1];
+      setEnginePrices(map);
+    });
+    return () => { active = false; };
+  }, [items]);
 
   useEffect(() => {
     const local = getLocalRoutingListings();
@@ -257,7 +292,12 @@ export default function RescuePage() {
       {/* Item grid */}
       <div className="mt-6 grid grid-cols-3 gap-4">
         {items.map((item) => (
-          <ItemCard key={item.returnId} item={item} offsetHours={offsetHours} />
+          <ItemCard
+            key={item.returnId}
+            item={item}
+            offsetHours={offsetHours}
+            enginePriceRupees={enginePrices[item.returnId]}
+          />
         ))}
       </div>
 

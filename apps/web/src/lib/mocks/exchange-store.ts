@@ -1,5 +1,8 @@
 // Exchange pipeline: returned products routed to local_resale with dynamic pricing + buyer matching.
 
+/** Default rescue window for a newly created local-routing listing (hours). */
+export const RESCUE_WINDOW_HOURS = 48;
+
 export interface MatchedBuyer {
   buyerId: string;
   name: string;
@@ -146,7 +149,7 @@ export function createLocalRoutingListing(params: {
     basePriceCents: params.priceCents,
     floorPriceCents: Math.round(params.priceCents * 0.5),
     similarListingsNearby: 0,
-    rescueWindowHours: 48,
+    rescueWindowHours: RESCUE_WINDOW_HOURS,
     rescueStartedAt: new Date().toISOString(),
     radiusKm: params.radiusKm,
     status: 'matched',

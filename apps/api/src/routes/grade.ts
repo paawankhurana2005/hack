@@ -4,8 +4,14 @@ import { nvidiaChat } from '../lib/nvidia-client.js';
 import { GradingServiceError } from '../lib/errors.js';
 import { MOCK_MODE } from '../lib/env.js';
 import { mockGradeResult } from '../lib/mocks.js';
+import { log } from '../lib/logger.js';
 
 const VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
+
+// Upload guards: cap the number of photos and the size of each base64 string so
+// a malicious or runaway client can't push huge payloads through this route.
+const MAX_PHOTOS = 6;
+const MAX_B64_LEN = 2_600_000; // ~2MB binary per image
 
 const VALID_REASONS = new Set<string>([
   'didnt_fit', 'changed_mind', 'duplicate_gift', 'defective',
@@ -75,6 +81,14 @@ export async function gradeHandler(req: Request, res: Response): Promise<void> {
     res.status(400).json({ error: '`photos` must be an array' });
     return;
   }
+  if (photos.length > MAX_PHOTOS) {
+    res.status(400).json({ error: `at most ${MAX_PHOTOS} photos` });
+    return;
+  }
+  if (!photos.every((p) => typeof p === 'string' && p.length <= MAX_B64_LEN)) {
+    res.status(400).json({ error: 'each photo must be a base64 string within the size limit' });
+    return;
+  }
   if (typeof reason !== 'string' || !VALID_REASONS.has(reason)) {
     res.status(400).json({ error: '`reason` must be a valid ReturnReason' });
     return;
@@ -114,7 +128,12 @@ export async function gradeHandler(req: Request, res: Response): Promise<void> {
 
     const result = parseGradeResponse(raw, typedReason);
     res.json(result);
-  } catch {
+  } catch (err) {
+    // Degrade gracefully, but surface WHY so the fallback isn't silent.
+    log('warn', 'grade fallback', {
+      reason: typedReason,
+      error: err instanceof Error ? err.message : String(err),
+    });
     res.json({ fallback: true, decision: 'warehouse' });
   }
 }

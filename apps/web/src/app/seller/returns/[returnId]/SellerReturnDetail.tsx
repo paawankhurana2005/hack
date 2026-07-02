@@ -8,7 +8,8 @@ import {
   completeDeal,
   type SubmittedReturn,
 } from '@/lib/mocks/return-store';
-import { createLocalRoutingListing } from '@/lib/mocks/exchange-store';
+import { createLocalRoutingListing, RESCUE_WINDOW_HOURS } from '@/lib/mocks/exchange-store';
+import { upsertReturnRecord } from '@/lib/api-client';
 import { earnSeller } from '@/lib/credits-store';
 import { Card } from '@/components/ui/card';
 
@@ -272,6 +273,27 @@ export function SellerReturnDetail({ returnId }: Props) {
             co2SavedKg: currentRouting.co2SavedKg ?? 2.4,
             distanceSavedKm: currentRouting.warehouseDistanceKm ?? 580,
             imageUrl: currentRet.photoUrls?.[0],
+          });
+
+          // Persist a structured return record so the backend pricing engine can
+          // price it on the rescue page. Best-effort: the approval already
+          // succeeded locally, so a DB/API hiccup here must not block the seller.
+          const nowMs = Date.now();
+          void upsertReturnRecord({
+            returnId: currentRet.returnId,
+            productName: currentRet.productName,
+            category: currentRet.category.toLowerCase(),
+            // No pincode on returns yet — default to a launch zone for the demo.
+            region_cluster: 'Bengaluru',
+            pincode: '560001',
+            base_price: Math.round(currentRet.priceCents / 100),
+            // condition_score is a placeholder until AI grading is wired in.
+            condition_score: 0.7,
+            listing_created_at: new Date(nowMs).toISOString(),
+            pickup_deadline: new Date(nowMs + RESCUE_WINDOW_HOURS * 3600_000).toISOString(),
+            grade: currentGrading.grade,
+          }).catch(() => {
+            // Swallow — pricing tab falls back to the local estimate if absent.
           });
         }
       }

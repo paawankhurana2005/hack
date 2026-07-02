@@ -12,6 +12,10 @@ const schema = z.object({
   PRICING_MODEL: z.string().min(1).default('meta/llama-3.3-70b-instruct'),
   PORT: z.coerce.number().int().positive().default(4000),
   WEB_ORIGIN: z.string().url().default('http://localhost:3000'),
+  // MongoDB Atlas — backs dummy login. Optional: when unset, auth routes return
+  // 503 and the web falls back to handle-only login, so the server still boots.
+  MONGODB_URI: z.string().min(1).optional(),
+  MONGODB_DB: z.string().min(1).default('reloop'),
 });
 
 const parsed = schema.safeParse(process.env);

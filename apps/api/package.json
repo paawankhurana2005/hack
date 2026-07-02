@@ -11,20 +11,30 @@
     "eval": "tsx src/eval/run.ts",
     "test:edge": "tsx src/eval/edge-cases.ts",
     "reprice:trace": "tsx src/scripts/reprice-trace.ts",
+    "seed:demand": "tsx src/scripts/seedDemandEvents.ts",
+    "aggregate:demand": "tsx src/scripts/runDemandAggregation.ts",
+    "seed:buyers": "tsx src/scripts/seedBuyers.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@reloop/shared": "workspace:*",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.0.0",
+    "mongodb": "^6.10.0",
+    "node-cron": "^3.0.3",
     "tsx": "^4.19.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.9.0",
+    "@types/node-cron": "^3.0.11",
     "typescript": "^5.6.3"
   }
 }
