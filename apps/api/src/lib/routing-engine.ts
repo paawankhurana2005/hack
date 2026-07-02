@@ -5,8 +5,20 @@
 // soft rules are now an explainable value-vs-carbon optimization. computeRouting keeps
 // its signature so route.ts + the eval harness are unchanged callers.
 
-import type { ReturnGradingResult, ReturnReason, ReturnRoutingDecision, RoutingEvBreakdown } from '@reloop/shared';
-import { decideRoute, type RoutingEvProfile } from '@reloop/shared';
+import type {
+  ItemCategory,
+  ReturnGradingResult,
+  ReturnReason,
+  ReturnRoutingDecision,
+  RoutingEvBreakdown,
+  RoutingFactor,
+} from '@reloop/shared';
+import {
+  computeReturnVoucherCredits,
+  decideRoute,
+  posteriorFromPointGrade,
+  type RoutingEvProfile,
+} from '@reloop/shared';
 
 export interface RoutingInputs {
   grade: ReturnGradingResult['grade'];
@@ -17,6 +29,11 @@ export interface RoutingInputs {
   functionallyVerifiable: boolean;
   /** Optional fraud signal: claimed reason contradicts the observed grade. */
   reasonGradeMismatch?: boolean;
+  // Spec 016 (all optional — eval-harness and legacy callers are unchanged):
+  /** Calibrated grading confidence 0–1; drives the posterior + route gates θ_r. */
+  confidence?: number;
+  /** Factory seal verified from photos/driver scan — gates the restock path. */
+  packagingSealed?: boolean;
 }
 
 export interface RoutingComputed {
@@ -27,6 +44,7 @@ export interface RoutingComputed {
   radiusKm: number;
   co2SavedKg: number;
   dwellBudgetHours: number;
+  ttlHours: number; // spec 016: decision validity before checkpoint re-evaluation
   sellerType: '1P' | '3P';
   fallbackChain: ReturnRoutingDecision['decision'][];
   // Phase 3 additions:
@@ -34,6 +52,9 @@ export interface RoutingComputed {
   localMargin: number; // rupees
   warehouseMargin: number; // rupees
   warehouseDistanceKm: number;
+  // Spec 015: only set for 1P items diverted from the warehouse (Track A scope).
+  voucherEcoCredits?: number;
+  voucherFactors?: RoutingFactor[];
 }
 
 interface MockPricing {
@@ -52,8 +73,23 @@ function getPricing(sku: string): MockPricing {
   return { residualValue: 500, localHandlingCost: 300, nearbyBuyers: 2, radiusKm: 5 };
 }
 
-// Distance to the nearest fulfilment centre (km). Constant now; Location Service in prod.
+// Distance to the regional returns hub (km). Constant now; Location Service in prod.
 const WAREHOUSE_DISTANCE_KM = 580;
+// Spec 016: the NEAREST fulfilment centre — the restock inbound leg. The 580km
+// returns hub vs the 45km city FC is exactly the leg the restock path deletes.
+const NEAREST_FC_KM = 45;
+
+// Same SKU-prefix mock the pricing table already keys off — an ItemCategory is
+// needed for carbon accounting (spec 015) but the return flow has no catalog
+// lookup yet. Mirrors the real category split in the return-flow mock fixtures
+// (B09 → electronics, B08 → apparel/fashion, B07 → kitchenware/home).
+function getCategory(sku: string): ItemCategory {
+  const prefix = sku.slice(0, 3);
+  if (prefix === 'B09') return 'electronics';
+  if (prefix === 'B08') return 'fashion';
+  if (prefix === 'B07') return 'home';
+  return 'other';
+}
 
 export function computeRouting(inputs: RoutingInputs): RoutingComputed {
   const pricing = getPricing(inputs.sku);
@@ -71,15 +107,37 @@ export function computeRouting(inputs: RoutingInputs): RoutingComputed {
     nearbyBuyers: pricing.nearbyBuyers,
     radiusKm: pricing.radiusKm,
     warehouseDistanceKm: WAREHOUSE_DISTANCE_KM,
+    // Spec 016 — only wired when the caller supplies the doorstep signals, so the
+    // eval harness's point-grade cases keep their exact legacy behavior.
+    ...(inputs.confidence !== undefined && {
+      confidence: inputs.confidence,
+      ...(inputs.grade && inputs.grade !== 'Salvage'
+        ? { gradePosterior: posteriorFromPointGrade(inputs.grade, inputs.confidence) }
+        : {}),
+      category: getCategory(inputs.sku),
+      nearestFcKm: NEAREST_FC_KM,
+      sealed: inputs.packagingSealed ?? false,
+      skuActive: true, // catalog lookup in prod; mock: known SKUs stay live
+    }),
   };
 
   const r = decideRoute(profile);
+
+  // Spec 015: 1P only — for 1P inventory, evByPath's EV delta vs. warehouse IS
+  // Amazon's own P&L, the real counterfactual the voucher formula is capped
+  // against. 3P/SELL-flow keep the flat impact.ts formula (Phase 2 roadmap item
+  // — see specs/015-carbon-inset-vouchers.md).
+  const voucher =
+    inputs.sellerType === '1P'
+      ? computeReturnVoucherCredits(getCategory(inputs.sku), r.decision, r.co2SavedKg, r.evByPath)
+      : null;
 
   return {
     decision: r.decision,
     sellerType: inputs.sellerType,
     fallbackChain: r.fallbackChain,
     dwellBudgetHours: r.dwellBudgetHours,
+    ttlHours: r.ttlHours,
     co2SavedKg: r.co2SavedKg,
     residualValue: pricing.residualValue,
     localHandlingCost: pricing.localHandlingCost,
@@ -89,5 +147,7 @@ export function computeRouting(inputs: RoutingInputs): RoutingComputed {
     localMargin: Math.round(r.localMarginCents / 100),
     warehouseMargin: Math.round(r.warehouseMarginCents / 100),
     warehouseDistanceKm: r.warehouseDistanceKm,
+    voucherEcoCredits: voucher?.ecoCredits,
+    voucherFactors: voucher?.factors,
   };
 }

@@ -1,13 +1,16 @@
 import type {
   GradingScenario,
   HandoffScenario,
+  ItemCategory,
   MockOrder,
+  PathEv,
   ReturnGradingResult,
   ReturnHandoffDetails,
   ReturnReason,
   ReturnRoutingDecision,
   RoutingScenario,
 } from '@reloop/shared';
+import { computeReturnVoucherCredits } from '@reloop/shared';
 
 export const mockOrders: MockOrder[] = [
   // Orders mapped to users' return-eligible owned items (My Items → Return).
@@ -91,6 +94,7 @@ const GRADING_SCENARIOS: Record<GradingScenario, Omit<ReturnGradingResult, 'rawR
     authenticityMatch: true,
     wardrobingFlag: false,
     functionallyVerifiable: true,
+    packagingSealed: true, // spec 016: seal verified from photos → restock-eligible
   },
   low_confidence: {
     grade: 'B',
@@ -127,6 +131,19 @@ const GRADING_SCENARIOS: Record<GradingScenario, Omit<ReturnGradingResult, 'rawR
 };
 
 const ROUTING_SCENARIOS: Record<RoutingScenario, ReturnRoutingDecision> = {
+  restock: {
+    decision: 'restock',
+    reasoning:
+      'Factory seal verified from photos and the reason is a change of mind — this item goes straight back to sellable inventory at the fulfilment centre 45km away, skipping the 580km returns-centre trip and weeks of dwell entirely.',
+    co2SavedKg: 2.1,
+    dwellBudgetHours: 0,
+    ttlHours: 24,
+    sellerType: '1P',
+    fallbackChain: ['local_resale', 'donate'],
+    warehouseDistanceKm: 580,
+    warehouseMargin: -480,
+    localMargin: 4820,
+  },
   local_resale: {
     decision: 'local_resale',
     reasoning:
@@ -209,10 +226,21 @@ export async function mockGradeItem(
   return { ...GRADING_SCENARIOS[scenario], rawReason: reason };
 }
 
+// Same SKU-prefix mock the API's routing engine keys off (apps/api/src/lib/routing-engine.ts),
+// mirrored here so the client-side demo scenarios can feed the real carbon-voucher
+// formula (spec 015) instead of inventing a second mapping.
+function categoryForSku(sku: string): ItemCategory {
+  const prefix = sku.slice(0, 3);
+  if (prefix === 'B09') return 'electronics';
+  if (prefix === 'B08') return 'fashion';
+  if (prefix === 'B07') return 'home';
+  return 'other';
+}
+
 export async function mockRouteItem(
   _gradingResult: ReturnGradingResult | null,
   reason: ReturnReason,
-  _sku: string,
+  sku: string,
   scenario: RoutingScenario = 'local_resale',
 ): Promise<ReturnRoutingDecision> {
   await randomDelay(2000, 2000);
@@ -220,7 +248,30 @@ export async function mockRouteItem(
   // arrived_damaged: shipping caused the damage; bridge still evaluates local paths
   // (refurbish, donate, as-is sale) rather than defaulting to recycle.
   if (reason === 'wrong_item') return { ...ROUTING_SCENARIOS.warehouse };
-  return { ...ROUTING_SCENARIOS[scenario] };
+
+  const decision = { ...ROUTING_SCENARIOS[scenario] };
+
+  // Spec 015, 1P only: fund the voucher from the real captured EV delta vs.
+  // warehouse. Only local_resale/refurbish carry margin data in this scenario
+  // table — donate/recycle/warehouse scenarios have no dollar counterfactual to
+  // cap a voucher against here, so they stay undefined rather than a guessed number.
+  if (
+    decision.sellerType === '1P' &&
+    decision.localMargin !== undefined &&
+    decision.warehouseMargin !== undefined
+  ) {
+    const paths: PathEv[] = [
+      { path: decision.decision, evCents: Math.round(decision.localMargin * 100), viable: true, terms: [] },
+      { path: 'warehouse', evCents: Math.round(decision.warehouseMargin * 100), viable: true, terms: [] },
+    ];
+    const voucher = computeReturnVoucherCredits(categoryForSku(sku), decision.decision, decision.co2SavedKg, paths);
+    if (voucher) {
+      decision.voucherEcoCredits = voucher.ecoCredits;
+      decision.voucherFactors = voucher.factors;
+    }
+  }
+
+  return decision;
 }
 
 export function mockHandoff(

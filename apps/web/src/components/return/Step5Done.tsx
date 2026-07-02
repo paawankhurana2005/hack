@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import type { MockOrder, ReturnFlowState, ReturnRoutingDecision } from '@reloop/shared';
 import { Card } from '@/components/ui/card';
+import { earnSeller } from '@/lib/credits-store';
 
 interface Props {
   flowState: ReturnFlowState;
@@ -21,6 +23,8 @@ function refundByDate() {
 
 // What happens to the item — framed as Amazon's action, not the user selling.
 const ITEM_DESTINATION: Record<ReturnRoutingDecision['decision'], string> = {
+  restock:
+    'Sealed and verified — this item goes straight back to sellable inventory at the nearest fulfilment centre, skipping the returns centre entirely.',
   local_resale:
     'Amazon matched this item to a verified buyer nearby. It will be handed off locally — no 600km warehouse trip.',
   refurbish:
@@ -33,6 +37,17 @@ const ITEM_DESTINATION: Record<ReturnRoutingDecision['decision'], string> = {
     'No local match was found. Your item is being processed at our returns centre.',
   return_to_seller:
     'Your item is being returned to the seller per their policy.',
+};
+
+// Spec 016: the final leg of the journey strip, per destination.
+const ITEM_JOURNEY_END: Record<ReturnRoutingDecision['decision'], string> = {
+  restock: 'Back on the shelf',
+  local_resale: 'Handed to a nearby buyer',
+  refurbish: 'Refurb partner',
+  donate: 'Charity partner',
+  recycle: 'Certified recycler',
+  warehouse: 'Returns centre',
+  return_to_seller: 'Back to the seller',
 };
 
 // What the seller gains — shown for local routes where the seller benefits.
@@ -51,6 +66,19 @@ export function Step5Done({ flowState, order }: Props) {
   const showCo2 = co2 > 0;
   const showHealthCard = decision === 'local_resale' || decision === 'refurbish';
   const sellerBenefit = SELLER_BENEFIT[decision];
+  const voucherEcoCredits = flowState.routingDecision?.voucherEcoCredits ?? 0;
+
+  // Award once per return — the idempotency key (not the mount itself) is what
+  // guards against double-crediting on a remount/refresh of this screen.
+  useEffect(() => {
+    if (voucherEcoCredits > 0) {
+      earnSeller(
+        voucherEcoCredits,
+        `Return routed to ${decision.replace('_', ' ')} — carbon avoided`,
+        `return:${order.orderId}:${decision}`,
+      );
+    }
+  }, [order.orderId, decision, voucherEcoCredits]);
 
   return (
     <div className="space-y-5">
@@ -76,6 +104,31 @@ export function Step5Done({ flowState, order }: Props) {
       <Card>
         <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">What happens next</p>
         <p className="mt-2 text-foreground">{ITEM_DESTINATION[decision]}</p>
+
+        {/* Spec 016: the journey ahead — decided now, verified at two checkpoints */}
+        <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-border pt-3">
+          {[
+            'Routed at your doorstep',
+            'Driver scan at pickup',
+            'Local hub check (~10 min)',
+            ITEM_JOURNEY_END[decision],
+          ].map((stage, i) => (
+            <div key={stage} className="flex items-center gap-1">
+              {i > 0 && <span className="text-muted-foreground">→</span>}
+              <span
+                className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
+                  i === 0 ? 'bg-success/15 text-success' : 'bg-secondary text-muted-foreground'
+                }`}
+              >
+                {stage}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          The route was decided before your item moves — and it's re-checked at each step while a
+          change is still cheap. Your refund is never affected by re-routing.
+        </p>
       </Card>
 
       {/* Seller notification — local routes only */}
@@ -91,14 +144,29 @@ export function Step5Done({ flowState, order }: Props) {
         </div>
       )}
 
-      {/* CO₂ savings */}
+      {/* CO₂ savings + EcoCredits earned */}
       {showCo2 && (
-        <div className="flex items-center gap-3 rounded-lg border border-success/30 bg-success/10 px-5 py-4">
-          <span className="text-2xl">🌿</span>
-          <div>
-            <p className="font-semibold text-success">{co2}kg of CO₂ avoided</p>
-            <p className="text-xs text-muted-foreground">vs. a warehouse round-trip for this item</p>
+        <div className="rounded-lg border border-success/30 bg-success/10 px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🌿</span>
+              <div>
+                <p className="font-semibold text-success">{co2}kg of CO₂ avoided</p>
+                <p className="text-xs text-muted-foreground">vs. a warehouse round-trip for this item</p>
+              </div>
+            </div>
+            {voucherEcoCredits > 0 && (
+              <span className="whitespace-nowrap font-mono text-sm font-semibold text-brand">
+                +{voucherEcoCredits} EcoCredits
+              </span>
+            )}
           </div>
+          {voucherEcoCredits > 0 && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Avoided emissions, estimated from category + routing data, counted toward Amazon's Climate
+              Pledge — not a traded carbon credit.
+            </p>
+          )}
         </div>
       )}
 

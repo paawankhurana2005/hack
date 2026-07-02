@@ -99,6 +99,7 @@ export function BuyerStep2Pickup({
         category,
         priceCents,
         reason,
+        sku, // spec 016: drives demand-graph matching + the open-box surface
         photoCount: photos.length,
         photoUrls: photos.length > 0 ? photos : undefined,
         gradingResult,
@@ -106,6 +107,12 @@ export function BuyerStep2Pickup({
         submittedAt: new Date().toISOString(),
         agentArrivesAt: new Date(Date.now() + 3 * 3600000).toISOString(),
         status: isGradeALocalResale ? 'pending_seller_approval' : 'awaiting_pickup',
+        // Spec 016: the lifecycle starts here — decided before the item moves.
+        lifecycleState: 'routed',
+        transitions: [
+          { from: 'initiated', to: 'evidence_captured', at: new Date().toISOString() },
+          { from: 'evidence_captured', to: 'routed', at: new Date().toISOString(), decision: routingDecision ?? undefined },
+        ],
       });
 
       setPhase('ready');
@@ -137,6 +144,7 @@ export function BuyerStep2Pickup({
   }, [routing, priceCents, reason, grade]);
 
   const PATH_LABEL: Record<ReturnRoutingDecision['decision'], string> = {
+    restock: 'Restock as sellable',
     local_resale: 'Resell locally',
     refurbish: 'Refurbish',
     donate: 'Donate',

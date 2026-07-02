@@ -89,6 +89,10 @@ export default function RewardsPage() {
               />
             </div>
           </div>
+          <p className="relative mt-4 max-w-md text-[11px] text-muted-foreground">
+            Avoided emissions, estimated from category + routing data, counted toward Amazon&apos;s
+            Climate Pledge — not a traded carbon credit.
+          </p>
         </div>
       </div>
 

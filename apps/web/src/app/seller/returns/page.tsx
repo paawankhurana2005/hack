@@ -6,6 +6,7 @@ import { getSubmittedReturns, type SubmittedReturn } from '@/lib/mocks/return-st
 import type { ReturnRoutingDecision } from '@reloop/shared';
 
 const DECISION_STYLE: Record<ReturnRoutingDecision['decision'], { label: string; cls: string }> = {
+  restock: { label: 'Restock', cls: 'bg-success/20 text-success' },
   local_resale: { label: 'Local Buyer', cls: 'bg-success/20 text-success' },
   refurbish: { label: 'Refurbish', cls: 'bg-warning/20 text-warning' },
   donate: { label: 'Donate', cls: 'bg-secondary text-foreground' },

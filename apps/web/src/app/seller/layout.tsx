@@ -7,6 +7,8 @@ import { useRole } from '@/lib/role-context';
 const nav = [
   { href: '/seller', label: 'Overview' },
   { href: '/seller/returns', label: 'Returns' },
+  { href: '/seller/hub', label: 'Hub Bench' },
+  { href: '/seller/local-listings', label: 'Local Listings' },
   { href: '/seller/listings', label: 'Listings' },
   { href: '/seller/rescue', label: 'Rescue' },
   { href: '/seller/bulk-exchange', label: 'Bulk Exchange' },

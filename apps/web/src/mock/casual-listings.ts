@@ -46,6 +46,11 @@ export interface CasualListing {
   originalPrice?: Money;
   card?: ProductHealthCard;
   impact?: ImpactEstimate;
+  // --- Spec 016: return-originated listings (born at the hub bench) ------------
+  /** Set when this listing was created by dispatching a RETURN to local_resale. */
+  returnId?: string;
+  /** The buy-new catalog product this is an open-box unit of (open-box surface). */
+  storeProductId?: string;
 }
 
 // No seed listings here — My Listings shows the demo seeds (seed-listings.ts) plus

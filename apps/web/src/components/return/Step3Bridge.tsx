@@ -20,6 +20,7 @@ interface Props {
 type Status = 'loading' | 'error_fallback' | 'done';
 
 const DECISION_STYLES: Record<ReturnRoutingDecision['decision'], { label: string; cls: string }> = {
+  restock: { label: 'Direct Restock', cls: 'bg-success/20 text-success border-success/30' },
   local_resale: { label: 'Local Buyer Match', cls: 'bg-success/20 text-success border-success/30' },
   refurbish: { label: 'Local Refurbishment', cls: 'bg-warning/20 text-warning border-warning/30' },
   donate: { label: 'Local Donation', cls: 'bg-secondary text-foreground border-border' },

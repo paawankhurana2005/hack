@@ -1,4 +1,10 @@
-import type { ReturnGradingResult, ReturnRoutingDecision, ReturnReason } from '@reloop/shared';
+import type {
+  ReturnGradingResult,
+  ReturnItemState,
+  ReturnRoutingDecision,
+  ReturnReason,
+  ReturnStateTransition,
+} from '@reloop/shared';
 
 export interface SubmittedReturn {
   returnId: string;
@@ -23,6 +29,20 @@ export interface SubmittedReturn {
   sellerApprovedAt?: string;
   dealCompletedAt?: string;
   ecoCreditsAwarded?: number;
+  // Spec 016: lifecycle state machine — absent on older records; treat a routed
+  // decision as state 'routed' (see lifecycleOf).
+  lifecycleState?: ReturnItemState;
+  transitions?: ReturnStateTransition[];
+  /** Catalog SKU of the returned item (drives demand-graph + open-box matching). */
+  sku?: string;
+  /** Set once the hub dispatched to local_resale and an agent listing was born. */
+  listingId?: string;
+}
+
+/** Effective lifecycle state for records created before spec 016. */
+export function lifecycleOf(r: SubmittedReturn): ReturnItemState {
+  if (r.lifecycleState) return r.lifecycleState;
+  return r.routingDecision ? 'routed' : 'initiated';
 }
 
 const STORAGE_KEY = 'reloop_returns_v1';
@@ -168,6 +188,36 @@ export function saveReturn(r: SubmittedReturn): void {
   } catch {
     // silently fail
   }
+}
+
+/**
+ * Spec 016: record a checkpoint transition. Appends to the item's transition
+ * log, advances the lifecycle state, and — when the checkpoint re-ran the
+ * engine — replaces the routing decision with the re-evaluated one.
+ */
+export function recordTransition(
+  returnId: string,
+  transition: ReturnStateTransition,
+): SubmittedReturn | null {
+  const target = getReturnById(returnId);
+  if (!target) return null;
+  const updated: SubmittedReturn = {
+    ...target,
+    lifecycleState: transition.to,
+    transitions: [...(target.transitions ?? []), transition],
+    ...(transition.decision ? { routingDecision: transition.decision } : {}),
+  };
+  saveReturn(updated);
+  return updated;
+}
+
+/** Spec 016: link the agent listing born at hub dispatch back to its return. */
+export function linkListing(returnId: string, listingId: string): SubmittedReturn | null {
+  const target = getReturnById(returnId);
+  if (!target) return null;
+  const updated: SubmittedReturn = { ...target, listingId };
+  saveReturn(updated);
+  return updated;
 }
 
 export function generateReturnId(): string {

@@ -1,5 +1,12 @@
 import type { Request, Response } from 'express';
-import type { ReturnGradingResult, ReturnReason, ReturnRoutingDecision } from '@reloop/shared';
+import type {
+  CheckpointEvidence,
+  ReturnGradingResult,
+  ReturnItemState,
+  ReturnReason,
+  ReturnRoutingDecision,
+  ReturnStateTransition,
+} from '@reloop/shared';
 import { nvidiaChat } from '../lib/nvidia-client.js';
 import { MOCK_MODE } from '../lib/env.js';
 import { computeRouting } from '../lib/routing-engine.js';
@@ -91,6 +98,9 @@ export async function routeHandler(req: Request, res: Response): Promise<void> {
       sellerType,
       authenticityMatch: gr.authenticityMatch,
       functionallyVerifiable: gr.functionallyVerifiable,
+      // Spec 016: doorstep signals → posterior + confidence gates + restock path.
+      confidence: gr.confidence,
+      packagingSealed: gr.packagingSealed,
     });
 
     let reasoning: string;
@@ -125,6 +135,7 @@ export async function routeHandler(req: Request, res: Response): Promise<void> {
       reasoning,
       co2SavedKg: computed.co2SavedKg,
       dwellBudgetHours: computed.dwellBudgetHours,
+      ttlHours: computed.ttlHours,
       sellerType: computed.sellerType,
       fallbackChain: computed.fallbackChain,
       // Phase 3: the glass-box EV optimization + real freight comparison.
@@ -134,10 +145,103 @@ export async function routeHandler(req: Request, res: Response): Promise<void> {
       warehouseDistanceKm: computed.warehouseDistanceKm,
       nearbyBuyers: computed.nearbyBuyers,
       radiusKm: computed.radiusKm,
+      voucherEcoCredits: computed.voucherEcoCredits,
+      voucherFactors: computed.voucherFactors,
     };
 
     res.json(result);
   } catch {
     res.json({ fallback: true, decision: 'warehouse' });
+  }
+}
+
+// --- Spec 016: checkpoint re-evaluation -------------------------------------
+// A return is a lifecycle, not one decision. Each physical checkpoint (driver
+// scan, hub bench) submits its evidence here; the SAME deterministic engine
+// re-runs with the updated posterior and the item is re-routed while redirect
+// is still cheap. The demo web app mirrors this client-side against the shared
+// engine; this endpoint is the production-shaped path.
+
+const CHECKPOINT_STATE: Record<CheckpointEvidence['source'], ReturnItemState> = {
+  customer: 'evidence_captured',
+  driver: 'pickup_verified',
+  hub_bench: 'hub_verified',
+};
+
+export async function checkpointHandler(req: Request, res: Response): Promise<void> {
+  const { gradingResult, reason, sku, sellerType, evidence, from } = req.body as {
+    gradingResult: unknown;
+    reason: unknown;
+    sku: unknown;
+    sellerType: unknown;
+    evidence: unknown;
+    from: unknown;
+  };
+
+  if (typeof reason !== 'string' || !VALID_REASONS.has(reason)) {
+    res.status(400).json({ error: '`reason` must be a valid ReturnReason' });
+    return;
+  }
+  if (typeof sku !== 'string') {
+    res.status(400).json({ error: '`sku` must be a string' });
+    return;
+  }
+  if (sellerType !== '1P' && sellerType !== '3P') {
+    res.status(400).json({ error: '`sellerType` must be "1P" or "3P"' });
+    return;
+  }
+  const ev = evidence as CheckpointEvidence;
+  if (ev?.source !== 'customer' && ev?.source !== 'driver' && ev?.source !== 'hub_bench') {
+    res.status(400).json({ error: '`evidence.source` must be customer | driver | hub_bench' });
+    return;
+  }
+
+  try {
+    const gr = gradingResult as ReturnGradingResult;
+    // Checkpoint evidence overrides the doorstep posterior: a hub-bench grade is
+    // near-certain (a human held the item), a driver contradiction voids the seal.
+    const grade = ev.observedGrade ?? gr.grade;
+    const confidence = ev.confidence ?? (ev.observedGrade !== undefined ? 0.98 : gr.confidence);
+    const computed = computeRouting({
+      grade,
+      reason: reason as ReturnReason,
+      sku,
+      sellerType,
+      authenticityMatch: gr.authenticityMatch,
+      functionallyVerifiable: ev.functionalCheckPassed ?? gr.functionallyVerifiable,
+      confidence,
+      packagingSealed: ev.packagingSealed ?? gr.packagingSealed,
+    });
+
+    const overrode = ev.observedGrade !== undefined && ev.observedGrade !== gr.grade;
+    const decision: ReturnRoutingDecision = {
+      decision: computed.decision,
+      reasoning: `${ev.source === 'hub_bench' ? 'Hub bench' : 'Pickup driver'} ${
+        overrode ? `overrode grade ${gr.grade ?? '?'} → ${ev.observedGrade}` : `confirmed grade ${grade ?? '?'}`
+      }; engine re-ran and routed to ${computed.decision}.`,
+      co2SavedKg: computed.co2SavedKg,
+      dwellBudgetHours: computed.dwellBudgetHours,
+      ttlHours: computed.ttlHours,
+      sellerType: computed.sellerType,
+      fallbackChain: computed.fallbackChain,
+      evBreakdown: computed.evBreakdown,
+      localMargin: computed.localMargin,
+      warehouseMargin: computed.warehouseMargin,
+      warehouseDistanceKm: computed.warehouseDistanceKm,
+      nearbyBuyers: computed.nearbyBuyers,
+      radiusKm: computed.radiusKm,
+      voucherEcoCredits: computed.voucherEcoCredits,
+      voucherFactors: computed.voucherFactors,
+    };
+    const transition: ReturnStateTransition = {
+      from: (from as ReturnItemState) ?? 'routed',
+      to: CHECKPOINT_STATE[ev.source],
+      at: new Date().toISOString(),
+      evidence: ev,
+      decision,
+    };
+    res.json({ decision, transition });
+  } catch {
+    res.status(500).json({ error: 'checkpoint re-evaluation failed' });
   }
 }

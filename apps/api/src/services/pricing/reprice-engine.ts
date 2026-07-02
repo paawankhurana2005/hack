@@ -29,6 +29,9 @@ const GRADE_ORDINAL: Record<PricingStateVector['gradeKey'], number> = {
   poor: 1,
 };
 
+// Fresh logged outcomes between offline retrains (spec 014). Mirrors ml/pricing RETRAIN_EVERY.
+const RETRAIN_EVERY = 500;
+
 /** Minimum fields a caller must supply; everything else is defaulted. */
 export interface RepriceRequest {
   listingId: string;
@@ -192,6 +195,38 @@ export class RepriceEngine {
       bucketUpdated = true;
     }
     this.outcomeLog.push({ ...outcome, reward });
+
+    // Unified "thinking" trace — same schema the Python agent emits, so a CloudWatch query
+    // spans both. One outcome line per terminal event...
+    // eslint-disable-next-line no-console
+    console.log(
+      JSON.stringify({
+        tag: 'pricing.outcome',
+        listingId: outcome.listingId,
+        bucket: prior ? `${prior.bucket.category}/${prior.bucket.gradeKey}` : null,
+        arm: outcome.arm,
+        sold: outcome.sold,
+        rerouted: outcome.rerouted,
+        rerouteDestination: outcome.rerouteDestination ?? null,
+        finalPrice: Math.round(outcome.finalPrice),
+        daysOnMarket: outcome.daysOnMarket,
+        reward: Math.round(reward),
+      }),
+    );
+    // ...and a signal when enough fresh rows have accrued to justify a retrain. The API
+    // can't retrain XGBoost itself (that's the Python learning loop, ml/pricing/retrain.py);
+    // it emits the trigger so an offline job / operator picks it up — honest split.
+    if (this.outcomeLog.length % RETRAIN_EVERY === 0) {
+      // eslint-disable-next-line no-console
+      console.log(
+        JSON.stringify({
+          tag: 'pricing.retrain_due',
+          loggedOutcomes: this.outcomeLog.length,
+          retrainEvery: RETRAIN_EVERY,
+          note: 'run ml/pricing retrain_from_logger → offline_policy_evaluation → promote',
+        }),
+      );
+    }
     return { reward, bucketUpdated };
   }
 

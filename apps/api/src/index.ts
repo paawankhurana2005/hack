@@ -14,13 +14,15 @@ import { NvidiaMarketProvider } from './services/pricing/nvidia-market-provider.
 import { PricingService } from './services/pricing/pricing-service.js';
 import { RepriceEngine } from './services/pricing/reprice-engine.js';
 import { HeuristicRewardModel, HttpRewardModel } from './services/pricing/reward-model.js';
+import type { Completer } from './services/pricing/reprice-narrate.js';
+import { nvidiaChat } from './services/nvidia/client.js';
 import { createPricingRouter } from './routes/pricing.js';
 import { HealthCardService } from './services/health-card/health-card-service.js';
 import { createSellRouter } from './routes/sell.js';
 import { createAgentRouter } from './routes/agent.js';
 import { createRufusRouter } from './routes/rufus.js';
 import { gradeHandler } from './routes/grade.js';
-import { routeHandler } from './routes/route.js';
+import { checkpointHandler, routeHandler } from './routes/route.js';
 import { healthCardHandler } from './routes/health-card.js';
 
 const app = express();
@@ -59,10 +61,24 @@ const healthCardService = new HealthCardService();
 
 // Dynamic reprice engine (spec 014). PRICING_MODEL_URL → the trained XGBoost server
 // (ml/pricing); unset → the deterministic in-process reward model (runs with no Python).
+// The LLM only NARRATES the decision (never changes the price); it's wired only when a key
+// is present, and every call falls back to the deterministic template if it errors.
 const pricingModelUrl = process.env.PRICING_MODEL_URL;
+const narrator: Completer | undefined = MOCK_MODE
+  ? undefined
+  : {
+      complete: (prompt: string) =>
+        nvidiaChat(config, {
+          model: config.PRICING_MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          maxTokens: 80,
+          temperature: 0.3,
+        }),
+    };
 const repriceEngine = new RepriceEngine(
   pricingModelUrl ? new HttpRewardModel(pricingModelUrl) : new HeuristicRewardModel(),
   pricingModelUrl ? 'xgboost-http' : 'heuristic-v1',
+  narrator,
 );
 
 app.use('/api/sell', createSellRouter(gradingService, pricingService, healthCardService));
@@ -72,6 +88,7 @@ app.use('/api/rufus', createRufusRouter(config));
 
 app.post('/api/grade', (req, res) => { void gradeHandler(req, res); });
 app.post('/api/route', (req, res) => { void routeHandler(req, res); });
+app.post('/api/return/checkpoint', (req, res) => { void checkpointHandler(req, res); });
 app.post('/api/health-card', (req, res) => { void healthCardHandler(req, res); });
 
 app.listen(config.PORT, () => {

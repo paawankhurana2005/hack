@@ -13,6 +13,8 @@ export * from './prevention.js';
 export * from './mesh.js';
 export * from './provenance.js';
 export * from './impact.js';
+export * from './carbon-methodology.js';
+export * from './carbon-vouchers.js';
 export * from './shop.js';
 export * from './agent.js';
 export * from './rufus.js';

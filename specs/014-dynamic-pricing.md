@@ -105,7 +105,59 @@ is the staleness backstop so a quiet listing still gets re-evaluated. Production
 | Event filter / engine / routes / narration | **Implemented** (Phase 5 — `/api/pricing/*`) |
 | Sell-through curve UI + reprice demo page | **Implemented** (Phase 6 — `/reprice`) |
 | End-to-end trace | **Implemented** (Phase 7 — `pnpm --filter api reprice:trace`) |
+| Autonomous agent + closed learning loop + marketplace sim | **Implemented** (Phase 8 — `ml/pricing/`) |
 | Neural net / DQN | **Dropped on purpose** (tabular → trees) |
+
+## Phase 8 — from decision *function* to autonomous *agent*
+Phases 0–7 built the decision brain (perceive → explore → decide → narrate). Phase 8 makes
+it a genuine **agent**: it runs its own loop, keeps memory, and closes the learning loop on
+its own. The properties of agentic AI, each mapped to code:
+
+| Agentic property | Where |
+|---|---|
+| **Perception** — sense the market, gate on significance | `significance.py` (mirror of `events.ts`) + `PricingAgent.sense` |
+| **Memory** — persist & compound across restarts | `memory.py` (`AgentMemory`) — JSONL transactions + per-bucket bandit posteriors |
+| **Reasoning** — goal-directed price choice | `PricingAgent.think` = model.predict → `BucketedBandit` → `guardrails.py` |
+| **Action / tools** — reprice / reroute / hold | `PricingAgent.act` (reroute = hand to the Intelligent Bridge) |
+| **Learning** — self-improve, no human | `retrain.py` (`LearningLoop.maybe_retrain`): log → retrain@500 → `offline_policy_evaluation` → promote(>2%) → **hot-swap** |
+| **Reflection** — explain every move | `PricingAgent.reflect` emits the same `pricing.decide` JSON the TS engine does + `narrate` |
+| **Autonomy** — own cadence | trigger gate (significant event OR heartbeat); the marketplace sim runs the loop headless over N items × M days |
+
+**The honest learning loop.** `agent.py`/`retrain.py` wire together three pieces that
+already existed but were never connected (`logger.ready_to_retrain(500)`,
+`offline_policy_evaluation`, the >2% gate). A retrain blends the synthetic warm-start
+backbone with the **real logged (state, arm, reward) rows** and only promotes if the
+candidate beats the incumbent by >2% on an offline replay of those rows. No RL — supervised
+learning over a growing dataset, gated by a measured offline win. On promotion the new model
+is hot-swapped into the live predictor and every bucket's bandit keeps its exploration.
+
+**The marketplace simulation** (`simulate_marketplace.py`) is the proof it does, in real
+time, everything it will do in production. It drives a diverse, self-refilling marketplace
+against a **hidden ground-truth demand world deliberately different from the model's
+warm-start belief** (some cohorts clear above the prior, some below). Because the model is
+systematically wrong for whole cohorts, the *only* way its predictions improve is by
+gathering real outcomes and retraining — which the loop does autonomously. It exercises
+every event type, every guardrail, all reroute destinations (donate / recycle / warehouse),
+and fires ≥1 offline-gated retrain + promotion mid-run. Every decision, outcome, and retrain
+is emitted as a CloudWatch-shaped JSON line to `runs/sim/trace.jsonl`; a run report +
+`summary.md` land alongside.
+
+```
+python -m reloop_pricing.pricing.simulate_marketplace --listings 200 --days 60 --seed 7
+```
+
+Representative run (seed 7): ~6.7k decisions (`pricing.decide`), 973 terminal outcomes,
+**50% of listing-days held** (calm cadence — the trigger gate working), every event type +
+every reachable guardrail exercised, reroutes across donate/recycle/warehouse, and one
+offline-gated retrain promoted (candidate ₹2,839 vs incumbent ₹2,336, **+21.5%** → promote
+v2). In shorter runs a *second* retrain on the already-corrected model correctly HELD
+(−0.8%), proving the gate is not a rubber stamp.
+
+**Autonomy infra decision.** Self-contained in-process loop with file-based (JSONL) memory;
+the structured logs are already CloudWatch-shaped, so it is AWS-ready without provisioning
+EventBridge/SQS/Lambda/DynamoDB. On the API side, `logOutcome` emits `pricing.outcome` and a
+`pricing.retrain_due` signal every 500 rows (the API signals; the Python `LearningLoop` is
+the retrainer — honest split, no fake TS XGBoost).
 
 ## Data sources + honest label
 Warm-start trains on **Mercari Price Suggestion + eBay Electronics**, with reward

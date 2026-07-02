@@ -8,7 +8,8 @@
 //      (clearing price × sell-through from P1/P2) and real freight/distance math.
 // Every term is returned for on-screen explanation; pure + deterministic + reproducible.
 
-import type { ReturnReason, ReturnRoutingDecision } from './return.js';
+import type { Grade, GradePosterior, ReturnReason, ReturnRoutingDecision } from './return.js';
+import type { ItemCategory } from './sell.js';
 
 export type ReturnPath = ReturnRoutingDecision['decision'];
 
@@ -30,6 +31,20 @@ export interface RoutingEvProfile {
   nearbyBuyers: number;
   radiusKm: number;
   warehouseDistanceKm: number;
+  // --- Spec 016: decision-under-uncertainty inputs (all optional — legacy
+  // callers that omit them get byte-identical behavior to the point-grade engine).
+  /** Grading confidence 0–1; gates route eligibility (θ_r per path). */
+  confidence?: number;
+  /** Full grade distribution; discounts recovery when mass sits below the modal grade. */
+  gradePosterior?: GradePosterior;
+  /** Category keys the price-decay curve (`decay(t_r)` — time is a P&L line). */
+  category?: ItemCategory;
+  /** Factory seal verified — gates the restock path. */
+  sealed?: boolean;
+  /** SKU still live in the catalog with healthy sell-through — gates restock. */
+  skuActive?: boolean;
+  /** Nearest FC inbound distance (restock leg); defaults to warehouseDistanceKm. */
+  nearestFcKm?: number;
 }
 
 export interface EvTerm {
@@ -43,6 +58,8 @@ export interface PathEv {
   evCents: number;
   viable: boolean;
   terms: EvTerm[];
+  /** Spec 016: why the path was gated out (e.g. confidence below the route's θ). */
+  gateReason?: string;
 }
 
 export interface RoutingEvResult {
@@ -53,6 +70,8 @@ export interface RoutingEvResult {
   evByPath: PathEv[];
   fallbackChain: ReturnPath[];
   dwellBudgetHours: number;
+  /** Spec 016: decision TTL — re-evaluated at the next checkpoint or on expiry. */
+  ttlHours: number;
   co2SavedKg: number;
   localMarginCents: number;
   warehouseMarginCents: number;
@@ -62,10 +81,12 @@ export interface RoutingEvResult {
 }
 
 // --- Tunable economics (documented; Location Service / carbon price in prod) ---
-const CENTS_PER_KG_CO2 = 200; // ₹2/kg internal carbon price
+// Exported so downstream carbon accounting (carbon-vouchers.ts) reuses this exact
+// internal carbon price instead of inventing a second, disagreeing one.
+export const CENTS_PER_KG_CO2 = 200; // ₹2/kg internal carbon price
 const FREIGHT_COST_PER_KM_CENTS = 200; // ₹2/km road freight
 const CO2_FREIGHT_PER_KM_KG = 0.004; // kg CO2e per km (≈2.3kg over 580km)
-const CO2_LOCAL_KG = 0.2; // local handling footprint
+export const CO2_LOCAL_KG = 0.2; // local handling footprint
 const HIGH_VALUE_CENTS = 2_000_000; // ₹20,000 → fraud/verification gate
 
 // Residual/cost model relative to the predicted clearing price.
@@ -77,6 +98,105 @@ const WAREHOUSE_RECOVERY_FRAC = 0.6; // liquidation recovery at the FC
 // almost nothing, a worn one gains a lot. Cost rises with how much work it needs.
 const REFURB_UPLIFT_BY_GRADE: Record<'A' | 'B' | 'C', number> = { A: 0.05, B: 0.18, C: 0.35 };
 const REFURB_COST_BY_GRADE: Record<'A' | 'B' | 'C', number> = { A: 0.12, B: 0.2, C: 0.3 };
+
+// --- Spec 016: restock, time decay, and confidence gates ------------------------
+// Restock = straight to the nearest FC inbound dock as sellable, deleting the
+// returns-center hop entirely. Recovery is near-full price (sold before markdown)
+// minus a receive+shelve touch.
+const RESTOCK_RECOVERY_FRAC = 0.92;
+const RESTOCK_HANDLING_CENTS = 15_000; // FC inbound receive + shelve (₹150)
+const RESTOCK_REASONS: ReadonlySet<ReturnReason> = new Set(['changed_mind', 'didnt_fit', 'duplicate_gift']);
+
+// decay(t_r): each path has an expected time-to-cash; category-specific weekly
+// price decay makes the engine SEE that weeks of returns-center dwell are a real
+// P&L line. This is the mathematical heart of "decide before it moves".
+const TIME_TO_CASH_DAYS: Record<ReturnPath, number> = {
+  restock: 4,
+  local_resale: 3,
+  refurbish: 8,
+  donate: 2,
+  recycle: 2,
+  warehouse: 21,
+  return_to_seller: 0,
+};
+const WEEKLY_DECAY_BY_CATEGORY: Record<ItemCategory, number> = {
+  electronics: 0.02,
+  fashion: 0.015,
+  home: 0.008,
+  sports: 0.01,
+  toys: 0.01,
+  books: 0.005,
+  other: 0.01,
+};
+
+// Confidence gates θ_r — DERIVED from correction cost, not arbitrary: a bad unit
+// reaching a buyer as "new" costs a second return plus trust (θ_restock high);
+// a mis-donated item costs almost nothing (θ_donate low). recycle/warehouse are
+// never gated, so the eligible set can only collapse TOWARD today's flow —
+// graceful degradation with no special-case code path.
+const CONFIDENCE_GATE: Partial<Record<ReturnPath, number>> = {
+  restock: 0.85,
+  local_resale: 0.6,
+  refurbish: 0.5,
+  donate: 0.3,
+};
+
+// Grade-sensitive recovery: how much of the modal-grade clearing price each grade
+// actually realizes. Used to discount recovery when the posterior spreads below
+// the modal grade (restock/local/refurb are grade-sensitive; donation, recycling
+// and FC liquidation recoveries are already conservative fractions).
+const GRADE_VALUE_FRAC: Record<Grade, number> = { A: 1.0, B: 0.85, C: 0.65, Salvage: 0.2 };
+
+/**
+ * Lift a point grade + calibrated confidence into a posterior: the modal grade
+ * keeps the confidence mass, the remainder spreads to adjacent grades.
+ */
+export function posteriorFromPointGrade(grade: Grade, confidence: number): GradePosterior {
+  const order: Grade[] = ['A', 'B', 'C', 'Salvage'];
+  const c = Math.min(0.999, Math.max(0.05, confidence));
+  const post: GradePosterior = { A: 0, B: 0, C: 0, Salvage: 0 };
+  post[grade] = c;
+  const i = order.indexOf(grade);
+  const neighbors = [order[i - 1], order[i + 1]].filter((g): g is Grade => g !== undefined);
+  for (const n of neighbors) post[n] = (1 - c) / neighbors.length;
+  return post;
+}
+
+/** Expected grade-value factor relative to the modal grade (degenerate posterior → 1). */
+function gradeMixFactor(posterior: GradePosterior | undefined): number {
+  if (!posterior) return 1;
+  const grades: Grade[] = ['A', 'B', 'C', 'Salvage'];
+  let total = 0;
+  let expected = 0;
+  let modal: Grade = 'A';
+  for (const g of grades) {
+    const w = posterior[g] ?? 0;
+    total += w;
+    expected += w * GRADE_VALUE_FRAC[g];
+    if (w > (posterior[modal] ?? 0)) modal = g;
+  }
+  if (total <= 0) return 1;
+  return expected / total / GRADE_VALUE_FRAC[modal];
+}
+
+/** Multiplicative value retention after the path's expected time-to-cash. */
+function decayFactor(category: ItemCategory | undefined, path: ReturnPath): number {
+  if (!category) return 1;
+  const weekly = WEEKLY_DECAY_BY_CATEGORY[category];
+  return Math.pow(1 - weekly, TIME_TO_CASH_DAYS[path] / 7);
+}
+
+// How long a decision stays valid before the next checkpoint must re-evaluate.
+// Demand-sensitive paths expire fastest.
+const TTL_HOURS: Record<ReturnPath, number> = {
+  local_resale: 12,
+  restock: 24,
+  refurbish: 24,
+  donate: 48,
+  recycle: 72,
+  warehouse: 72,
+  return_to_seller: 72,
+};
 
 function refurbGrade(grade: RoutingEvProfile['grade']): 'A' | 'B' | 'C' {
   return grade === 'A' || grade === 'B' || grade === 'C' ? grade : 'C';
@@ -128,6 +248,37 @@ export function evByPath(p: RoutingEvProfile): PathEv[] {
   const localCarbon = carbonCostCents(CO2_LOCAL_KG);
   const freightCost = Math.round(p.warehouseDistanceKm * FREIGHT_COST_PER_KM_CENTS);
   const freightCarbon = carbonCostCents(p.warehouseDistanceKm * CO2_FREIGHT_PER_KM_KG);
+  const mix = gradeMixFactor(p.gradePosterior);
+
+  // Recovery with the spec-016 uncertainty + time adjustments surfaced as their own
+  // signed terms (glass-box: the screen shows WHY a path lost value, not just that
+  // it did). Both no-op when the optional inputs are absent — legacy callers get
+  // byte-identical terms.
+  const recovered = (
+    path: ReturnPath,
+    label: string,
+    baseCents: number,
+    gradeSensitive: boolean,
+  ): { terms: EvTerm[]; totalCents: number } => {
+    const terms: EvTerm[] = [{ label, valueCents: baseCents }];
+    let value = baseCents;
+    if (gradeSensitive && mix !== 1) {
+      const adj = Math.round(baseCents * (mix - 1));
+      if (adj !== 0) {
+        terms.push({ label: 'Grade uncertainty discount', valueCents: adj });
+        value += adj;
+      }
+    }
+    const d = decayFactor(p.category, path);
+    if (d !== 1) {
+      const adj = Math.round(value * (d - 1));
+      if (adj !== 0) {
+        terms.push({ label: `Value decay (${TIME_TO_CASH_DAYS[path]}d to cash)`, valueCents: adj });
+        value += adj;
+      }
+    }
+    return { terms, totalCents: value };
+  };
 
   const rg = refurbGrade(p.grade);
   const localResaleValue = Math.round(p.clearingPriceCents * stp);
@@ -140,62 +291,119 @@ export function evByPath(p: RoutingEvProfile): PathEv[] {
   const recycleValue = Math.round(p.clearingPriceCents * RECYCLE_VALUE_FRAC);
   const warehouseRecovery = Math.round(p.clearingPriceCents * WAREHOUSE_RECOVERY_FRAC);
 
+  // Restock: nearest FC inbound, not the returns center. Only meaningful when the
+  // seal + catalog signals are present; without them it is simply not viable.
+  const fcKm = p.nearestFcKm ?? p.warehouseDistanceKm;
+  const fcFreight = Math.round(fcKm * FREIGHT_COST_PER_KM_CENTS);
+  const fcCarbon = carbonCostCents(fcKm * CO2_FREIGHT_PER_KM_KG);
+  const restockRecovery = recovered(
+    'restock',
+    'Restock at full recovery',
+    Math.round(p.clearingPriceCents * RESTOCK_RECOVERY_FRAC),
+    true,
+  );
+  const restock: PathEv = {
+    path: 'restock',
+    viable: p.sealed === true && p.skuActive === true && RESTOCK_REASONS.has(p.reason),
+    evCents: restockRecovery.totalCents - fcFreight - RESTOCK_HANDLING_CENTS - fcCarbon,
+    terms: [
+      ...restockRecovery.terms,
+      { label: `FC inbound ${fcKm}km`, valueCents: -fcFreight },
+      { label: 'Receive + shelve', valueCents: -RESTOCK_HANDLING_CENTS },
+      { label: 'Freight carbon', valueCents: -fcCarbon },
+    ],
+  };
+
+  const localRecovery = recovered(
+    'local_resale',
+    `Resale × ${Math.round(stp * 100)}% sell-through`,
+    localResaleValue,
+    true,
+  );
   const local: PathEv = {
     path: 'local_resale',
     viable: p.nearbyBuyers >= 1,
-    evCents: localResaleValue - p.localHandlingCents - localCarbon,
+    evCents: localRecovery.totalCents - p.localHandlingCents - localCarbon,
     terms: [
-      { label: `Resale × ${Math.round(stp * 100)}% sell-through`, valueCents: localResaleValue },
+      ...localRecovery.terms,
       { label: 'Local handling', valueCents: -p.localHandlingCents },
       { label: 'Carbon', valueCents: -localCarbon },
     ],
   };
+  const refurbRecovery = recovered(
+    'refurbish',
+    `Refurbished resale × ${Math.round(stp * 100)}%`,
+    refurbValue,
+    true,
+  );
   const refurbish: PathEv = {
     path: 'refurbish',
     viable: refurbViable,
-    evCents: refurbValue - refurbCost - p.localHandlingCents - localCarbon,
+    evCents: refurbRecovery.totalCents - refurbCost - p.localHandlingCents - localCarbon,
     terms: [
-      { label: `Refurbished resale × ${Math.round(stp * 100)}%`, valueCents: refurbValue },
+      ...refurbRecovery.terms,
       { label: 'Refurb cost', valueCents: -refurbCost },
       { label: 'Local handling', valueCents: -p.localHandlingCents },
       { label: 'Carbon', valueCents: -localCarbon },
     ],
   };
+  const donateRecovery = recovered('donate', 'Donation credit', donationValue, false);
   const donate: PathEv = {
     path: 'donate',
     viable: true,
-    evCents: donationValue - Math.round(p.localHandlingCents * 0.5) - localCarbon,
+    evCents: donateRecovery.totalCents - Math.round(p.localHandlingCents * 0.5) - localCarbon,
     terms: [
-      { label: 'Donation credit', valueCents: donationValue },
+      ...donateRecovery.terms,
       { label: 'Handling', valueCents: -Math.round(p.localHandlingCents * 0.5) },
       { label: 'Carbon', valueCents: -localCarbon },
     ],
   };
+  const recycleRecovery = recovered('recycle', 'Recovered materials', recycleValue, false);
   const recycle: PathEv = {
     path: 'recycle',
     viable: true,
-    evCents: recycleValue - Math.round(p.localHandlingCents * 0.5) - localCarbon,
+    evCents: recycleRecovery.totalCents - Math.round(p.localHandlingCents * 0.5) - localCarbon,
     terms: [
-      { label: 'Recovered materials', valueCents: recycleValue },
+      ...recycleRecovery.terms,
       { label: 'Handling', valueCents: -Math.round(p.localHandlingCents * 0.5) },
       { label: 'Carbon', valueCents: -localCarbon },
     ],
   };
+  // The 21-day time-to-cash decay is the warehouse path's honest hidden cost:
+  // returns-center dwell is price decay + working capital, not just freight.
+  const warehouseRec = recovered('warehouse', 'FC liquidation recovery', warehouseRecovery, false);
   const warehouse: PathEv = {
     path: 'warehouse',
     viable: true,
-    evCents: warehouseRecovery - freightCost - freightCarbon,
+    evCents: warehouseRec.totalCents - freightCost - freightCarbon,
     terms: [
-      { label: 'FC liquidation recovery', valueCents: warehouseRecovery },
+      ...warehouseRec.terms,
       { label: `Freight ${p.warehouseDistanceKm}km`, valueCents: -freightCost },
       { label: 'Freight carbon', valueCents: -freightCarbon },
     ],
   };
-  return [local, refurbish, donate, recycle, warehouse];
+
+  const paths = [restock, local, refurbish, donate, recycle, warehouse];
+
+  // Confidence gates θ_r: low confidence collapses the eligible set toward the
+  // ungated paths (recycle/warehouse) — i.e., toward today's flow. Applied last so
+  // the glass-box screen still shows the gated path's full EV next to its reason.
+  if (p.confidence !== undefined) {
+    for (const e of paths) {
+      const theta = CONFIDENCE_GATE[e.path];
+      if (theta !== undefined && e.viable && p.confidence < theta) {
+        e.viable = false;
+        e.gateReason = `confidence ${p.confidence.toFixed(2)} below the ${theta} gate for ${e.path}`;
+      }
+    }
+  }
+
+  return paths;
 }
 
 const DWELL: Partial<Record<ReturnPath, number>> = { local_resale: 48, refurbish: 72, donate: 96 };
 const FALLBACKS: Record<ReturnPath, ReturnPath[]> = {
+  restock: ['local_resale', 'donate'], // seal broken at the hub → cascade locally
   local_resale: ['donate', 'recycle'],
   refurbish: ['local_resale', 'donate'],
   donate: ['recycle'],
@@ -230,21 +438,32 @@ export function decideRoute(p: RoutingEvProfile): RoutingEvResult {
       hardRule: forced.rule,
       fallbackChain: FALLBACKS[forced.path],
       dwellBudgetHours: DWELL[forced.path] ?? 0,
+      ttlHours: TTL_HOURS[forced.path],
       // Avoiding the freight round-trip is the carbon saved when we stay local.
       co2SavedKg: savesCarbon ? freightCarbonKg : 0,
     };
   }
 
   // EV optimization over viable paths (argmax). Deterministic; ties broken by order.
+  // recycle/warehouse are never confidence-gated, so `viable` is never empty.
   const viable = paths.filter((e) => e.viable);
   const best = viable.reduce((acc, e) => (e.evCents > acc.evCents ? e : acc));
-  const co2SavedKg = best.path === 'warehouse' ? 0 : freightCarbonKg;
+  // Restock still ships one (short) leg to the nearest FC — the carbon saved is
+  // the returns-center linehaul it avoided, net of that inbound leg.
+  const fcKm = p.nearestFcKm ?? p.warehouseDistanceKm;
+  const restockSavedKg = Math.max(
+    0,
+    Math.round((p.warehouseDistanceKm - fcKm) * CO2_FREIGHT_PER_KM_KG * 10) / 10,
+  );
+  const co2SavedKg =
+    best.path === 'warehouse' ? 0 : best.path === 'restock' ? restockSavedKg : freightCarbonKg;
 
   return {
     ...base,
     decision: best.path,
     fallbackChain: FALLBACKS[best.path],
     dwellBudgetHours: DWELL[best.path] ?? 0,
+    ttlHours: TTL_HOURS[best.path],
     co2SavedKg,
   };
 }

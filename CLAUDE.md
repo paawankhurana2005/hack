@@ -1,19 +1,24 @@
 # ReLoop — Project Guide for Claude Code
 
 ## What we're building
-ReLoop is an AI layer that gives returned, unused, or outgrown products a
-second life — instead of being hauled back to a warehouse or written off.
-Built for the Amazon hackathon. Customer-obsessed, one-stop, Amazon-native.
+ReLoop is the intelligence layer for Amazon's returns pipeline: grade at the
+doorstep, decide the item's best next life BEFORE reverse-logistics costs are
+incurred. Built for the Amazon hackathon. Customer-obsessed, one-stop,
+Amazon-native. The full product thesis lives in `specs/016-return-pipeline.md`.
 
-### Two user-side functionalities
-1. **SELL (user-initiated):** A user has an item with life left in it. AI grades
-   it, sets a fair price, generates a trust card, matches it to a nearby buyer,
-   and Amazon handles the handoff. The item never touches a warehouse.
-2. **RETURN (Amazon-decided):** A user returns an item. The AI grades it AT THE
-   DOORSTEP, *before it moves*. Then the "Intelligent Bridge" decides the best
-   next path — local resale / refurbish / donate / recycle / warehouse — based on
-   value vs. local handling cost vs. nearby demand vs. carbon.
+### The product (spec 016 — Return Pipeline first)
+1. **RETURN (the product):** A user returns an item. The AI grades it AT THE
+   DOORSTEP, *before it moves*. The "Intelligent Bridge" — one deterministic EV
+   engine — picks the best path: restock / local resale / refurbish / donate /
+   recycle / warehouse (standard reverse logistics = the engine's FALLBACK, so
+   downside is bounded). The decision is re-checked at physical checkpoints
+   (driver scan, local hub bench) while a redirect is still cheap.
    **Core innovation: grade at the source, decide before the item moves.**
+   Positioning: Amazon already resells returns at scale (Grade & Resell, Renewed,
+   Resale) — but every program grades AFTER the linehaul. We are the missing
+   front end. Do NOT pitch ReLoop as a reselling/C2C app.
+2. **SELL (shared rails, not a pitch vertical):** the same grading/pricing/
+   Health Card rails, user-initiated. Kept in-app; de-emphasized in the pitch.
 
 ### Two interfaces
 - **User app** — the Sell and Return flows above.
@@ -69,9 +74,11 @@ written-spec gate. The loop:
    spec afterward to match what shipped.
 
 ## Current phase
-Scaffolding only. NO real functionality yet — no AI, no backend logic, no real
-data. Frontend uses placeholder screens and mock data. We add features in later
-spec-gated iterations.
+Working prototype (specs 001–016 shipped): real grading/pricing model calls,
+deterministic glass-box engines (routing EV, listing agent, provenance), mock
+catalog/demand state for reproducibility. Current focus: the Return Pipeline as
+the single product thesis (spec 016) — engine upgrades, checkpoint lifecycle,
+and the all-in-returns pitch.
 
 ## Deployment (production)
 Live URLs:

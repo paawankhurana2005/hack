@@ -519,6 +519,24 @@ export function acceptRoute(id: string): { state: AgentState; impact: ImpactEsti
   return { state: s, impact };
 }
 
+/** Spec 016: a buyer bought the listing — the agent's job is done. */
+export function markAgentSold(id: string, salePriceCents?: number): AgentState | null {
+  const s = read(id);
+  if (!s || s.status === 'sold') return s;
+  s.status = 'sold';
+  s.events = [
+    ...s.events,
+    {
+      day: s.day,
+      phase: 'acted',
+      text: `Sold at ${formatMoney(inr(salePriceCents ?? s.priceCents))} — a matched local buyer completed the purchase. Agent retired.`,
+      at: new Date().toISOString(),
+    },
+  ];
+  write(s);
+  return s;
+}
+
 export function resetAgent(listing: CasualListing): AgentState {
   if (typeof window !== 'undefined') {
     try {

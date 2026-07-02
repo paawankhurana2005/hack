@@ -78,3 +78,55 @@ class ContextualBandit:
 
     def load_state_dict(self, state: dict) -> None:
         self.arm_observations = {float(k): int(v) for k, v in state["arm_observations"].items()}
+
+
+class BucketedBandit:
+    """Pooled Thompson-sampling posteriors, one bucket per (category × grade).
+
+    Mirrors the TS RepriceBandit (apps/api/src/services/pricing/reprice-bandit.ts), which
+    pools observations by ``category|gradeKey``: every outcome in a bucket teaches every
+    listing in that bucket, so a brand-new listing inherits the exploration its cohort has
+    already paid for. The reward predictor is shared across buckets and hot-swappable —
+    when a retrain is promoted the agent calls ``set_predictor`` so all buckets score with
+    the new model while keeping their accumulated exploration counts.
+    """
+
+    def __init__(self, predictor: RewardPredictor, arms: Optional[List[float]] = None, rng=None):
+        self.predictor = predictor
+        self.arms = arms or ARMS
+        self._rng = rng or np.random.default_rng()
+        self._buckets: Dict[str, ContextualBandit] = {}
+
+    @staticmethod
+    def bucket_key(category: str, grade_key: str) -> str:
+        return f"{category}|{grade_key}"
+
+    def _bandit(self, key: str) -> ContextualBandit:
+        if key not in self._buckets:
+            self._buckets[key] = ContextualBandit(self.predictor, self.arms, self._rng)
+        return self._buckets[key]
+
+    def set_predictor(self, predictor: RewardPredictor) -> None:
+        """Hot-swap the reward model (after a promoted retrain) without losing posteriors."""
+        self.predictor = predictor
+        for bandit in self._buckets.values():
+            bandit.predictor = predictor
+
+    def decide(self, bucket_key: str, state: Dict, anchor_price: float, floor: float, ceiling: float) -> Dict:
+        return self._bandit(bucket_key).decide(state, anchor_price, floor, ceiling)
+
+    def update(self, bucket_key: str, arm: float, reward: float) -> None:
+        self._bandit(bucket_key).update(arm, reward)
+
+    def observations(self, bucket_key: str) -> Dict[float, int]:
+        return dict(self._bandit(bucket_key).arm_observations)
+
+    def uncertainty(self, bucket_key: str, arm: float, spread: float) -> float:
+        return self._bandit(bucket_key).uncertainty(arm, spread)
+
+    def state_dict(self) -> dict:
+        return {key: bandit.state_dict() for key, bandit in self._buckets.items()}
+
+    def load_state_dict(self, state: dict) -> None:
+        for key, sub in state.items():
+            self._bandit(key).load_state_dict(sub)

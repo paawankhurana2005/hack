@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import type { ShopItem } from '@reloop/shared';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatMoney } from '@/lib/money';
+import type { ShopEntry } from '@/lib/market';
 
 const gradeTone = {
   new: 'success',
@@ -17,7 +17,7 @@ export function ShopCard({
   sold,
   priceCents,
 }: {
-  item: ShopItem;
+  item: ShopEntry;
   sold?: boolean;
   priceCents?: number;
 }) {
@@ -42,6 +42,11 @@ export function ShopCard({
           {card.authenticityVerified && (
             <span className="absolute right-3 top-3 rounded-full bg-background/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-brand backdrop-blur">
               ✓ Verified
+            </span>
+          )}
+          {item.openBox && !sold && (
+            <span className="absolute bottom-3 left-3 rounded-full bg-brand/90 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-brand-foreground backdrop-blur">
+              Open-box · doorstep graded
             </span>
           )}
           {sold && (

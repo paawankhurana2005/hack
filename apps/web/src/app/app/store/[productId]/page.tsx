@@ -7,6 +7,7 @@ import { PageShell } from '@/components/layout/page-shell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ReturnRiskPanel } from '@/components/store/return-risk-panel';
+import { OpenBoxOfferCard } from '@/components/store/open-box-offer';
 import { formatMoney } from '@/lib/money';
 import { getReturnRisk } from '@/lib/prevention';
 import { findStoreProduct } from '@/mock/store-products';
@@ -77,6 +78,9 @@ export default function StoreProductPage() {
             )}
             <p className="mt-4 text-sm text-muted-foreground">{product.description}</p>
           </div>
+
+          {/* Spec 016: a doorstep-graded return of this exact product, nearby */}
+          <OpenBoxOfferCard productId={product.id} newPriceCents={product.price.amountCents} />
 
           {sized && (
             <div>

@@ -10,6 +10,8 @@ import type { CasualListing } from '@/mock/casual-listings';
 
 export interface ShopEntry extends ShopItem {
   sellerId: string;
+  /** Spec 016: a hub-dispatched RETURN — open-box, doorstep-graded, hub-verified. */
+  openBox?: boolean;
 }
 
 // Most catalog items belong to "external" sellers, but a few are owned by our
@@ -40,6 +42,7 @@ function fromListing(l: CasualListing): ShopEntry | null {
     listingPrice: l.listedPrice,
     card: l.card,
     impact: l.impact,
+    openBox: l.returnId !== undefined,
   };
 }
 

@@ -1,6 +1,8 @@
 // Return flow — contracts for the 5-step return experience.
 // These are distinct from the scaffold-era GradingResult/RoutingDecision (sell flow).
 
+import type { RoutingFactor } from './routing.js';
+
 export type ReturnReason =
   | 'didnt_fit'
   | 'changed_mind'
@@ -20,12 +22,22 @@ export interface ReturnGradingResult {
   wardrobingFlag: boolean;
   functionallyVerifiable: boolean;
   rawReason: ReturnReason;
+  /** Spec 016: factory seal / packaging intact — gates the restock path. */
+  packagingSealed?: boolean;
 }
 
 export type Grade = 'A' | 'B' | 'C' | 'Salvage';
 
+/**
+ * Spec 016: grading as a distribution over grades (sums to 1), not a point label.
+ * Routes differ in error sensitivity — restock is brutally sensitive to a wrong A,
+ * donation barely cares — so the engine takes the full posterior.
+ */
+export type GradePosterior = Record<Grade, number>;
+
 export interface ReturnRoutingDecision {
   decision:
+    | 'restock'
     | 'local_resale'
     | 'refurbish'
     | 'donate'
@@ -35,6 +47,8 @@ export interface ReturnRoutingDecision {
   reasoning: string;
   co2SavedKg: number;
   dwellBudgetHours: number;
+  /** Spec 016: how long this decision stays valid before checkpoint re-evaluation. */
+  ttlHours?: number;
   sellerType: '1P' | '3P';
   fallbackChain: ReturnRoutingDecision['decision'][];
   // Economic margins — present for local_resale and refurbish
@@ -46,6 +60,11 @@ export interface ReturnRoutingDecision {
   warehouseDistanceKm?: number;   // distance to nearest warehouse (shows what we avoided)
   // Phase 3: per-path expected-value breakdown (the glass-box optimization).
   evBreakdown?: RoutingEvBreakdown;
+  // Spec 015: EcoCredits earned for a 1P item diverted from the warehouse, capped
+  // by Amazon's own captured EV delta (see carbon-vouchers.ts). Undefined for
+  // 3P/warehouse/return_to_seller — no Amazon-owned counterfactual to fund against.
+  voucherEcoCredits?: number;
+  voucherFactors?: RoutingFactor[];
 }
 
 /** A single path's expected value + signed term contributions (paise). */
@@ -54,6 +73,8 @@ export interface RoutingPathEv {
   evCents: number;
   viable: boolean;
   terms: { label: string; valueCents: number }[];
+  /** Spec 016: why the path was gated out (e.g. confidence below the route's θ). */
+  gateReason?: string;
 }
 
 /** The EV optimization, surfaced for on-screen explanation. */
@@ -126,6 +147,7 @@ export type GradingScenario =
   | 'unverifiable';
 
 export type RoutingScenario =
+  | 'restock'
   | 'local_resale'
   | 'refurbish'
   | 'donate'
@@ -151,4 +173,55 @@ export interface ReturnHealthCard {
   verifiedAttributes: string[];  // what was actually checked from photos
   notVerified: string[];         // what could not be verified from photos alone
   trustScore: number;            // 0–100
+}
+
+// --- Spec 016: the return-item state machine -------------------------------
+// A return is a lifecycle, not one decision. The engine re-runs at every
+// physical checkpoint: information improves and redirection cost rises as the
+// item moves. RL_OUTBOUND (today's reverse-logistics flow) is the universal
+// fallback edge — the graceful-degradation guarantee.
+
+export type ReturnItemState =
+  // decision phase (nothing has moved — redirect is free)
+  | 'initiated'
+  | 'evidence_captured'
+  | 'routed' // provisional, carries a TTL
+  // custody checkpoints (cheap redirects)
+  | 'pickup_verified' // driver scan at the doorstep
+  | 'at_local_hub' // delivery station bench queue
+  | 'hub_verified' // grade confirmed/overridden — last cheap redirect
+  // execution (committed to a destination)
+  | 'listed_local'
+  | 'sold'
+  | 'delivered_to_buyer'
+  | 'refurb_queue'
+  | 'restock_outbound'
+  | 'restocked'
+  | 'pallet_staging'
+  | 'liquidated'
+  | 'donation_batch'
+  | 'donated'
+  | 'recycle_batch'
+  | 'recycled'
+  | 'rl_outbound'; // handed to the standard reverse-logistics chain
+
+/** Evidence gathered at a checkpoint that can move the posterior. */
+export interface CheckpointEvidence {
+  source: 'customer' | 'driver' | 'hub_bench';
+  /** Grade observed at this checkpoint (hub bench may override the AI). */
+  observedGrade?: Grade;
+  confidence?: number;
+  packagingSealed?: boolean;
+  matchesPhotos?: boolean; // driver: does the physical item match the capture?
+  functionalCheckPassed?: boolean; // hub bench, powered items
+  notes?: string;
+}
+
+/** One transition in the lifecycle; `decision` is set when the engine re-ran. */
+export interface ReturnStateTransition {
+  from: ReturnItemState;
+  to: ReturnItemState;
+  at: string; // ISO timestamp
+  evidence?: CheckpointEvidence;
+  decision?: ReturnRoutingDecision; // present when this checkpoint re-routed
 }

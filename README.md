@@ -1,36 +1,45 @@
 # ReLoop
 
-**An AI layer that gives returned, unused, and outgrown products a second life —
-instead of hauling them back to a warehouse or writing them off.**
+**The intelligence layer for Amazon's returns pipeline: grade at the doorstep,
+decide the item's best next life before reverse-logistics costs are incurred.**
 
-When something is returned today, it usually ships hundreds of kilometres back to
-a fulfilment centre before anyone decides what to do with it — burning freight,
-carbon, and most of the item's residual value along the way. ReLoop flips that:
-it **grades the item at the source and decides before it moves.**
+Amazon already runs the world's largest resale operation — Grade & Resell,
+Renewed, Amazon Resale, Liquidations, Donations. But every one of those programs
+activates **after** the returned item has been picked up, sorted, and hauled
+hundreds of kilometres to a returns centre — the freight is spent, weeks of
+price decay are sunk, and only then does anyone decide what the item is worth.
+ReLoop is the missing front end: it **grades the item at the source and decides
+before it moves.** Standard reverse logistics remains the engine's *fallback*,
+so the downside is bounded — every correct early decision is pure margin.
 
 > **Core idea:** *Grade at the doorstep. Decide before the item travels.*
+> Full product thesis: [`specs/016-return-pipeline.md`](specs/016-return-pipeline.md)
 
 ---
 
 ## What it does
 
-ReLoop has two flows for the customer and one dashboard for sellers.
-
-### 1. Sell (customer-initiated)
-A customer has an item with life left in it. The AI grades it from photos, sets a
-fair resale price, generates a trust card, and an autonomous agent works to get it
-sold to a nearby buyer. **The item never touches a warehouse.**
-
-### 2. Return (platform-decided)
+### 1. Return (the product)
 A customer returns an item. The AI grades it **at the doorstep, before it moves.**
-A deterministic decision engine — the **Intelligent Bridge** — then picks the best
-next path for that specific item: local resale, refurbish, donate, recycle, return
-to seller, or (only as a last resort) warehouse. The decision weighs residual
-value against local handling cost, nearby demand, and carbon.
+A deterministic decision engine — the **Intelligent Bridge** — computes the
+expected value of every path and picks the best one for that specific item:
+**restock** (straight back to sellable inventory), local resale, refurbish,
+donate, recycle, return to seller, or standard reverse logistics as the safe
+fallback. The decision weighs residual value (as a grade *posterior*, not a point
+label), local handling cost, nearby demand, time-to-cash price decay, and carbon
+— and it is **re-checked at physical checkpoints** (driver scan at pickup, a
+10-minute local hub bench) while a redirect still costs a shelf move, not a lost
+item. Low AI confidence collapses routing toward today's flow automatically.
+
+### 2. Sell (shared rails)
+The same grading, pricing, and Health Card rails, pointed at a user-initiated
+flow: AI grades from photos, sets a fair price, mints a trust card, and an
+autonomous agent works the listing. It exists because the Return Pipeline
+already built every piece it needs.
 
 ### 3. Seller dashboard
-For sellers handling returns at volume — triage, rescue, exchange, spare-parts
-recovery, and insights.
+For sellers handling returns at volume — triage, the hub bench, rescue, exchange,
+spare-parts recovery, and insights.
 
 ---
 
@@ -98,7 +107,7 @@ A **pnpm-workspaces monorepo**, strict TypeScript throughout (no `any`).
 apps/web         Next.js (App Router) + TypeScript + Tailwind — the customer app + seller dashboard
 apps/api         Node + Express + TypeScript — AI-backed endpoints (grading, pricing, narration)
 packages/shared  @reloop/shared — the single source of truth for every data contract
-specs/           Spec-per-iteration build log (001–013)
+specs/           Spec-per-iteration build log (001–016)
 ```
 
 - **`@reloop/shared`** holds all data contracts *and* the pure decision engines
@@ -156,6 +165,8 @@ config on boot and exits with a clear message if `NVIDIA_API_KEY` is missing.
 | `POST /api/sell/grade` | Real multimodal grading of 1–4 photos |
 | `POST /api/sell/price` | Condition-and-demand-based resale price |
 | `POST /api/sell/health-card` | Assembles the Product Health Card |
+| `POST /api/route` | The Intelligent Bridge — hard-constraint ladder + EV routing |
+| `POST /api/return/checkpoint` | Checkpoint re-evaluation (driver scan / hub bench evidence) |
 | `POST /api/agent/narrate` | One-sentence narration of a listing-agent action |
 | `POST /api/rufus/*` | Health-Card-grounded shopping-assistant answers |
 
@@ -177,7 +188,7 @@ apps/
     src/lib/        Routing engine, NVIDIA client, env/config
 packages/
   shared/src/       Data contracts + pure decision engines (the single source of truth)
-specs/              001–013 — one doc per iteration (goal, scope, contracts, acceptance)
+specs/              001–016 — one doc per iteration (goal, scope, contracts, acceptance)
 ```
 
 ---

@@ -15,6 +15,7 @@ import { buyItem, isSold, type PurchaseResult } from '@/lib/marketplace-store';
 import { getAgentState } from '@/lib/agent-store';
 import { recordSale } from '@/lib/sale-store';
 import { earnFor } from '@/lib/credits-store';
+import { completeReturnSale } from '@/lib/return-market';
 import type { ShopEntry } from '@/lib/market';
 
 const inr = (cents: number): Money => ({ amountCents: cents, currency: 'INR' });
@@ -51,6 +52,9 @@ export function ShopDetail({ item }: { item: ShopEntry }) {
     });
     // The SELLER (a different account) gets paid into their own ledger.
     earnFor(item.sellerId, res.sellerCredits, `Sold ${card.title}`);
+    // Spec 016: if this was a hub-dispatched RETURN, the purchase closes its
+    // lifecycle (listed_local → sold → delivered_to_buyer) and retires the agent.
+    completeReturnSale(item.id, priceCents, res.sellerCredits);
     setResult(res);
     setAlreadySold(true);
   }
@@ -71,6 +75,11 @@ export function ShopDetail({ item }: { item: ShopEntry }) {
               <span className="absolute left-3 top-3 rounded-full bg-background/80 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground backdrop-blur">
                 {item.sellerName}
               </span>
+              {item.openBox && !sold && (
+                <span className="absolute bottom-3 left-3 rounded-full bg-brand/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-brand-foreground backdrop-blur">
+                  Open-box · doorstep graded · hub verified
+                </span>
+              )}
             </div>
           </Card>
 
