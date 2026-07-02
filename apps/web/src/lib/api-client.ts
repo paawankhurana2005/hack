@@ -8,9 +8,11 @@ import type {
   GradeRequest,
   GradingResult,
   HealthCardRequest,
+  PriceBreakdown,
   PriceRequest,
   PricingResult,
   ProductHealthCard,
+  ReturnRecordInput,
   RufusRequest,
   RufusResponse,
 } from '@reloop/shared';
@@ -136,6 +138,17 @@ export function narrateAgent(req: AgentNarrateRequest): Promise<AgentNarrateResp
 
 export function askRufus(req: RufusRequest): Promise<RufusResponse> {
   return postJson<RufusRequest, RufusResponse>('/api/rufus/ask', req);
+}
+
+/** Upsert the structured return record so the pricing engine can price it.
+ *  Called when a seller approves a return for local routing. */
+export function upsertReturnRecord(req: ReturnRecordInput): Promise<{ ok: boolean; returnId: string }> {
+  return postJson<ReturnRecordInput, { ok: boolean; returnId: string }>('/api/returns', req);
+}
+
+/** Fetch the live, dynamic price breakdown for a return from the pricing engine. */
+export function getPricing(returnId: string): Promise<PriceBreakdown> {
+  return getJson<PriceBreakdown>(`/api/pricing/${encodeURIComponent(returnId)}`);
 }
 
 export function createHealthCard(req: HealthCardRequest): Promise<ProductHealthCard> {

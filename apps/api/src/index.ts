@@ -19,6 +19,13 @@ import { createAgentRouter } from './routes/agent.js';
 import { createRufusRouter } from './routes/rufus.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createStateRouter } from './routes/state.js';
+import { createPricingRouter } from './routes/pricing.js';
+import { createReturnsRouter } from './routes/returns.js';
+import { createMatchingRouter } from './routes/matching.js';
+import { isMongoConfigured, getDb } from './lib/mongo.js';
+import { ensurePricingIndexes } from './lib/collections.js';
+import { scheduleDemandAggregation } from './jobs/computeDemandIndex.js';
+import { scheduleMatchingCascade } from './jobs/matchingCascade.js';
 import { gradeHandler } from './routes/grade.js';
 import { routeHandler } from './routes/route.js';
 import { healthCardHandler } from './routes/health-card.js';
@@ -82,6 +89,9 @@ app.use('/api/agent', createAgentRouter(config));
 app.use('/api/rufus', createRufusRouter(config));
 app.use('/api/auth', createAuthRouter());
 app.use('/api/state', createStateRouter());
+app.use('/api/pricing', createPricingRouter());
+app.use('/api/returns', createReturnsRouter());
+app.use('/api/matching', createMatchingRouter());
 
 app.post('/api/grade', (req, res) => { void gradeHandler(req, res); });
 app.post('/api/route', (req, res) => { void routeHandler(req, res); });
@@ -91,5 +101,18 @@ app.listen(config.PORT, () => {
   log('info', 'api listening', { port: config.PORT, mockMode: MOCK_MODE });
   if (MOCK_MODE) {
     log('warn', 'NVIDIA_API_KEY not set — running in mock mode');
+  }
+
+  // Dynamic pricing: ensure indexes exist and start the hourly demand rollup.
+  // Best-effort — failures here must never take the API down.
+  if (isMongoConfigured()) {
+    getDb()
+      .then((db) => ensurePricingIndexes(db))
+      .catch((err: unknown) => {
+        const detail = err instanceof Error ? err.message : 'unknown error';
+        log('error', 'failed to ensure pricing indexes', { detail });
+      });
+    scheduleDemandAggregation();
+    scheduleMatchingCascade();
   }
 });

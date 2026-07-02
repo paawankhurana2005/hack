@@ -12,9 +12,51 @@ import {
   type ExchangeItem,
   type MatchedBuyer,
 } from '@/lib/mocks/exchange-store';
+import { getPricing } from '@/lib/api-client';
+import type { PriceBreakdown } from '@reloop/shared';
 
 function formatINR(cents: number) {
   return `₹${(cents / 100).toLocaleString('en-IN')}`;
+}
+
+function formatRupees(rupees: number) {
+  return `₹${Math.round(rupees).toLocaleString('en-IN')}`;
+}
+
+// ─── Dynamic pricing engine card (live, backend) ───────────────────────────────
+function EngineBreakdown({ b }: { b: PriceBreakdown }) {
+  const factors = [
+    { label: 'Base price', value: formatRupees(b.basePrice), hint: 'Original market value' },
+    { label: 'Condition', value: `×${b.conditionFactor}`, hint: 'AI grade (placeholder 0.7)' },
+    { label: 'Local demand', value: `×${b.demandFactor}`, hint: 'From regional demand index' },
+    { label: 'Urgency', value: `×${b.urgencyFactor}`, hint: `${b.daysRemaining}d to pickup deadline` },
+    { label: 'Category', value: `×${b.categoryFactor}`, hint: 'Resale fraction by category' },
+  ];
+  return (
+    <div className="rounded-2xl border border-brand/30 bg-brand/5 p-6">
+      <div className="flex items-center justify-between">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
+          Dynamic pricing engine · live
+        </p>
+        <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">
+          from /api/pricing
+        </span>
+      </div>
+      <p className="mt-3 text-4xl font-bold tabular-nums text-foreground">{formatRupees(b.finalPrice)}</p>
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {factors.map((f) => (
+          <div key={f.label} className="rounded-xl bg-card p-3 ring-1 ring-border">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{f.label}</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-foreground">{f.value}</p>
+            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{f.hint}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 rounded-lg bg-card/60 px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground ring-1 ring-border">
+        {b.breakdown}
+      </p>
+    </div>
+  );
 }
 
 function minutesAgo(iso: string) {
@@ -31,7 +73,15 @@ const GRADE_COLOR: Record<'A' | 'B' | 'C', string> = {
 };
 
 // ─── Pricing tab ──────────────────────────────────────────────────────────────
-function PricingTab({ item, offsetHours }: { item: ExchangeItem; offsetHours: number }) {
+function PricingTab({
+  item,
+  offsetHours,
+  engine,
+}: {
+  item: ExchangeItem;
+  offsetHours: number;
+  engine: PriceBreakdown | 'loading' | 'error';
+}) {
   const currentPrice = computeCurrentPrice(item, offsetHours);
   const progress = rescueProgress(item, offsetHours);
   const hrs = hoursRemaining(item, offsetHours);
@@ -67,6 +117,22 @@ function PricingTab({ item, offsetHours }: { item: ExchangeItem; offsetHours: nu
 
   return (
     <div className="mt-6 space-y-6">
+      {/* Live engine price (backend) */}
+      {engine === 'loading' && (
+        <div className="h-40 animate-pulse rounded-2xl bg-card ring-1 ring-border" />
+      )}
+      {engine === 'error' && (
+        <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+          Pricing engine unavailable — showing the local time-decay estimate below.
+          <span className="ml-1 text-xs">(Approve this return for local routing, or start the API, to see the live price.)</span>
+        </div>
+      )}
+      {typeof engine === 'object' && <EngineBreakdown b={engine} />}
+
+      {/* Local time-decay simulation */}
+      <p className="pt-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        Time-decay simulation · local preview
+      </p>
       {/* Price arrow */}
       <div className="flex items-center gap-4 rounded-2xl bg-card p-6 ring-1 ring-border">
         <div className="text-center">
@@ -221,12 +287,22 @@ export default function RescueDetailPage() {
   const [tab, setTab] = useState<'pricing' | 'buyers'>('pricing');
   const [offsetHours, setOffsetHours] = useState(0);
   const [ticking, setTicking] = useState(false);
+  const [engine, setEngine] = useState<PriceBreakdown | 'loading' | 'error'>('loading');
 
   useEffect(() => {
     if (!ticking) return;
     const id = setInterval(() => setOffsetHours((h) => h + 1), 800);
     return () => clearInterval(id);
   }, [ticking]);
+
+  useEffect(() => {
+    let active = true;
+    setEngine('loading');
+    getPricing(returnId)
+      .then((b) => { if (active) setEngine(b); })
+      .catch(() => { if (active) setEngine('error'); });
+    return () => { active = false; };
+  }, [returnId]);
 
   const item =
     EXCHANGE_ITEMS.find((i) => i.returnId === returnId) ??
@@ -242,10 +318,14 @@ export default function RescueDetailPage() {
     );
   }
 
-  const currentPrice = computeCurrentPrice(item, offsetHours);
+  const localPrice = computeCurrentPrice(item, offsetHours);
   const progress = rescueProgress(item, offsetHours);
   const hrs = hoursRemaining(item, offsetHours);
   const urgent = progress > 0.75;
+  // Prefer the live engine price for the headline; fall back to the local
+  // estimate while it loads or if the API/record is unavailable.
+  const headlinePrice =
+    typeof engine === 'object' ? formatRupees(engine.finalPrice) : formatINR(localPrice);
 
   return (
     <div>
@@ -276,7 +356,7 @@ export default function RescueDetailPage() {
           <div>
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Live price</p>
             <p className={`text-xl font-bold tabular-nums ${urgent ? 'text-orange-400' : 'text-foreground'}`}>
-              {formatINR(currentPrice)}
+              {headlinePrice}
             </p>
           </div>
           <div className="h-8 w-px bg-border" />
@@ -339,7 +419,7 @@ export default function RescueDetailPage() {
       </div>
 
       {tab === 'pricing' ? (
-        <PricingTab item={item} offsetHours={offsetHours} />
+        <PricingTab item={item} offsetHours={offsetHours} engine={engine} />
       ) : (
         <BuyersTab item={item} offsetHours={offsetHours} />
       )}

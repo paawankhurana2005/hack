@@ -5,6 +5,7 @@ export * from './routing.js';
 export * from './health-card.js';
 export * from './sell.js';
 export * from './pricing.js';
+export * from './pricing-engine.js';
 export * from './return.js';
 export * from './owned-item.js';
 export * from './prevention.js';
