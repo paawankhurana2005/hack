@@ -85,6 +85,27 @@ manifests — transparent pallets price higher than mystery pallets. (5) **Time*
 category price decay × weeks of dwell is a real P&L line our engine prices and
 today's process cannot act on.
 
+**"Isn't liquidation just a write-off — why model it at all?"**
+Because today's version is priced badly, and that's exactly the gap. Amazon's
+own FBA Liquidations nets sellers only 5–10% of average selling price after
+fees, and Amazon itself sells to liquidators at 20–30¢ on the retail dollar —
+but that's for *unmanifested* pallets. Our engine prices the honest blend (a
+returns-centre item is maybe-restocked 15% of the time, liquidated the rest,
+at ~20¢ recovery) as the fallback's real value — not the fantasy flat 60% we
+used to assume — and then prices the manifested pallet as a genuinely better
+alternative: every unit's Health Card is exactly the information a liquidation
+buyer pays a premium for. We're not eliminating liquidation, we're pricing it
+honestly and then beating it locally.
+
+**"What about items that cost more to process than they're worth?"**
+We refund and let the customer keep it — a real Amazon lever, not a hack.
+Processing a return runs about $27 per $100 of order value once you count
+restocking, shipping, and inspection; for a cheap item that alone can exceed
+every recovery path. Our engine checks this explicitly: if every route loses
+money, and the customer clears a trust threshold, and there's no fraud signal,
+and the item isn't high-value, it refunds with zero pickup, zero handling,
+zero carbon. Otherwise it's a real route like anything else.
+
 **"Why is this Amazon-native and not OLX-like?"**
 OLX is unverified strangers, no trust layer, no logistics. ReLoop is AI-verified
 condition + a Product Health Card + Amazon-mediated handoff and guarantee. And

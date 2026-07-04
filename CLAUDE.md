@@ -74,11 +74,16 @@ written-spec gate. The loop:
    spec afterward to match what shipped.
 
 ## Current phase
-Working prototype (specs 001–016 shipped): real grading/pricing model calls,
+Working prototype (specs 001–021 shipped): real grading/pricing model calls,
 deterministic glass-box engines (routing EV, listing agent, provenance), mock
 catalog/demand state for reproducibility. Current focus: the Return Pipeline as
 the single product thesis (spec 016) — engine upgrades, checkpoint lifecycle,
-and the all-in-returns pitch.
+and the all-in-returns pitch. Spec 021 ("016.1") priced the engine honestly
+against real Amazon returns economics: liquidation is now a first-class,
+Health-Card-manifested hub-pallet path (with a real bulk-lot engine behind
+it), the warehouse fallback lost its flat 60%-recovery fiction, refurb prices
+defect-level repairs, and a returnless-refund path exists for items where
+every route genuinely loses money. See `specs/021-liquidation-returnless.md`.
 
 ## Deployment (production)
 Live URLs:

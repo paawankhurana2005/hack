@@ -29,6 +29,8 @@ const ITEM_DESTINATION: Record<ReturnRoutingDecision['decision'], string> = {
     'Amazon matched this item to a verified buyer nearby. It will be handed off locally — no 600km warehouse trip.',
   refurbish:
     'This item is going to a certified local refurbishment partner. Once restored, it will be relisted.',
+  liquidate:
+    'This item joins a graded, Health-Card-manifested pallet at your local hub — sold to a verified bulk buyer, no long-haul trip.',
   donate:
     'This item will be donated to a verified local charity partner. It stays in the community.',
   recycle:
@@ -37,6 +39,8 @@ const ITEM_DESTINATION: Record<ReturnRoutingDecision['decision'], string> = {
     'No local match was found. Your item is being processed at our returns centre.',
   return_to_seller:
     'Your item is being returned to the seller per their policy.',
+  returnless_refund:
+    'Keep the item — no pickup needed. Every return route costs more than it recovers, so your refund is issued and nothing moves.',
 };
 
 // Spec 016: the final leg of the journey strip, per destination.
@@ -44,10 +48,12 @@ const ITEM_JOURNEY_END: Record<ReturnRoutingDecision['decision'], string> = {
   restock: 'Back on the shelf',
   local_resale: 'Handed to a nearby buyer',
   refurbish: 'Refurb partner',
+  liquidate: 'Manifested pallet → verified bulk buyer',
   donate: 'Charity partner',
   recycle: 'Certified recycler',
   warehouse: 'Returns centre',
   return_to_seller: 'Back to the seller',
+  returnless_refund: 'Stays with you',
 };
 
 // What the seller gains — shown for local routes where the seller benefits.
@@ -58,6 +64,8 @@ const SELLER_BENEFIT: Partial<Record<ReturnRoutingDecision['decision'], string>>
     'The seller has been notified. Local refurbishment recovers more value than a warehouse return.',
   donate:
     'The seller has been notified. Local donation avoids warehouse handling costs.',
+  liquidate:
+    'The seller has been notified. Graded, manifested pallets recover far more than unmanifested FC liquidation.',
 };
 
 export function Step5Done({ flowState, order }: Props) {

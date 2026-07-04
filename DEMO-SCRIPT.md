@@ -81,10 +81,13 @@ warehouse flow, which stays as the built-in fallback. It prices the freight, the
 handling, the local demand, the carbon — and the weeks of price decay a returns
 centre would burn. Watch the sealed-box case: it routes straight back to a
 fulfilment centre shelf, skipping the returns centre entirely. And if the AI
-isn't confident? The gates close and the item simply follows today's flow.
-Worst case, we do exactly what Amazon does now. Every better decision is pure
-margin — and the route is re-checked at two physical checkpoints before the item
-commits."*
+isn't confident? The gates close toward the cheapest correction, not the most
+expensive one — low-confidence items collapse to a graded, Health-Card-
+manifested hub pallet, where a wrong grade costs about fifteen rupees to
+re-sort, instead of a 580-kilometre round trip. Worst case ever, we still do
+exactly what Amazon does now — that's the ungated fallback. Every better
+decision is pure margin — and the route is re-checked at two physical
+checkpoints before the item commits."*
 
 💡 Pause on the EV breakdown — restock row + a gated row visible together is the
 "decision under uncertainty" money shot. Then the journey strip sets up the next
@@ -156,9 +159,13 @@ discarded) → quick montage: **Returns queue → Rescue → Bulk exchange → S
 parts.**
 
 🎙 *"At volume, the same brain runs the seller side: a returns queue graded at
-the doorstep, the hub bench you saw, a rescue pipeline, B2B bulk exchange, even
-spare-part harvesting for items too far gone to sell whole. Every destroyed item
-needs a logged, replayable reason — the engine's job is to shrink that number."*
+the doorstep, the hub bench you saw, a rescue pipeline, and bulk exchange —
+where liquidation-bound items are staged into graded pallets, each one carrying
+its Health Card. Manifested pallets like these clear at the top of the
+liquidation market instead of mystery-lot pricing, because the buyer can see
+exactly what's inside. Even spare-part harvesting for items too far gone to
+sell whole. Every destroyed item needs a logged, replayable reason — the
+engine's job is to shrink that number."*
 
 ---
 

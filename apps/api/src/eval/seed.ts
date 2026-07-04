@@ -168,5 +168,30 @@ export const ROUTING_EV_CASES: RoutingEvProfile[] = [
   ev({ grade: 'C', clearingPriceCents: 200_000, nearbyBuyers: 8, functionallyVerifiable: false }), // worn + demand → refurbish beats as-is
   ev({ grade: 'B', clearingPriceCents: 40_000, nearbyBuyers: 2 }), // low value → donate
   ev({ grade: 'B', clearingPriceCents: 15_000, nearbyBuyers: 1 }), // very low → donate/recycle
-  ev({ grade: 'A', clearingPriceCents: 500_000, nearbyBuyers: 0 }), // no buyers → warehouse/recovery
+  // 016.1: functional item, no local demand → the manifested hub PALLET, not the
+  // warehouse linehaul — warehouse is now priced honestly (blended ~0.30 of
+  // clearing, not the old flat 0.6), so liquidate legitimately wins this case.
+  ev({ grade: 'A', clearingPriceCents: 500_000, nearbyBuyers: 0 }),
+  // 016.1: graded + fully manifested electronics, no local demand → liquidate
+  // should clear the (honestly-repriced) warehouse path even more decisively —
+  // the manifest premium is exactly the market's price for grading at source.
+  ev({
+    grade: 'B',
+    clearingPriceCents: 250_000,
+    nearbyBuyers: 0,
+    category: 'electronics',
+    manifestCoverage: 1,
+    confidence: 0.9,
+  }),
+  // 016.1: every movement path loses money on a cheap item → returnless refund.
+  // Note: routingEvMetrics() recomputes argmax over ALL viable paths (it doesn't
+  // special-case returnless_refund the way decideRoute's argmax does), but they
+  // agree here by construction — returnless's avoided-cost EV is the max exactly
+  // when decideRoute's "all movement paths negative" rule would also select it.
+  ev({
+    clearingPriceCents: 5_000,
+    localHandlingCents: 3_000,
+    nearbyBuyers: 0,
+    customerTrust: 0.9,
+  }),
 ];

@@ -170,6 +170,19 @@ const ROUTING_SCENARIOS: Record<RoutingScenario, ReturnRoutingDecision> = {
     warehouseMargin: -440,
     localMargin: 1400,
   },
+  liquidate: {
+    decision: 'liquidate',
+    reasoning:
+      'Functional but local demand is thin — staged into a graded pallet at the hub. Every unit carries its Health Card: manifested pallets clear at 25–30¢ on the retail dollar vs 5–20¢ for mystery lots, and skip the 580km linehaul.',
+    co2SavedKg: 2.2,
+    dwellBudgetHours: 96,
+    ttlHours: 48,
+    sellerType: '1P',
+    fallbackChain: ['donate', 'recycle'],
+    warehouseDistanceKm: 580,
+    warehouseMargin: -310,
+    localMargin: 540,
+  },
   donate: {
     decision: 'donate',
     reasoning:
@@ -205,6 +218,16 @@ const ROUTING_SCENARIOS: Record<RoutingScenario, ReturnRoutingDecision> = {
     co2SavedKg: 0,
     dwellBudgetHours: 0,
     sellerType: '3P',
+    fallbackChain: [],
+  },
+  returnless_refund: {
+    decision: 'returnless_refund',
+    reasoning:
+      'Every route loses money for this item — processing runs ~₹27 per ₹100 of order value, more than any recovery path returns. Refund issued; keep the item. Zero trips, zero packaging, zero carbon.',
+    co2SavedKg: 2.5,
+    dwellBudgetHours: 0,
+    ttlHours: 72,
+    sellerType: '1P',
     fallbackChain: [],
   },
 };
@@ -279,6 +302,8 @@ export function mockHandoff(
   scenario: HandoffScenario = 'locker',
 ): ReturnHandoffDetails | null {
   if (decision === 'warehouse') return null;
+  // Returnless: the item never moves — there is no handoff at all.
+  if (decision === 'returnless_refund') return null;
 
   const base = {
     qrCode: `QR-RET-${Date.now()}`,

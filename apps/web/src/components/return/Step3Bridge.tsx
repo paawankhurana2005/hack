@@ -23,10 +23,12 @@ const DECISION_STYLES: Record<ReturnRoutingDecision['decision'], { label: string
   restock: { label: 'Direct Restock', cls: 'bg-success/20 text-success border-success/30' },
   local_resale: { label: 'Local Buyer Match', cls: 'bg-success/20 text-success border-success/30' },
   refurbish: { label: 'Local Refurbishment', cls: 'bg-warning/20 text-warning border-warning/30' },
+  liquidate: { label: 'Hub Pallet (Manifested)', cls: 'bg-warning/20 text-warning border-warning/30' },
   donate: { label: 'Local Donation', cls: 'bg-secondary text-foreground border-border' },
   recycle: { label: 'Local Recycling', cls: 'bg-secondary text-brand border-border' },
   warehouse: { label: 'Warehouse Return', cls: 'bg-secondary text-muted-foreground border-border' },
   return_to_seller: { label: 'Return to Seller', cls: 'bg-brand/20 text-brand border-brand/30' },
+  returnless_refund: { label: 'Keep It — Refund Issued', cls: 'bg-success/20 text-success border-success/30' },
 };
 
 function PulseSkeleton() {
@@ -126,7 +128,10 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
 
   const style = DECISION_STYLES[decision.decision];
   const fallbackLabels = decision.fallbackChain.map((d) => DECISION_STYLES[d]?.label ?? d);
-  const isLocal = decision.decision !== 'warehouse' && decision.decision !== 'return_to_seller';
+  const isLocal =
+    decision.decision !== 'warehouse' &&
+    decision.decision !== 'return_to_seller' &&
+    decision.decision !== 'returnless_refund';
 
   return (
     <Card>
@@ -195,6 +200,32 @@ export function Step3Bridge({ flowState, onNext, routingScenario, handoffScenari
           <div className="flex items-center gap-2 text-brand">
             <span>♻️</span>
             <span className="text-sm">Certified local recycler. Zero landfill guaranteed.</span>
+          </div>
+        )}
+
+        {/* Liquidate — manifested hub pallet */}
+        {decision.decision === 'liquidate' && (
+          <div className="rounded-lg border border-warning/30 bg-warning/10 p-4">
+            <p className="text-sm font-semibold text-warning">
+              Staged into a graded pallet at your local hub
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Every unit carries its Health Card — manifested pallets sell for 30–50% more than
+              mystery lots, with no {decision.warehouseDistanceKm ?? 580}km linehaul.
+            </p>
+          </div>
+        )}
+
+        {/* Returnless refund — the best route is no route */}
+        {decision.decision === 'returnless_refund' && (
+          <div className="rounded-lg border border-success/30 bg-success/10 p-4">
+            <p className="text-sm font-semibold text-success">
+              No pickup needed — your refund is on its way
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Every return route costs more than it recovers for this item, so it stays with you.
+              Zero trips, zero packaging, zero carbon.
+            </p>
           </div>
         )}
 

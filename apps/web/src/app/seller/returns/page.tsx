@@ -9,10 +9,12 @@ const DECISION_STYLE: Record<ReturnRoutingDecision['decision'], { label: string;
   restock: { label: 'Restock', cls: 'bg-success/20 text-success' },
   local_resale: { label: 'Local Buyer', cls: 'bg-success/20 text-success' },
   refurbish: { label: 'Refurbish', cls: 'bg-warning/20 text-warning' },
+  liquidate: { label: 'Hub Pallet', cls: 'bg-warning/20 text-warning' },
   donate: { label: 'Donate', cls: 'bg-secondary text-foreground' },
   recycle: { label: 'Recycle', cls: 'bg-brand/20 text-brand' },
   warehouse: { label: 'Warehouse', cls: 'bg-secondary text-muted-foreground' },
   return_to_seller: { label: 'Return to Seller', cls: 'bg-brand/20 text-brand' },
+  returnless_refund: { label: 'Returnless Refund', cls: 'bg-secondary text-muted-foreground' },
 };
 
 const GRADE_STYLE: Record<string, string> = {

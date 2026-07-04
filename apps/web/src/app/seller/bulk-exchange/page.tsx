@@ -175,7 +175,7 @@ function NewBatchModal({ onClose, onCreated }: NewBatchModalProps) {
     const units = Math.max(1, parseInt(unitsStr) || 100);
     const cat = category.trim() || 'Mixed Products';
     const g = generateGrades(units, cat);
-    const m = generateMatch(units, cat, preferred);
+    const m = generateMatch(units, cat, preferred, g);
     const batch: BulkBatch = {
       id: generateBatchId(),
       category: cat,
@@ -770,6 +770,7 @@ const STATUS_META: Record<
   BulkBatch['status'] | 'searching',
   { label: string; dot: string; text: string }
 > = {
+  staging: { label: 'Filling at hub', dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
   pending_approval: { label: 'Awaiting approval', dot: 'bg-brand', text: 'text-brand' },
   partially_matched: { label: 'Partially matched', dot: 'bg-warning', text: 'text-warning' },
   approved: { label: 'Approved · In transit', dot: 'bg-emerald-500', text: 'text-emerald-500' },
@@ -896,6 +897,25 @@ function BatchCard({ batch, onUpdate, isNew }: BatchCardProps) {
 
         {/* Action panels */}
         {declining && <SearchingCard batchId={batch.id} />}
+
+        {!declining && batch.status === 'staging' && (
+          <div className="rounded-xl bg-secondary/50 p-3.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              Health-Card manifest coverage {Math.round((batch.manifestCoverage ?? 1) * 100)}% — filling
+              from hub-bench-verified returns.
+            </p>
+            {batch.primaryMatch && (
+              <p className="mt-1.5 text-xs text-foreground">
+                Current best bid: <span className="font-semibold">{batch.primaryMatch.buyerName}</span>{' '}
+                ({batch.primaryMatch.buyerType}) — ₹
+                {batch.primaryMatch.sellerEarnings.toLocaleString('en-IN')} to seller
+              </p>
+            )}
+            {batch.remainingNote && (
+              <p className="mt-1 text-[11px] text-muted-foreground">{batch.remainingNote}</p>
+            )}
+          </div>
+        )}
 
         {!declining && batch.status === 'pending_approval' && batch.primaryMatch && (
           <ApprovalPanel

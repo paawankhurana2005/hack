@@ -17,6 +17,7 @@ import {
   computeReturnVoucherCredits,
   decideRoute,
   posteriorFromPointGrade,
+  tagDefects,
   type RoutingEvProfile,
 } from '@reloop/shared';
 
@@ -34,6 +35,13 @@ export interface RoutingInputs {
   confidence?: number;
   /** Factory seal verified from photos/driver scan — gates the restock path. */
   packagingSealed?: boolean;
+  // Spec 016.1 (all optional):
+  /** Free-text grader defects — mapped to DefectTags for defect-level refurb economics. */
+  defects?: string[];
+  /** 0–1 customer trust; gates the returnless-refund path (omit = ineligible). */
+  customerTrust?: number;
+  /** Wardrobing/photo-reuse flag — hard-blocks returnless refund. */
+  wardrobingFlag?: boolean;
 }
 
 export interface RoutingComputed {
@@ -107,8 +115,9 @@ export function computeRouting(inputs: RoutingInputs): RoutingComputed {
     nearbyBuyers: pricing.nearbyBuyers,
     radiusKm: pricing.radiusKm,
     warehouseDistanceKm: WAREHOUSE_DISTANCE_KM,
-    // Spec 016 — only wired when the caller supplies the doorstep signals, so the
-    // eval harness's point-grade cases keep their exact legacy behavior.
+    // Spec 016/016.1 — only wired when the caller supplies the doorstep signals;
+    // point-grade eval cases never enter this branch (016.1 note: absolute EVs
+    // shifted for everyone via the honest warehouse mixture — intended).
     ...(inputs.confidence !== undefined && {
       confidence: inputs.confidence,
       ...(inputs.grade && inputs.grade !== 'Salvage'
@@ -118,6 +127,11 @@ export function computeRouting(inputs: RoutingInputs): RoutingComputed {
       nearestFcKm: NEAREST_FC_KM,
       sealed: inputs.packagingSealed ?? false,
       skuActive: true, // catalog lookup in prod; mock: known SKUs stay live
+      // Spec 016.1: defect-level refurb + manifested-pallet + returnless inputs.
+      defectTags: tagDefects(inputs.defects ?? []),
+      manifestCoverage: 0.9, // ReLoop-graded item ⇒ near-full Health-Card manifest (mock)
+      fraudSignal: inputs.wardrobingFlag ?? false,
+      ...(inputs.customerTrust !== undefined && { customerTrust: inputs.customerTrust }),
     }),
   };
 

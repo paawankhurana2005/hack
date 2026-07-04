@@ -24,12 +24,17 @@ A customer returns an item. The AI grades it **at the doorstep, before it moves.
 A deterministic decision engine — the **Intelligent Bridge** — computes the
 expected value of every path and picks the best one for that specific item:
 **restock** (straight back to sellable inventory), local resale, refurbish,
-donate, recycle, return to seller, or standard reverse logistics as the safe
-fallback. The decision weighs residual value (as a grade *posterior*, not a point
-label), local handling cost, nearby demand, time-to-cash price decay, and carbon
-— and it is **re-checked at physical checkpoints** (driver scan at pickup, a
-10-minute local hub bench) while a redirect still costs a shelf move, not a lost
-item. Low AI confidence collapses routing toward today's flow automatically.
+**liquidate** (a Health-Card-manifested pallet staged at the hub), donate,
+recycle, return to seller, standard reverse logistics as the safe fallback —
+or, when every route genuinely loses money, a **returnless refund** (the
+customer keeps the item, nothing ships). The decision weighs residual value
+(as a grade *posterior*, not a point label), local handling cost, nearby
+demand, time-to-cash price decay, carbon, and the **expected cost of routing
+wrong** — and it is **re-checked at physical checkpoints** (driver scan at
+pickup, a 10-minute local hub bench) while a redirect still costs a shelf
+move, not a lost item. Low AI confidence collapses routing to the cheapest
+correction — the manifested pallet, not the fantasy-priced warehouse — with
+today's full reverse-logistics flow as the ungated absolute fallback.
 
 ### 2. Sell (shared rails)
 The same grading, pricing, and Health Card rails, pointed at a user-initiated

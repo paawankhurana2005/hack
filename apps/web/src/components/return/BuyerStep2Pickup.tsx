@@ -147,10 +147,12 @@ export function BuyerStep2Pickup({
     restock: 'Restock as sellable',
     local_resale: 'Resell locally',
     refurbish: 'Refurbish',
+    liquidate: 'Liquidate (hub pallet)',
     donate: 'Donate',
     recycle: 'Recycle',
     warehouse: 'Warehouse',
     return_to_seller: 'Return to seller',
+    returnless_refund: 'Returnless refund',
   };
   const inr = (paise: number) => `₹${Math.round(paise / 100).toLocaleString('en-IN')}`;
 

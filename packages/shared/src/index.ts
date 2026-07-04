@@ -26,6 +26,7 @@ export * from './ml/gbdt.js';
 export * from './ml/logreg.js';
 export * from './pricing-model.js';
 export * from './routing-ev.js';
+export * from './liquidation-lot.js'; // hub-staged manifested pallets (spec 016.1)
 export * from './return-risk-model.js';
 export * from './flywheel.js';
 export * from './rufus-rag.js';

@@ -29,6 +29,22 @@ export interface ReturnGradingResult {
 export type Grade = 'A' | 'B' | 'C' | 'Salvage';
 
 /**
+ * Spec 016.1: defect vocabulary for defect-level refurb economics. Free-text
+ * grader defects are mapped onto these tags (see `tagDefects` in
+ * liquidation-lot.ts); each tag carries a repair cost + grade delta in the
+ * engine's DEFECT_REPAIR_TABLE ("missing charger: ₹300, B→A").
+ */
+export type DefectTag =
+  | 'missing_charger'
+  | 'missing_cable'
+  | 'scratched_screen'
+  | 'scuffed_body'
+  | 'worn_packaging'
+  | 'missing_manual'
+  | 'dead_battery'
+  | 'missing_accessory';
+
+/**
  * Spec 016: grading as a distribution over grades (sums to 1), not a point label.
  * Routes differ in error sensitivity — restock is brutally sensitive to a wrong A,
  * donation barely cares — so the engine takes the full posterior.
@@ -40,10 +56,12 @@ export interface ReturnRoutingDecision {
     | 'restock'
     | 'local_resale'
     | 'refurbish'
+    | 'liquidate' // spec 016.1: hub-staged manifested pallet (first-class path)
     | 'donate'
     | 'recycle'
     | 'warehouse'
-    | 'return_to_seller';
+    | 'return_to_seller'
+    | 'returnless_refund'; // spec 016.1: every route loses money → refund, item stays
   reasoning: string;
   co2SavedKg: number;
   dwellBudgetHours: number;
@@ -150,10 +168,12 @@ export type RoutingScenario =
   | 'restock'
   | 'local_resale'
   | 'refurbish'
+  | 'liquidate'
   | 'donate'
   | 'recycle'
   | 'warehouse'
-  | 'return_to_seller';
+  | 'return_to_seller'
+  | 'returnless_refund';
 
 export type HandoffScenario = 'locker' | 'agent_pickup' | 'hub_dropoff' | 'no_locker' | 'locker_full';
 
@@ -203,7 +223,8 @@ export type ReturnItemState =
   | 'donated'
   | 'recycle_batch'
   | 'recycled'
-  | 'rl_outbound'; // handed to the standard reverse-logistics chain
+  | 'rl_outbound' // handed to the standard reverse-logistics chain
+  | 'returnless_closed'; // spec 016.1: refund issued, item stays — nothing ever moves
 
 /** Evidence gathered at a checkpoint that can move the posterior. */
 export interface CheckpointEvidence {

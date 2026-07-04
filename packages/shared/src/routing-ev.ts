@@ -8,7 +8,8 @@
 //      (clearing price × sell-through from P1/P2) and real freight/distance math.
 // Every term is returned for on-screen explanation; pure + deterministic + reproducible.
 
-import type { Grade, GradePosterior, ReturnReason, ReturnRoutingDecision } from './return.js';
+import type { DefectTag, Grade, GradePosterior, ReturnReason, ReturnRoutingDecision } from './return.js';
+import { LIQUIDATION_RECOVERY_FRAC, manifestPremium } from './liquidation-lot.js';
 import type { ItemCategory } from './sell.js';
 
 export type ReturnPath = ReturnRoutingDecision['decision'];
@@ -31,8 +32,9 @@ export interface RoutingEvProfile {
   nearbyBuyers: number;
   radiusKm: number;
   warehouseDistanceKm: number;
-  // --- Spec 016: decision-under-uncertainty inputs (all optional — legacy
-  // callers that omit them get byte-identical behavior to the point-grade engine).
+  // --- Spec 016/016.1: decision-under-uncertainty inputs (all optional —
+  // legacy callers still typecheck and hard-ladder outcomes are identical;
+  // absolute EVs were recalibrated by 016.1's honest warehouse economics).
   /** Grading confidence 0–1; gates route eligibility (θ_r per path). */
   confidence?: number;
   /** Full grade distribution; discounts recovery when mass sits below the modal grade. */
@@ -45,6 +47,15 @@ export interface RoutingEvProfile {
   skuActive?: boolean;
   /** Nearest FC inbound distance (restock leg); defaults to warehouseDistanceKm. */
   nearestFcKm?: number;
+  // --- Spec 016.1 inputs ---------------------------------------------------
+  /** Structured defect tags → defect-level refurb economics (repair cost + grade delta). */
+  defectTags?: DefectTag[];
+  /** 0–1: Health-Card manifest coverage — drives the pallet's manifest premium. */
+  manifestCoverage?: number;
+  /** 0–1: customer trust score; gates the returnless-refund path (undefined = ineligible). */
+  customerTrust?: number;
+  /** Any fraud signal (wardrobing, photo reuse) — hard-blocks returnless refund. */
+  fraudSignal?: boolean;
 }
 
 export interface EvTerm {
@@ -92,12 +103,80 @@ const HIGH_VALUE_CENTS = 2_000_000; // ₹20,000 → fraud/verification gate
 // Residual/cost model relative to the predicted clearing price.
 const DONATION_VALUE_FRAC = 0.15; // social/tax credit residual
 const RECYCLE_VALUE_FRAC = 0.08; // recovered materials
-const WAREHOUSE_RECOVERY_FRAC = 0.6; // liquidation recovery at the FC
+
+// --- Spec 016.1: the warehouse path priced honestly -----------------------------
+// Reality check: only ~10–20% of returns get restocked after the linehaul +
+// weeks of dwell; the rest liquidate — Amazon sells to liquidators at 20–30¢ on
+// the retail dollar and FBA Liquidations nets sellers ~5–10% of ASP. The old
+// flat 0.6 recovery was fantasy. Warehouse is now a mixture:
+//   P(restock after inspection) × post-markdown recovery
+// + P(liquidate)               × unmanifested FC-liquidation recovery
+// Blended ≈ 0.2975 of clearing (≈18¢ retail), before the 21-day dwell decay.
+const WAREHOUSE_P_RESTOCK = 0.15;
+const WAREHOUSE_RESTOCK_RECOVERY_FRAC = 0.85; // restocked weeks later → sold post-markdown
+const WAREHOUSE_LIQUIDATION_FRAC = 0.2; // unmanifested pallet at the FC (≈12¢ retail)
+
+// Hub-pallet share of staging labor (no listing, no customer touch — just a shelf
+// and a manifest stamp).
+const LIQUIDATE_HANDLING_FRAC = 0.4;
 
 // Refurbishment only helps when there's condition to recover: a near-new item gains
 // almost nothing, a worn one gains a lot. Cost rises with how much work it needs.
+// Grade-level fallback — used when no structured defect tags are available.
 const REFURB_UPLIFT_BY_GRADE: Record<'A' | 'B' | 'C', number> = { A: 0.05, B: 0.18, C: 0.35 };
 const REFURB_COST_BY_GRADE: Record<'A' | 'B' | 'C', number> = { A: 0.12, B: 0.2, C: 0.3 };
+
+// --- Spec 016.1: defect-level refurb economics -----------------------------------
+// The spec's promise made concrete: "missing charger: ₹300, B→A, +₹1,500".
+// Each tag prices a repair (absolute paise) and a grade delta; the uplift falls
+// out of GRADE_VALUE_FRAC (repairing B→A is worth (1.0−0.85)/0.85 ≈ +18% —
+// consistent with the grade-level fallback by construction).
+const DEFECT_REPAIR_TABLE: Record<DefectTag, { repairCostCents: number; gradeSteps: 0 | 1 }> = {
+  missing_charger: { repairCostCents: 30_000, gradeSteps: 1 },
+  missing_cable: { repairCostCents: 15_000, gradeSteps: 1 },
+  scratched_screen: { repairCostCents: 90_000, gradeSteps: 1 },
+  scuffed_body: { repairCostCents: 20_000, gradeSteps: 1 },
+  worn_packaging: { repairCostCents: 8_000, gradeSteps: 1 },
+  missing_manual: { repairCostCents: 5_000, gradeSteps: 0 },
+  dead_battery: { repairCostCents: 120_000, gradeSteps: 1 },
+  missing_accessory: { repairCostCents: 25_000, gradeSteps: 1 },
+};
+
+// --- Spec 016.1: E[correction_cost(r)] — the EV formula's missing term ----------
+// Being wrong has a price, and it differs wildly by route: a bad unit reaching a
+// buyer as "new" costs a second return (~$27 per $100 order of processing) plus
+// trust; a mis-graded unit on a pallet costs a ₹15 re-sort. Expected correction
+// cost = (posterior mass below the grade the route needs) × redirect cost.
+const CORRECTION_MIN_GRADE: Partial<Record<ReturnPath, Grade>> = {
+  restock: 'A',
+  local_resale: 'B',
+  refurbish: 'C',
+  liquidate: 'C', // must at least be functional — only Salvage mass is "wrong"
+};
+function redirectCostCents(path: ReturnPath, clearingPriceCents: number): number {
+  switch (path) {
+    case 'restock':
+      return Math.round(0.27 * clearingPriceCents) + 25_000; // second return + trust penalty
+    case 'local_resale':
+      return 4_000; // hub shelf move
+    case 'refurbish':
+      return 8_000; // wasted bench slot
+    case 'liquidate':
+      return 1_500; // pallet re-sort
+    default:
+      return 0; // donate/recycle/warehouse — being wrong is (nearly) free
+  }
+}
+
+// --- Spec 016.1: returnless refund — "the best route is no route" ----------------
+// Amazon's real lever: for cheap items, processing (~$27 per $100 order) wipes
+// out every recovery path. When ALL movement paths have negative EV, refund and
+// let the customer keep it. Hard-gated: never high-value, never with any fraud
+// signal, and only when trust × confidence clears the same lever that times
+// refunds at pickup (spec 016 stage 4).
+const RETURNLESS_MAX_VALUE_CENTS = 80_000; // ₹800
+const RETURNLESS_TRUST_GATE = 0.5; // customerTrust × confidence threshold
+const RETURNLESS_AVOIDED_PICKUP_CENTS = 9_000; // ₹90 last-mile stop avoided
 
 // --- Spec 016: restock, time decay, and confidence gates ------------------------
 // Restock = straight to the nearest FC inbound dock as sellable, deleting the
@@ -114,10 +193,12 @@ const TIME_TO_CASH_DAYS: Record<ReturnPath, number> = {
   restock: 4,
   local_resale: 3,
   refurbish: 8,
+  liquidate: 7, // hub pallet fills + partner pickup ≈ 1 week (vs 30–90d FBA payout)
   donate: 2,
   recycle: 2,
   warehouse: 21,
   return_to_seller: 0,
+  returnless_refund: 0,
 };
 const WEEKLY_DECAY_BY_CATEGORY: Record<ItemCategory, number> = {
   electronics: 0.02,
@@ -129,17 +210,25 @@ const WEEKLY_DECAY_BY_CATEGORY: Record<ItemCategory, number> = {
   other: 0.01,
 };
 
-// Confidence gates θ_r — DERIVED from correction cost, not arbitrary: a bad unit
-// reaching a buyer as "new" costs a second return plus trust (θ_restock high);
-// a mis-donated item costs almost nothing (θ_donate low). recycle/warehouse are
-// never gated, so the eligible set can only collapse TOWARD today's flow —
-// graceful degradation with no special-case code path.
+// Confidence gates θ_r — DERIVED from correction cost (redirectCostCents above),
+// not arbitrary: the θ ordering mirrors the redirect-cost ordering exactly.
+// restock (second return + trust, ~₹700+ on a ₹2.5k item) → 0.85
+// local_resale (hub shelf move, ₹40)                      → 0.6
+// refurbish (wasted bench slot, ₹80 but pre-buyer)        → 0.5
+// donate (being wrong is nearly free)                     → 0.3
+// liquidate (pallet re-sort, ₹15 — cheapest commercial)   → 0.2
+// recycle/warehouse are never gated, so the eligible set can only collapse
+// toward low-stakes aggregate flows and, ultimately, today's flow — graceful
+// degradation with no special-case code path.
 const CONFIDENCE_GATE: Partial<Record<ReturnPath, number>> = {
   restock: 0.85,
   local_resale: 0.6,
   refurbish: 0.5,
   donate: 0.3,
+  liquidate: 0.2,
 };
+/** Exported for the eval harness: θ ordering must track redirect-cost ordering. */
+export const CONFIDENCE_GATE_THETA = CONFIDENCE_GATE;
 
 // Grade-sensitive recovery: how much of the modal-grade clearing price each grade
 // actually realizes. Used to discount recovery when the posterior spreads below
@@ -192,10 +281,12 @@ const TTL_HOURS: Record<ReturnPath, number> = {
   local_resale: 12,
   restock: 24,
   refurbish: 24,
+  liquidate: 48, // pallet needs time to fill
   donate: 48,
   recycle: 72,
   warehouse: 72,
   return_to_seller: 72,
+  returnless_refund: 72, // terminal — nothing to re-evaluate
 };
 
 function refurbGrade(grade: RoutingEvProfile['grade']): 'A' | 'B' | 'C' {
@@ -252,8 +343,7 @@ export function evByPath(p: RoutingEvProfile): PathEv[] {
 
   // Recovery with the spec-016 uncertainty + time adjustments surfaced as their own
   // signed terms (glass-box: the screen shows WHY a path lost value, not just that
-  // it did). Both no-op when the optional inputs are absent — legacy callers get
-  // byte-identical terms.
+  // it did). Both no-op when the optional inputs are absent.
   const recovered = (
     path: ReturnPath,
     label: string,
@@ -282,14 +372,45 @@ export function evByPath(p: RoutingEvProfile): PathEv[] {
 
   const rg = refurbGrade(p.grade);
   const localResaleValue = Math.round(p.clearingPriceCents * stp);
-  const refurbValue = Math.round(p.clearingPriceCents * (1 + REFURB_UPLIFT_BY_GRADE[rg]) * stp);
-  const refurbCost = Math.round(p.clearingPriceCents * REFURB_COST_BY_GRADE[rg]);
+
+  // Spec 016.1: defect-level refurb economics when structured tags exist —
+  // repair cost is the sum of the table's absolute costs, uplift falls out of
+  // the grade delta the repairs achieve ((frac(g′) − frac(g)) / frac(g)).
+  // Falls back to the grade-level fractions when no tags are available.
+  const tags = p.defectTags ?? [];
+  let refurbValue: number;
+  let refurbCost: number;
+  let refurbValueLabel: string;
+  let refurbCostLabel = 'Refurb cost';
+  if (tags.length > 0) {
+    const gradeOrder: ('A' | 'B' | 'C')[] = ['A', 'B', 'C'];
+    const gi = gradeOrder.indexOf(rg);
+    const steps = Math.min(
+      gi, // can't repair above A
+      tags.reduce((s, t) => s + DEFECT_REPAIR_TABLE[t].gradeSteps, 0),
+    );
+    const target = gradeOrder[gi - steps] ?? rg;
+    const upliftFrac = (GRADE_VALUE_FRAC[target] - GRADE_VALUE_FRAC[rg]) / GRADE_VALUE_FRAC[rg];
+    refurbValue = Math.round(p.clearingPriceCents * (1 + upliftFrac) * stp);
+    refurbCost = tags.reduce((s, t) => s + DEFECT_REPAIR_TABLE[t].repairCostCents, 0);
+    refurbValueLabel =
+      steps > 0
+        ? `Repaired ${rg}→${target} resale × ${Math.round(stp * 100)}%`
+        : `Refurbished resale × ${Math.round(stp * 100)}%`;
+    refurbCostLabel = `Defect repairs (${tags.map((t) => t.replace(/_/g, ' ')).join(', ')})`;
+  } else {
+    refurbValue = Math.round(p.clearingPriceCents * (1 + REFURB_UPLIFT_BY_GRADE[rg]) * stp);
+    refurbCost = Math.round(p.clearingPriceCents * REFURB_COST_BY_GRADE[rg]);
+    refurbValueLabel = `Refurbished resale × ${Math.round(stp * 100)}%`;
+  }
   // Refurbish is only viable when there's condition to recover (worn grade) or the
-  // item couldn't be functionally verified from photos (needs a bench check).
-  const refurbViable = p.grade === 'B' || p.grade === 'C' || !p.functionallyVerifiable;
+  // item couldn't be functionally verified from photos (needs a bench check) — AND
+  // a downstream channel exists: a repaired unit re-enters local resale, so with
+  // zero nearby demand there is nowhere for it to go (016.1 fix).
+  const refurbViable =
+    (p.grade === 'B' || p.grade === 'C' || !p.functionallyVerifiable) && p.nearbyBuyers >= 1;
   const donationValue = Math.round(p.clearingPriceCents * DONATION_VALUE_FRAC);
   const recycleValue = Math.round(p.clearingPriceCents * RECYCLE_VALUE_FRAC);
-  const warehouseRecovery = Math.round(p.clearingPriceCents * WAREHOUSE_RECOVERY_FRAC);
 
   // Restock: nearest FC inbound, not the returns center. Only meaningful when the
   // seal + catalog signals are present; without them it is simply not viable.
@@ -330,20 +451,54 @@ export function evByPath(p: RoutingEvProfile): PathEv[] {
       { label: 'Carbon', valueCents: -localCarbon },
     ],
   };
-  const refurbRecovery = recovered(
-    'refurbish',
-    `Refurbished resale × ${Math.round(stp * 100)}%`,
-    refurbValue,
-    true,
-  );
+  const refurbRecovery = recovered('refurbish', refurbValueLabel, refurbValue, true);
   const refurbish: PathEv = {
     path: 'refurbish',
     viable: refurbViable,
     evCents: refurbRecovery.totalCents - refurbCost - p.localHandlingCents - localCarbon,
     terms: [
       ...refurbRecovery.terms,
-      { label: 'Refurb cost', valueCents: -refurbCost },
+      { label: refurbCostLabel, valueCents: -refurbCost },
       { label: 'Local handling', valueCents: -p.localHandlingCents },
+      { label: 'Carbon', valueCents: -localCarbon },
+    ],
+  };
+
+  // Spec 016.1: liquidate — a graded, Health-Card-manifested pallet staged at the
+  // hub. Grade-INsensitive (the buyer's bid curve absorbs grade risk, not the mix
+  // factor); the manifest premium is the market's price for grading at source.
+  const liqFrac = LIQUIDATION_RECOVERY_FRAC[p.category ?? 'other'];
+  const liqPremium = manifestPremium(p.manifestCoverage ?? 0, p.confidence ?? 1);
+  const liqBase = Math.round(p.clearingPriceCents * liqFrac);
+  const liqPremiumCents = Math.round(liqBase * (liqPremium - 1));
+  const liqTerms: EvTerm[] = [
+    { label: `Pallet liquidation (${Math.round(liqFrac * 100)}% of clearing)`, valueCents: liqBase },
+  ];
+  let liqValue = liqBase;
+  if (liqPremiumCents !== 0) {
+    liqTerms.push({
+      label: `Manifest premium (Health-Card ${Math.round((p.manifestCoverage ?? 0) * 100)}%)`,
+      valueCents: liqPremiumCents,
+    });
+    liqValue += liqPremiumCents;
+  }
+  const liqDecay = decayFactor(p.category, 'liquidate');
+  if (liqDecay !== 1) {
+    const adj = Math.round(liqValue * (liqDecay - 1));
+    if (adj !== 0) {
+      liqTerms.push({ label: `Value decay (${TIME_TO_CASH_DAYS.liquidate}d to cash)`, valueCents: adj });
+      liqValue += adj;
+    }
+  }
+  const liqHandling = Math.round(p.localHandlingCents * LIQUIDATE_HANDLING_FRAC);
+  const liquidate: PathEv = {
+    path: 'liquidate',
+    // Pallets take anything functional/graded; Salvage is hard-laddered to recycle.
+    viable: p.functionallyVerifiable || p.grade !== null,
+    evCents: liqValue - liqHandling - localCarbon,
+    terms: [
+      ...liqTerms,
+      { label: 'Pallet staging (hub)', valueCents: -liqHandling },
       { label: 'Carbon', valueCents: -localCarbon },
     ],
   };
@@ -369,21 +524,92 @@ export function evByPath(p: RoutingEvProfile): PathEv[] {
       { label: 'Carbon', valueCents: -localCarbon },
     ],
   };
-  // The 21-day time-to-cash decay is the warehouse path's honest hidden cost:
-  // returns-center dwell is price decay + working capital, not just freight.
-  const warehouseRec = recovered('warehouse', 'FC liquidation recovery', warehouseRecovery, false);
+  // The warehouse path priced honestly (016.1): a mixture of "maybe restocked
+  // after inspection" and "unmanifested FC liquidation", then the 21-day dwell
+  // decay — returns-center dwell is price decay + working capital, not just
+  // freight. Both mixture components surface as their own glass-box terms.
+  const whRestockPart = Math.round(
+    p.clearingPriceCents * WAREHOUSE_P_RESTOCK * WAREHOUSE_RESTOCK_RECOVERY_FRAC,
+  );
+  const whLiquidatePart = Math.round(
+    p.clearingPriceCents * (1 - WAREHOUSE_P_RESTOCK) * WAREHOUSE_LIQUIDATION_FRAC,
+  );
+  const whTerms: EvTerm[] = [
+    {
+      label: `Restock after inspection (${Math.round(WAREHOUSE_P_RESTOCK * 100)}% × ${Math.round(WAREHOUSE_RESTOCK_RECOVERY_FRAC * 100)}%)`,
+      valueCents: whRestockPart,
+    },
+    {
+      label: `FC liquidation (${Math.round((1 - WAREHOUSE_P_RESTOCK) * 100)}% × ${Math.round(WAREHOUSE_LIQUIDATION_FRAC * 100)}%)`,
+      valueCents: whLiquidatePart,
+    },
+  ];
+  let whValue = whRestockPart + whLiquidatePart;
+  const whDecay = decayFactor(p.category, 'warehouse');
+  if (whDecay !== 1) {
+    const adj = Math.round(whValue * (whDecay - 1));
+    if (adj !== 0) {
+      whTerms.push({ label: `Value decay (${TIME_TO_CASH_DAYS.warehouse}d to cash)`, valueCents: adj });
+      whValue += adj;
+    }
+  }
   const warehouse: PathEv = {
     path: 'warehouse',
     viable: true,
-    evCents: warehouseRec.totalCents - freightCost - freightCarbon,
+    evCents: whValue - freightCost - freightCarbon,
     terms: [
-      ...warehouseRec.terms,
+      ...whTerms,
       { label: `Freight ${p.warehouseDistanceKm}km`, valueCents: -freightCost },
       { label: 'Freight carbon', valueCents: -freightCarbon },
     ],
   };
 
-  const paths = [restock, local, refurbish, donate, recycle, warehouse];
+  // Spec 016.1: returnless refund — no route at all. The refund is paid on every
+  // path, so its EV is purely the movement costs avoided. Excluded from the
+  // argmax (those savings exist on every path's "don't move" counterfactual);
+  // decideRoute applies it only when every movement path has NEGATIVE EV.
+  const returnlessSavings =
+    RETURNLESS_AVOIDED_PICKUP_CENTS + Math.round(p.localHandlingCents * 0.5);
+  const trustProduct = (p.customerTrust ?? -1) * (p.confidence ?? 1);
+  let returnlessGate: string | undefined;
+  if (p.customerTrust === undefined) returnlessGate = 'no customer trust signal — ineligible';
+  else if (p.clearingPriceCents >= RETURNLESS_MAX_VALUE_CENTS)
+    returnlessGate = 'high-value item — must be physically recovered';
+  else if (p.fraudSignal || p.reasonGradeMismatch || !p.authenticityMatch)
+    returnlessGate = 'fraud signal present — refund only against physical custody';
+  else if (trustProduct < RETURNLESS_TRUST_GATE)
+    returnlessGate = `trust × confidence ${Math.max(0, trustProduct).toFixed(2)} below the ${RETURNLESS_TRUST_GATE} gate`;
+  const returnless: PathEv = {
+    path: 'returnless_refund',
+    viable: returnlessGate === undefined,
+    gateReason: returnlessGate,
+    evCents: returnlessSavings,
+    terms: [
+      { label: 'Avoided pickup (last-mile stop)', valueCents: RETURNLESS_AVOIDED_PICKUP_CENTS },
+      { label: 'Avoided hub handling', valueCents: Math.round(p.localHandlingCents * 0.5) },
+    ],
+  };
+
+  const paths = [restock, local, refurbish, liquidate, donate, recycle, warehouse, returnless];
+
+  // Spec 016.1: E[correction_cost(r)] — the EV formula's missing term, now real.
+  // Expected cost of routing wrong = posterior mass below the grade the route
+  // needs × that route's redirect cost. Makes the θ gates principled AND visible.
+  if (p.gradePosterior) {
+    const gradeOrder: Grade[] = ['A', 'B', 'C', 'Salvage'];
+    for (const e of paths) {
+      const min = CORRECTION_MIN_GRADE[e.path];
+      if (!min) continue;
+      const below = gradeOrder
+        .slice(gradeOrder.indexOf(min) + 1)
+        .reduce((s, g) => s + (p.gradePosterior?.[g] ?? 0), 0);
+      const cost = Math.round(below * redirectCostCents(e.path, p.clearingPriceCents));
+      if (cost > 0) {
+        e.terms.push({ label: 'Expected correction cost', valueCents: -cost });
+        e.evCents -= cost;
+      }
+    }
+  }
 
   // Confidence gates θ_r: low confidence collapses the eligible set toward the
   // ungated paths (recycle/warehouse) — i.e., toward today's flow. Applied last so
@@ -401,15 +627,22 @@ export function evByPath(p: RoutingEvProfile): PathEv[] {
   return paths;
 }
 
-const DWELL: Partial<Record<ReturnPath, number>> = { local_resale: 48, refurbish: 72, donate: 96 };
+const DWELL: Partial<Record<ReturnPath, number>> = {
+  local_resale: 48,
+  refurbish: 72,
+  liquidate: 96, // pallet fill window
+  donate: 96,
+};
 const FALLBACKS: Record<ReturnPath, ReturnPath[]> = {
   restock: ['local_resale', 'donate'], // seal broken at the hub → cascade locally
-  local_resale: ['donate', 'recycle'],
+  local_resale: ['liquidate', 'donate'], // unsold listing joins the pallet, same building
   refurbish: ['local_resale', 'donate'],
+  liquidate: ['donate', 'recycle'],
   donate: ['recycle'],
   recycle: [],
   warehouse: [],
   return_to_seller: [],
+  returnless_refund: [],
 };
 
 /** Decide the route: hard ladder first, then argmax-EV over viable paths. */
@@ -444,10 +677,31 @@ export function decideRoute(p: RoutingEvProfile): RoutingEvResult {
     };
   }
 
-  // EV optimization over viable paths (argmax). Deterministic; ties broken by order.
-  // recycle/warehouse are never confidence-gated, so `viable` is never empty.
-  const viable = paths.filter((e) => e.viable);
+  // EV optimization over viable MOVEMENT paths (argmax). Deterministic; ties
+  // broken by order. recycle/warehouse are never confidence-gated, so `viable`
+  // is never empty. returnless_refund is excluded — its "EV" is avoided cost
+  // that exists on every path's don't-move counterfactual, so it only wins via
+  // the explicit all-paths-negative rule below.
+  const viable = paths.filter((e) => e.viable && e.path !== 'returnless_refund');
   const best = viable.reduce((acc, e) => (e.evCents > acc.evCents ? e : acc));
+
+  // Spec 016.1: the best route is no route. If even the argmax LOSES money and
+  // the trust/fraud/value gates all pass, refund and let the customer keep it —
+  // zero legs, zero handling, zero carbon (Amazon's real returnless lever,
+  // decided deterministically instead of ad hoc).
+  const returnless = byPath('returnless_refund');
+  if (returnless?.viable && best.evCents < 0) {
+    return {
+      ...base,
+      decision: 'returnless_refund',
+      hardRule: 'every movement path loses money → returnless refund (item stays with the customer)',
+      fallbackChain: FALLBACKS.returnless_refund,
+      dwellBudgetHours: 0,
+      ttlHours: TTL_HOURS.returnless_refund,
+      // Nothing moves at all: the linehaul AND the local trip are both avoided.
+      co2SavedKg: Math.round((freightCarbonKg + CO2_LOCAL_KG) * 10) / 10,
+    };
+  }
   // Restock still ships one (short) leg to the nearest FC — the carbon saved is
   // the returns-center linehaul it avoided, net of that inbound leg.
   const fcKm = p.nearestFcKm ?? p.warehouseDistanceKm;

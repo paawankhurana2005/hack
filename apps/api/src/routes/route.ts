@@ -23,7 +23,22 @@ function buildFallbackReasoning(
   nearbyBuyers: number,
   radiusKm: number,
 ): string {
+  if (decision === 'liquidate') {
+    return `Staged into a manifested hub pallet — graded, Health-Card-listed lots clear at the top of the liquidation band instead of mystery-lot pricing.`;
+  }
   return `Value ₹${residualValue} exceeds handling cost ₹${localHandlingCost}. ${nearbyBuyers} buyers within ${radiusKm}km. Routed to ${decision}.`;
+}
+
+// Spec 016.1: deterministic template — the "no route" decision needs a replayable
+// reason, not an LLM narration.
+const RETURNLESS_REASONING =
+  'Every route loses money net of pickup and handling — refund issued, the customer keeps the item. Zero legs, zero carbon.';
+
+// Mock customer trust keyed off the observed grade (real: account-history model).
+function mockCustomerTrust(grade: ReturnGradingResult['grade']): number {
+  if (grade === 'A') return 0.92;
+  if (grade === 'B') return 0.75;
+  return 0.55;
 }
 
 async function narrateRouting(
@@ -101,12 +116,29 @@ export async function routeHandler(req: Request, res: Response): Promise<void> {
       // Spec 016: doorstep signals → posterior + confidence gates + restock path.
       confidence: gr.confidence,
       packagingSealed: gr.packagingSealed,
+      // Spec 016.1: defect-level refurb, fraud gate, returnless trust lever.
+      defects: gr.defects,
+      wardrobingFlag: gr.wardrobingFlag,
+      customerTrust: mockCustomerTrust(gr.grade),
     });
 
     let reasoning: string;
 
     if (computed.decision === 'return_to_seller') {
       reasoning = RETURN_TO_SELLER_REASONING;
+    } else if (computed.decision === 'returnless_refund') {
+      reasoning = RETURNLESS_REASONING;
+    } else if (computed.decision === 'liquidate') {
+      // Skip the LLM: nearbyBuyers/radiusKm are meaningless for a pallet decision
+      // and the generic narration prompt has fabricated "local buyer" language
+      // from them before. The deterministic template is the correct story.
+      reasoning = buildFallbackReasoning(
+        computed.decision,
+        computed.residualValue,
+        computed.localHandlingCost,
+        computed.nearbyBuyers,
+        computed.radiusKm,
+      );
     } else if (MOCK_MODE) {
       // In mock mode, skip NVIDIA and use the template string directly
       reasoning = buildFallbackReasoning(
@@ -211,6 +243,10 @@ export async function checkpointHandler(req: Request, res: Response): Promise<vo
       functionallyVerifiable: ev.functionalCheckPassed ?? gr.functionallyVerifiable,
       confidence,
       packagingSealed: ev.packagingSealed ?? gr.packagingSealed,
+      // Spec 016.1: checkpoints carry the same defect/fraud/trust signals.
+      defects: gr.defects,
+      wardrobingFlag: gr.wardrobingFlag,
+      customerTrust: mockCustomerTrust(grade),
     });
 
     const overrode = ev.observedGrade !== undefined && ev.observedGrade !== gr.grade;

@@ -37,6 +37,8 @@ export interface SubmittedReturn {
   sku?: string;
   /** Set once the hub dispatched to local_resale and an agent listing was born. */
   listingId?: string;
+  /** Spec 016.1: set once the hub staged this return into a liquidation lot. */
+  lotId?: string;
 }
 
 /** Effective lifecycle state for records created before spec 016. */
@@ -216,6 +218,15 @@ export function linkListing(returnId: string, listingId: string): SubmittedRetur
   const target = getReturnById(returnId);
   if (!target) return null;
   const updated: SubmittedReturn = { ...target, listingId };
+  saveReturn(updated);
+  return updated;
+}
+
+/** Spec 016.1: link the hub liquidation lot this return was staged into. */
+export function linkLot(returnId: string, lotId: string): SubmittedReturn | null {
+  const target = getReturnById(returnId);
+  if (!target) return null;
+  const updated: SubmittedReturn = { ...target, lotId };
   saveReturn(updated);
   return updated;
 }

@@ -1,4 +1,23 @@
+// Spec 016.1: this store now sits on the deterministic lot engine in
+// @reloop/shared/liquidation-lot — bid curves + manifest premium + ship-vs-wait
+// decide; there is no Math.random anywhere in the pricing path. localStorage
+// persistence and the BulkBatch/BulkMatch shapes are unchanged (the page
+// renders the same fields).
+
+import {
+  bestBuyer,
+  lotValueCents,
+  secondBestBuyer,
+  shipNowOrWait,
+  type Grade,
+  type ItemCategory,
+  type LotBuyerType,
+  type LotComposition,
+  type LotValue,
+} from '@reloop/shared';
+
 export type BatchStatus =
+  | 'staging' // spec 016.1: open hub pallet, filling from routed returns
   | 'pending_approval'
   | 'partially_matched'
   | 'approved'
@@ -31,6 +50,10 @@ export interface BulkBatch {
   approvedAt?: string;
   completedAt?: string;
   ecoCreditsAwarded?: number;
+  /** Spec 016.1: mean clearing price across staged units (paise) — engine input. */
+  avgClearingCents?: number;
+  /** Spec 016.1: Health-Card manifest coverage of the lot (0–1). */
+  manifestCoverage?: number;
 }
 
 const STORAGE_KEY = 'reloop_bulk_v1';
@@ -152,7 +175,8 @@ export function updateBatch(id: string, patch: Partial<BulkBatch>): BulkBatch | 
 }
 
 export function generateBatchId(): string {
-  return `BLK-2025-${Math.floor(1000 + Math.random() * 9000)}`;
+  // Deterministic-enough and collision-free for the demo; no Math.random.
+  return `BLK-2026-${Date.now() % 100000}`;
 }
 
 export function generateGrades(
@@ -167,66 +191,168 @@ export function generateGrades(
   return { A, B, C, D };
 }
 
-const BUYERS: Record<string, { name: string; type: string; location: string }> = {
-  donation: { name: 'Samarthan Foundation', type: 'NGO Partner', location: 'Nagpur' },
-  refurbisher: { name: 'ReNew Electronics India', type: 'Verified Refurbisher', location: 'Bangalore' },
-  fashion: { name: 'SecondStyle Pvt Ltd', type: 'Fashion Reseller', location: 'Surat' },
-  default: { name: 'BulkMart Wholesale', type: 'General Wholesaler', location: 'Pune' },
+// --- Engine adapters -------------------------------------------------------------
+
+function toItemCategory(category: string): ItemCategory {
+  if (/electron|laptop|tablet|phone|gadget/i.test(category)) return 'electronics';
+  if (/fashion|cloth|apparel|wear|shoe/i.test(category)) return 'fashion';
+  if (/home|kitchen|appliance|furniture/i.test(category)) return 'home';
+  if (/sport|fitness|gym/i.test(category)) return 'sports';
+  if (/toy|game/i.test(category)) return 'toys';
+  if (/book/i.test(category)) return 'books';
+  return 'other';
+}
+
+// Mean clearing price per unit by category (paise) — SKU-prefix-style mock,
+// same role as getPricing in the API's routing adapter.
+const CLEARING_PER_UNIT_CENTS: Record<ItemCategory, number> = {
+  electronics: 500_000, // ₹5,000
+  home: 250_000,
+  sports: 200_000,
+  toys: 120_000,
+  fashion: 120_000,
+  books: 60_000,
+  other: 200_000,
 };
 
-export function generateMatch(units: number, category: string, preferred: string): BulkMatch {
-  const isElec = /electron|laptop|tablet|phone|gadget/i.test(category);
-  const isFashion = /fashion|cloth|apparel|wear/i.test(category);
-  const isDonation = preferred === 'Donation accepted';
+// Batches submitted through the seller form are AI-graded (near-full manifest);
+// hub-staged pallets are bench-verified (full manifest).
+const SUBMITTED_MANIFEST_COVERAGE = 0.9;
+const HUB_MANIFEST_COVERAGE = 1;
 
-  const buyer = isDonation
-    ? BUYERS.donation
-    : preferred === 'Refurbisher only' || isElec
-    ? BUYERS.refurbisher
-    : isFashion
-    ? BUYERS.fashion
-    : BUYERS.default;
-
-  const pricePerUnit = isElec ? 1800 : isFashion ? 400 : 900;
-  const dealValue = isDonation ? 0 : Math.round(units * pricePerUnit * (0.85 + Math.random() * 0.2));
-  const amazonCut = isDonation ? 0 : Math.round(dealValue * 0.1);
-
-  const pickupDate = new Date(Date.now() + 3 * 24 * 3600000);
+function toLot(
+  grades: { A: number; B: number; C: number; D: number },
+  category: string,
+  avgClearingCents: number,
+  manifestCoverage: number,
+): LotComposition {
   return {
-    buyerName: buyer!.name,
-    buyerType: buyer!.type,
-    buyerLocation: buyer!.location,
+    category: toItemCategory(category),
+    // The store's legacy D bucket is the engine's Salvage.
+    gradeHistogram: { A: grades.A, B: grades.B, C: grades.C, Salvage: grades.D },
+    avgClearingCents,
+    manifestCoverageFrac: manifestCoverage,
+  };
+}
+
+const BUYER_DIRECTORY: Record<LotBuyerType, { name: string; type: string; location: string }> = {
+  refurbisher: { name: 'ReNew Electronics India', type: 'Verified Refurbisher', location: 'Bangalore' },
+  wholesaler: { name: 'BulkMart Wholesale', type: 'Verified Wholesaler', location: 'Pune' },
+  ngo: { name: 'Samarthan Foundation', type: 'NGO Donation Partner', location: 'Nagpur' },
+  fashion_reseller: { name: 'SecondStyle Pvt Ltd', type: 'Fashion Reseller', location: 'Surat' },
+};
+
+// Deterministic alternates for re-matching (deal fell through → second-best bid).
+const ALT_BUYER_DIRECTORY: Record<LotBuyerType, { name: string; type: string; location: string }> = {
+  refurbisher: { name: 'GreenTech Refurb Co', type: 'Certified Refurbisher', location: 'Hyderabad' },
+  wholesaler: { name: 'ValueChain India', type: 'B2B Reseller', location: 'Chennai' },
+  ngo: { name: 'GreenHome NGO', type: 'NGO Donation Partner', location: 'Pune' },
+  fashion_reseller: { name: 'EcoCircle Partners', type: 'Sustainability Reseller', location: 'Ahmedabad' },
+};
+
+function toBulkMatch(
+  value: LotValue,
+  lot: LotComposition,
+  units: number,
+  directory: Record<LotBuyerType, { name: string; type: string; location: string }>,
+): BulkMatch {
+  const buyer = directory[value.buyer];
+  const verdict = shipNowOrWait(lot);
+  const pickupDate = new Date(Date.now() + (verdict.shipNow ? 2 : 5) * 24 * 3600000);
+  return {
+    buyerName: buyer.name,
+    buyerType: buyer.type,
+    buyerLocation: buyer.location,
     matchedUnits: units,
-    dealValue,
-    amazonCut,
-    sellerEarnings: dealValue - amazonCut,
-    co2SavedKg: parseFloat((units * 0.042 + Math.random() * 1.5).toFixed(1)),
+    // NGO lots are zero-cash by design — the page detects donation via
+    // sellerEarnings === 0; the CSR credit lives in the note, not the deal value.
+    dealValue: Math.round(value.grossCents / 100),
+    amazonCut: Math.round(value.amazonCutCents / 100),
+    sellerEarnings: Math.round(value.sellerCents / 100),
+    co2SavedKg: parseFloat((units * 0.042).toFixed(1)),
     pickupDate: pickupDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
   };
 }
 
-export function generateRematching(batch: BulkBatch): BulkMatch {
-  const altBuyers = [
-    { name: 'GreenTech Refurb Co', type: 'Certified Refurbisher', location: 'Hyderabad' },
-    { name: 'ValueChain India', type: 'B2B Reseller', location: 'Chennai' },
-    { name: 'EcoCircle Partners', type: 'Sustainability Reseller', location: 'Ahmedabad' },
-  ];
-  const buyer = altBuyers[Math.floor(Math.random() * altBuyers.length)];
-  const units = batch.units;
-  const pricePerUnit = /electron/i.test(batch.category) ? 1650 : 850;
-  const dealValue = Math.round(units * pricePerUnit * (0.88 + Math.random() * 0.15));
-  const amazonCut = Math.round(dealValue * 0.1);
+export function generateMatch(
+  units: number,
+  category: string,
+  preferred: string,
+  grades?: { A: number; B: number; C: number; D: number },
+): BulkMatch {
+  const g = grades ?? generateGrades(units, category);
+  const cat = toItemCategory(category);
+  const lot = toLot(g, category, CLEARING_PER_UNIT_CENTS[cat], SUBMITTED_MANIFEST_COVERAGE);
+  const value =
+    preferred === 'Donation accepted'
+      ? lotValueCents(lot, 'ngo')
+      : preferred === 'Refurbisher only' && cat === 'electronics'
+        ? lotValueCents(lot, 'refurbisher')
+        : bestBuyer(lot);
+  return toBulkMatch(value, lot, units, BUYER_DIRECTORY);
+}
 
-  const pickupDate = new Date(Date.now() + 4 * 24 * 3600000);
-  return {
-    buyerName: buyer!.name,
-    buyerType: buyer!.type,
-    buyerLocation: buyer!.location,
-    matchedUnits: units,
-    dealValue,
-    amazonCut,
-    sellerEarnings: dealValue - amazonCut,
-    co2SavedKg: parseFloat((units * 0.038 + Math.random() * 1.2).toFixed(1)),
-    pickupDate: pickupDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+export function generateRematching(batch: BulkBatch): BulkMatch {
+  const cat = toItemCategory(batch.category);
+  const lot = toLot(
+    batch.grades,
+    batch.category,
+    batch.avgClearingCents ?? CLEARING_PER_UNIT_CENTS[cat],
+    batch.manifestCoverage ?? SUBMITTED_MANIFEST_COVERAGE,
+  );
+  // The first deal fell through: take the second-best bid, from the alternate
+  // partner directory (a different counterparty, deterministically chosen).
+  const value = secondBestBuyer(lot) ?? bestBuyer(lot);
+  return toBulkMatch(value, lot, batch.units, ALT_BUYER_DIRECTORY);
+}
+
+// --- Spec 016.1: hub pallet staging ----------------------------------------------
+// Returns whose engine decision is `liquidate` land here from the hub bench:
+// one open lot per category fills unit by unit; the match and the ship-vs-wait
+// verdict are recomputed by the engine on every unit added.
+
+export function hubLotId(category: string): string {
+  return `BLK-HUB-${toItemCategory(category)}`;
+}
+
+export function stageReturnIntoLot(
+  ret: { returnId: string; category: string; priceCents: number },
+  grade: Grade,
+): BulkBatch {
+  const cat = toItemCategory(ret.category);
+  const id = hubLotId(ret.category);
+  const existing = getBatches().find((b) => b.id === id && b.status === 'staging');
+  const clearingCents = Math.round(ret.priceCents * 0.6); // clearing ≈ 60% of retail
+
+  const prevUnits = existing?.units ?? 0;
+  const prevAvg = existing?.avgClearingCents ?? 0;
+  const grades = existing
+    ? { ...existing.grades }
+    : { A: 0, B: 0, C: 0, D: 0 };
+  const bucket = grade === 'Salvage' ? 'D' : grade;
+  grades[bucket] += 1;
+  const units = prevUnits + 1;
+  const avgClearingCents = Math.round((prevAvg * prevUnits + clearingCents) / units);
+
+  const lot = toLot(grades, ret.category, avgClearingCents, HUB_MANIFEST_COVERAGE);
+  const value = bestBuyer(lot);
+  const verdict = shipNowOrWait(lot);
+
+  const batch: BulkBatch = {
+    id,
+    category: ret.category,
+    description: `Hub pallet — ${cat}, bench-verified, Health-Card manifested`,
+    units,
+    preferredOutcome: 'Let AI decide',
+    submittedAt: existing?.submittedAt ?? new Date().toISOString(),
+    grades,
+    status: 'staging',
+    primaryMatch: toBulkMatch(value, lot, units, BUYER_DIRECTORY),
+    remainingUnits: 0,
+    remainingNote: verdict.reason,
+    avgClearingCents,
+    manifestCoverage: HUB_MANIFEST_COVERAGE,
   };
+  persistBatch(batch);
+  return batch;
 }

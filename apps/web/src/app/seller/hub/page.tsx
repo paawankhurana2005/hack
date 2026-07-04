@@ -10,7 +10,9 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   decideRoute,
   estimateImpact,
+  PALLET_CAPACITY,
   posteriorFromPointGrade,
+  tagDefects,
   type ConditionGrade,
   type Grade,
   type ItemCategory,
@@ -25,9 +27,11 @@ import {
   getSubmittedReturns,
   lifecycleOf,
   linkListing,
+  linkLot,
   recordTransition,
   type SubmittedReturn,
 } from '@/lib/mocks/return-store';
+import { getBatches, stageReturnIntoLot, type BulkBatch } from '@/lib/mocks/bulk-exchange-store';
 import { addListing } from '@/lib/listings-store';
 import { ensureAgent } from '@/lib/agent-store';
 import { demandCurve, SKU_TO_STORE_PRODUCT } from '@/lib/demand-graph';
@@ -51,6 +55,8 @@ const STATE_LABEL: Partial<Record<ReturnItemState, string>> = {
   donation_batch: 'Donation batch',
   recycle_batch: 'Recycle batch',
   pallet_staging: 'Pallet staging',
+  liquidated: 'Liquidated (pallet sold)',
+  returnless_closed: 'Returnless — refund issued',
   rl_outbound: 'Standard RL outbound',
 };
 
@@ -59,20 +65,24 @@ const EXEC_STATE: Record<ReturnRoutingDecision['decision'], ReturnItemState> = {
   restock: 'restock_outbound',
   local_resale: 'listed_local',
   refurbish: 'refurb_queue',
+  liquidate: 'pallet_staging',
   donate: 'donation_batch',
   recycle: 'recycle_batch',
   warehouse: 'rl_outbound',
   return_to_seller: 'rl_outbound',
+  returnless_refund: 'returnless_closed', // unreachable at the hub (item never moves)
 };
 
 const PATH_LABEL: Record<ReturnRoutingDecision['decision'], string> = {
   restock: 'Restock as sellable',
   local_resale: 'Resell locally',
   refurbish: 'Refurbish',
+  liquidate: 'Liquidate (hub pallet)',
   donate: 'Donate',
   recycle: 'Recycle',
   warehouse: 'Warehouse',
   return_to_seller: 'Return to seller',
+  returnless_refund: 'Returnless refund',
 };
 
 const CHECKPOINT_FLOW: ReturnItemState[] = ['routed', 'pickup_verified', 'at_local_hub', 'hub_verified'];
@@ -122,9 +132,13 @@ function birthReturnListing(
   const storeProductId = ret.sku ? SKU_TO_STORE_PRODUCT[ret.sku] : undefined;
   const storeProduct = storeProductId ? findStoreProduct(storeProductId) : undefined;
 
-  // Floor = what the item is worth if the agent gives up locally (warehouse path EV),
-  // clamped to a sane band under the list price.
-  const salvageEv = benchResult.evByPath.find((p) => p.path === 'warehouse')?.evCents ?? 0;
+  // Floor = what the item is worth if the agent gives up locally — the better of
+  // the warehouse linehaul and the manifested hub pallet (016.1: the pallet is
+  // now honestly the route-elsewhere value), clamped to a sane band under list.
+  const salvageEv = Math.max(
+    benchResult.evByPath.find((p) => p.path === 'warehouse')?.evCents ?? 0,
+    benchResult.evByPath.find((p) => p.path === 'liquidate')?.evCents ?? 0,
+  );
   const floorCents = Math.max(
     Math.round(listedCents * 0.4),
     Math.min(Math.max(0, salvageEv), Math.round(listedCents * 0.85)),
@@ -204,6 +218,8 @@ function birthReturnListing(
 export default function HubBenchPage() {
   const [returns, setReturns] = useState<SubmittedReturn[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Spec 016.1: open hub pallets (one per category) filling from liquidate-routed items.
+  const [stagingLots, setStagingLots] = useState<BulkBatch[]>([]);
 
   // Bench form state
   const [benchGrade, setBenchGrade] = useState<Grade>('A');
@@ -214,6 +230,7 @@ export default function HubBenchPage() {
     const all = getSubmittedReturns().filter((r) => r.routingDecision !== null);
     setReturns(all);
     if (all.length > 0) setSelectedId(all[0]!.returnId);
+    setStagingLots(getBatches().filter((b) => b.status === 'staging'));
   }, []);
 
   const selected = returns.find((r) => r.returnId === selectedId) ?? null;
@@ -253,12 +270,18 @@ export default function HubBenchPage() {
       sealed: sealIntact,
       skuActive: true,
       nearestFcKm: 45,
+      // Spec 016.1: bench-verified Health Card ⇒ full manifest; defect tags feed
+      // the defect-level refurb table; wardrobing blocks returnless.
+      defectTags: tagDefects(selected.gradingResult?.defects ?? []),
+      manifestCoverage: 1,
+      fraudSignal: selected.gradingResult?.wardrobingFlag ?? false,
     };
     return decideRoute(profile);
   }, [selected, benchGrade, sealIntact, functionalPass]);
 
   function refresh() {
     setReturns(getSubmittedReturns().filter((r) => r.routingDecision !== null));
+    setStagingLots(getBatches().filter((b) => b.status === 'staging'));
   }
 
   function transition(to: ReturnItemState, extra?: Partial<ReturnStateTransition>) {
@@ -326,6 +349,16 @@ export default function HubBenchPage() {
     if (benchResult.decision === 'local_resale') {
       birthReturnListing(selected, benchGrade, benchResult, categoryOf(selected));
     }
+    // Spec 016.1: liquidate-bound items join the open hub pallet for their
+    // category — the lot engine re-prices the pallet and re-runs ship-vs-wait
+    // on every unit added.
+    if (benchResult.decision === 'liquidate') {
+      const lot = stageReturnIntoLot(
+        { returnId: selected.returnId, category: selected.category, priceCents: selected.priceCents },
+        benchGrade,
+      );
+      linkLot(selected.returnId, lot.id);
+    }
     refresh();
   }
 
@@ -343,6 +376,56 @@ export default function HubBenchPage() {
         doorstep AI grade in ~10 minutes, repackage, and the engine re-routes while a redirect still
         costs a shelf move. Wrong grades are caught before any buyer sees the item.
       </p>
+
+      {/* Spec 016.1: pallet staging — the manifested lots filling at this hub */}
+      {stagingLots.length > 0 && (
+        <div className="mt-6 space-y-2">
+          {stagingLots.map((lot) => {
+            const fill = Math.min(1, lot.units / PALLET_CAPACITY);
+            return (
+              <div key={lot.id} className="rounded-2xl bg-card p-4 ring-1 ring-border">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      Pallet staging — {lot.category}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {lot.id} · Health-Card manifested ·{' '}
+                      {lot.units}/{PALLET_CAPACITY} units
+                    </p>
+                  </div>
+                  {lot.primaryMatch && (
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-foreground">
+                        {lot.primaryMatch.buyerName}{' '}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          ({lot.primaryMatch.buyerType})
+                        </span>
+                      </p>
+                      <p className="text-xs text-success">
+                        Current bid ₹{lot.primaryMatch.sellerEarnings.toLocaleString('en-IN')} to
+                        the seller
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary">
+                  <div className="h-full rounded-full bg-warning" style={{ width: `${fill * 100}%` }} />
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">{lot.remainingNote}</p>
+                  <Link
+                    href="/seller/bulk-exchange"
+                    className="text-xs font-semibold text-brand hover:underline"
+                  >
+                    View in Bulk Exchange →
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mt-8 flex gap-6">
         {/* Queue */}

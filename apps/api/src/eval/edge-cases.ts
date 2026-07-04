@@ -7,6 +7,7 @@ import {
   assessDrift,
   buildCorpus,
   calibrateConfidence,
+  CONFIDENCE_GATE_THETA,
   cumulativeImpact,
   decideRoute,
   evByPath,
@@ -112,6 +113,99 @@ async function run(): Promise<void> {
   const argmax = viable.reduce((a, b) => (b.evCents > a.evCents ? b : a));
   check('routing: EV picks argmax viable path', dec.decision === argmax.path);
   check('routing: no buyers → local_resale not viable', evByPath(evp({ nearbyBuyers: 0 })).find((e) => e.path === 'local_resale')?.viable === false);
+
+  // --- Routing: legacy regression (016.1 must not silently change this) ----
+  check('routing: default profile still routes local_resale', decideRoute(evp({})).decision === 'local_resale');
+
+  // --- Routing: liquidate (016.1) -------------------------------------------
+  const liqManifested = evByPath(
+    evp({ category: 'electronics', manifestCoverage: 1, confidence: 0.9, nearbyBuyers: 0 }),
+  );
+  const liqUnmanifested = evByPath(
+    evp({ category: 'electronics', manifestCoverage: 0, confidence: 0.9, nearbyBuyers: 0 }),
+  );
+  const whManifested = liqManifested.find((e) => e.path === 'warehouse')!;
+  const liqM = liqManifested.find((e) => e.path === 'liquidate')!;
+  const liqU = liqUnmanifested.find((e) => e.path === 'liquidate')!;
+  check('routing: manifested pallet beats honestly-priced warehouse', liqM.evCents > whManifested.evCents);
+  check('routing: manifest premium is monotone in coverage', liqM.evCents > liqU.evCents);
+  check(
+    'routing: warehouse recovery pinned to the honest blend (≤31% of clearing)',
+    // evp() default clearingPriceCents is 300_000 — see the profile builder above.
+    whManifested.terms.slice(0, 2).reduce((s, t) => s + t.valueCents, 0) <= 0.31 * 300_000,
+  );
+  check(
+    'routing: no-demand functional item → liquidate, not warehouse (016.1 recalibration)',
+    decideRoute(evp({ grade: 'A', nearbyBuyers: 0 })).decision === 'liquidate',
+  );
+
+  // --- Routing: refurb fix + defect-level economics (016.1) -----------------
+  check(
+    'routing: refurb not viable with zero nearby buyers (016.1 fix — no downstream channel)',
+    evByPath(evp({ grade: 'C', nearbyBuyers: 0 })).find((e) => e.path === 'refurbish')?.viable === false,
+  );
+  const refurbNoTags = decideRoute(evp({ grade: 'B', nearbyBuyers: 3 }));
+  const refurbWithTags = decideRoute(evp({ grade: 'B', nearbyBuyers: 3, defectTags: ['missing_charger'] }));
+  const refurbEv = (r: typeof refurbNoTags) => r.evByPath.find((e) => e.path === 'refurbish')!.evCents;
+  check(
+    'routing: defect-table repair cost (₹300) beats the grade-level fallback (₹600) on a ₹3,000 item',
+    refurbEv(refurbWithTags) > refurbEv(refurbNoTags),
+  );
+  check(
+    'routing: defect repair cost surfaces as its own glass-box term',
+    refurbWithTags.evByPath
+      .find((e) => e.path === 'refurbish')!
+      .terms.some((t) => t.label.startsWith('Defect repairs') && t.valueCents === -30_000),
+  );
+
+  // --- Routing: E[correction_cost(r)] (016.1 — the spec formula's missing term) --
+  const uncertainA = evByPath(
+    evp({ grade: 'A', gradePosterior: { A: 0.7, B: 0.2, C: 0.1, Salvage: 0 }, sealed: true, skuActive: true }),
+  );
+  check(
+    'routing: restock carries a negative correction-cost term when posterior mass sits below A',
+    uncertainA.find((e) => e.path === 'restock')!.terms.some((t) => t.label === 'Expected correction cost' && t.valueCents < 0),
+  );
+  check(
+    'routing: donate carries no correction-cost term (being wrong is free)',
+    !uncertainA.find((e) => e.path === 'donate')!.terms.some((t) => t.label === 'Expected correction cost'),
+  );
+  check(
+    'routing: θ gate ordering mirrors redirect-cost ordering',
+    CONFIDENCE_GATE_THETA.restock! > CONFIDENCE_GATE_THETA.local_resale! &&
+      CONFIDENCE_GATE_THETA.local_resale! > CONFIDENCE_GATE_THETA.refurbish! &&
+      CONFIDENCE_GATE_THETA.refurbish! > CONFIDENCE_GATE_THETA.donate! &&
+      CONFIDENCE_GATE_THETA.donate! > CONFIDENCE_GATE_THETA.liquidate!,
+  );
+
+  // --- Routing: returnless refund (016.1) — "the best route is no route" --------
+  const returnlessBase: Partial<RoutingEvProfile> = {
+    clearingPriceCents: 5_000,
+    localHandlingCents: 3_000,
+    nearbyBuyers: 0,
+    customerTrust: 0.9,
+  };
+  check('routing: all-paths-negative + trust → returnless refund', decideRoute(evp(returnlessBase)).decision === 'returnless_refund');
+  check(
+    'routing: no trust signal → ineligible, stays a real route',
+    decideRoute(evp({ ...returnlessBase, customerTrust: undefined })).decision !== 'returnless_refund',
+  );
+  check(
+    'routing: high-value item never goes returnless',
+    decideRoute(evp({ ...returnlessBase, clearingPriceCents: 200_000 })).decision !== 'returnless_refund',
+  );
+  check(
+    'routing: fraud signal blocks returnless',
+    decideRoute(evp({ ...returnlessBase, fraudSignal: true })).decision !== 'returnless_refund',
+  );
+
+  // --- Routing: hero-demo guard (liquidate must never cannibalize the flagship) --
+  check(
+    'routing: B09-shaped demo profile still routes local_resale',
+    decideRoute(
+      evp({ grade: 'A', category: 'electronics', clearingPriceCents: 249_900, localHandlingCents: 38_000, nearbyBuyers: 8, radiusKm: 4 }),
+    ).decision === 'local_resale',
+  );
 
   // --- Resell / provenance (flywheel + multi-life) ------------------------
   const chains = sampleChains();
