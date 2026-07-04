@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
 
 const tones: Record<Tone, string> = {
-  neutral: 'bg-secondary text-muted-foreground',
-  accent: 'bg-brand/15 text-brand',
-  success: 'bg-brand/15 text-brand',
-  warning: 'bg-brand/15 text-brand',
+  neutral: 'bg-surface text-muted-foreground',
+  accent: 'bg-orange/10 text-orange',
+  success: 'bg-success/15 text-success',
+  warning: 'bg-orange/10 text-orange',
   danger: 'bg-destructive/15 text-destructive',
 };
 

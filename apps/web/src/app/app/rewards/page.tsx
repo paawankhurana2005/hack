@@ -178,7 +178,7 @@ export default function RewardsPage() {
               {vouchers.map((v) => (
                 <li
                   key={v.code}
-                  className="flex items-center justify-between rounded-lg bg-background/60 px-3 py-2"
+                  className="flex items-center justify-between rounded-lg bg-surface px-3 py-2"
                 >
                   <span className="font-mono text-sm tracking-widest text-brand">{v.code}</span>
                   <span className="text-sm text-foreground">{v.label.replace(' Amazon voucher', '')}</span>

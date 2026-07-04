@@ -151,13 +151,13 @@ export function HealthCardHistory({
 
       {/* Cumulative beat — compounded across the whole life, derived not invented */}
       <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-        <div className="rounded-xl bg-background/60 p-3">
+        <div className="rounded-xl bg-surface p-3">
           <p className="text-2xl font-semibold tabular-nums text-brand">{lives}</p>
           <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
             {lives === 1 ? 'Life' : 'Lives'}
           </p>
         </div>
-        <div className="rounded-xl bg-background/60 p-3">
+        <div className="rounded-xl bg-surface p-3">
           <p className="text-2xl font-semibold tabular-nums text-foreground">
             {impact.co2SavedKg}
             <span className="text-sm text-muted-foreground">kg</span>
@@ -166,7 +166,7 @@ export function HealthCardHistory({
             CO₂ avoided across its life
           </p>
         </div>
-        <div className="rounded-xl bg-background/60 p-3">
+        <div className="rounded-xl bg-surface p-3">
           <p className="text-2xl font-semibold tabular-nums text-foreground">{impact.ecoCredits}</p>
           <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
             EcoCredits earned

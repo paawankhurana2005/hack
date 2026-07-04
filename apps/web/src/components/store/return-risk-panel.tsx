@@ -51,7 +51,7 @@ export function ReturnRiskPanel({ prediction, onSwitch }: ReturnRiskPanelProps) 
             <span className="w-28 shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {r.reason}
             </span>
-            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-background/60">
+            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface">
               <span
                 className={`block h-full rounded-full ${tone.dot}`}
                 style={{ width: `${Math.round(r.share * 100)}%` }}
@@ -66,7 +66,7 @@ export function ReturnRiskPanel({ prediction, onSwitch }: ReturnRiskPanelProps) 
 
       {/* Smart recommendation — the prevention nudge */}
       {rec ? (
-        <div className="mt-5 rounded-xl bg-background/50 p-4">
+        <div className="mt-5 rounded-xl bg-surface p-4">
           <p className="text-sm text-foreground">
             Consider <span className="font-semibold text-brand">{rec.variantLabel}</span> — only{' '}
             <span className="font-semibold text-brand tabular-nums">{pct(rec.returnRate)}</span> come
@@ -82,7 +82,7 @@ export function ReturnRiskPanel({ prediction, onSwitch }: ReturnRiskPanelProps) 
           </button>
         </div>
       ) : (
-        <p className="mt-5 rounded-xl bg-background/50 p-3 text-center text-xs text-muted-foreground">
+        <p className="mt-5 rounded-xl bg-surface p-3 text-center text-xs text-muted-foreground">
           Great fit for most shoppers — you just helped avoid a likely return.
         </p>
       )}

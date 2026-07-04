@@ -9,10 +9,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Semantic tokens (Lovable design system).
+        // Amazon-native light design system (mirrors newFrontend styles.css).
         surface: c('surface'),
         background: c('background'),
         foreground: c('foreground'),
+        hairline: c('hairline'),
+        success: c('success'),
+
+        // Semantic shadcn tokens.
         card: { DEFAULT: c('card'), foreground: c('card-foreground') },
         popover: { DEFAULT: c('popover'), foreground: c('popover-foreground') },
         primary: { DEFAULT: c('primary'), foreground: c('primary-foreground') },
@@ -25,22 +29,26 @@ const config: Config = {
         input: c('input'),
         ring: c('ring'),
 
-        // Legacy aliases — keep pre-existing navy/orange classes resolving to the
-        // new palette so every flow page adopts the dark+gold look automatically.
+        // Navy: DEFAULT is the dark ink accent (pills, primary buttons). The 900–500
+        // scale keys are legacy aliases from the old dark theme, remapped to light
+        // equivalents so any not-yet-reskinned page still renders on the light canvas.
         navy: {
+          DEFAULT: c('navy'),
           900: c('surface'),
-          800: c('card'),
-          700: c('secondary'),
-          600: c('border'),
-          500: c('border'),
+          800: c('background'),
+          700: c('surface'),
+          600: c('hairline'),
+          500: c('hairline'),
         },
+        // Orange: DEFAULT + hover match Amazon Ember; 400–600 keep legacy classes valid.
         orange: {
-          400: c('brand'),
-          500: c('brand'),
-          600: c('brand-strong'),
+          DEFAULT: c('orange'),
+          hover: c('orange-hover'),
+          400: c('orange'),
+          500: c('orange'),
+          600: c('orange-hover'),
         },
-        success: c('brand'),
-        warning: c('brand'),
+        warning: c('orange'),
         danger: c('destructive'),
       },
       borderRadius: {
@@ -60,6 +68,8 @@ const config: Config = {
         float: 'float-y 5s ease-in-out infinite',
         marquee: 'marquee 40s linear infinite',
         glow: 'glow-pulse 3s ease-in-out infinite',
+        'fade-up': 'fade-up 0.6s ease-out both',
+        'fade-in': 'fade-in 0.5s ease-out both',
       },
     },
   },

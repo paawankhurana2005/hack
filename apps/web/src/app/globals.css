@@ -3,31 +3,37 @@
 @tailwind utilities;
 
 /* Design tokens as CSS variables — mirror of src/lib/tokens.ts.
+   Amazon-native LIGHT palette: white surfaces, navy ink, orange accent.
    Stored as oklch channels (no oklch() wrapper) so Tailwind can apply alpha. */
 :root {
-  --surface: 0.16 0.005 285;
-  --background: 0.16 0.005 285;
-  --foreground: 0.985 0 0;
-  --card: 0.21 0.006 285;
-  --card-foreground: 0.985 0 0;
-  --popover: 0.21 0.006 285;
-  --popover-foreground: 0.985 0 0;
-  --primary: 0.985 0 0;
-  --primary-foreground: 0.16 0.005 285;
-  --secondary: 0.27 0.006 285;
-  --secondary-foreground: 0.985 0 0;
-  --muted: 0.27 0.006 285;
-  --muted-foreground: 0.705 0.01 285;
-  --accent: 0.27 0.006 285;
-  --accent-foreground: 0.985 0 0;
-  --destructive: 0.62 0.22 25;
-  --destructive-foreground: 0.985 0 0;
-  --border: 0.3 0.006 285;
-  --input: 0.3 0.006 285;
-  --ring: 0.85 0.17 88;
-  --brand: 0.82 0.17 88;
-  --brand-foreground: 0.16 0.005 285;
-  --brand-strong: 0.78 0.17 88;
+  --surface: 0.97 0.002 247;
+  --background: 1 0 0;
+  --foreground: 0.27 0.03 252;
+  --navy: 0.27 0.03 252;
+  --orange: 0.78 0.17 65;
+  --orange-hover: 0.72 0.17 60;
+  --hairline: 0.92 0.004 247;
+  --success: 0.6 0.15 152;
+  --card: 1 0 0;
+  --card-foreground: 0.27 0.03 252;
+  --popover: 1 0 0;
+  --popover-foreground: 0.27 0.03 252;
+  --primary: 0.78 0.17 65;
+  --primary-foreground: 1 0 0;
+  --secondary: 0.97 0.002 247;
+  --secondary-foreground: 0.27 0.03 252;
+  --muted: 0.97 0.002 247;
+  --muted-foreground: 0.5 0.02 252;
+  --accent: 0.97 0.002 247;
+  --accent-foreground: 0.27 0.03 252;
+  --destructive: 0.577 0.245 27.325;
+  --destructive-foreground: 0.985 0.003 247;
+  --border: 0.92 0.004 247;
+  --input: 0.92 0.004 247;
+  --ring: 0.78 0.17 65;
+  --brand: 0.78 0.17 65;
+  --brand-foreground: 1 0 0;
+  --brand-strong: 0.72 0.17 60;
 }
 
 @layer base {
@@ -42,8 +48,8 @@
     font-feature-settings: 'ss01', 'cv11';
   }
   ::selection {
-    background-color: oklch(var(--brand));
-    color: oklch(var(--brand-foreground));
+    background-color: oklch(var(--orange));
+    color: oklch(var(--primary-foreground));
   }
 }
 

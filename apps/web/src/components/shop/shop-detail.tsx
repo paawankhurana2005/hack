@@ -97,19 +97,19 @@ export function ShopDetail({ item }: { item: ShopEntry }) {
                 </div>
               </div>
               <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-xl bg-background/60 p-3">
+                <div className="rounded-xl bg-surface p-3">
                   <p className="text-2xl font-semibold tabular-nums text-brand">+{result.buyerCredits}</p>
                   <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
                     You earned
                   </p>
                 </div>
-                <div className="rounded-xl bg-background/60 p-3">
+                <div className="rounded-xl bg-surface p-3">
                   <p className="text-2xl font-semibold tabular-nums text-foreground">+{result.sellerCredits}</p>
                   <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
                     Seller earned
                   </p>
                 </div>
-                <div className="rounded-xl bg-background/60 p-3">
+                <div className="rounded-xl bg-surface p-3">
                   <p className="text-2xl font-semibold tabular-nums text-foreground">
                     {result.co2SavedKg}
                     <span className="text-sm text-muted-foreground">kg</span>
@@ -146,7 +146,7 @@ export function ShopDetail({ item }: { item: ShopEntry }) {
                 {card.authenticityVerified && <Badge tone="success">✓ Verified</Badge>}
               </div>
 
-              <div className="mt-4 flex items-center gap-2 rounded-xl bg-background/60 p-3">
+              <div className="mt-4 flex items-center gap-2 rounded-xl bg-surface p-3">
                 <span className="size-1.5 rounded-full bg-brand" />
                 <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   Choose second-life · earn{' '}

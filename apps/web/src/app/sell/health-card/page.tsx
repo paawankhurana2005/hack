@@ -170,7 +170,7 @@ export default function SellHealthCardPage() {
               </div>
             )}
 
-            <div className="mt-5 rounded-xl bg-background/60 p-4">
+            <div className="mt-5 rounded-xl bg-surface p-4">
               <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-brand">
                 Timeline
               </p>

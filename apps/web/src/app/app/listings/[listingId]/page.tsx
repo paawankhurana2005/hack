@@ -209,7 +209,7 @@ export default function ListingDetailPage() {
             </span>
           </div>
           <div className="mt-5 grid grid-cols-3 gap-3">
-            <div className="rounded-xl bg-background/60 p-4 text-center">
+            <div className="rounded-xl bg-surface p-4 text-center">
               <p className="text-2xl font-semibold tabular-nums text-brand">
                 {formatMoney(inr(sale.soldPriceCents))}
               </p>
@@ -217,13 +217,13 @@ export default function ListingDetailPage() {
                 Payout to you
               </p>
             </div>
-            <div className="rounded-xl bg-background/60 p-4 text-center">
+            <div className="rounded-xl bg-surface p-4 text-center">
               <p className="text-2xl font-semibold tabular-nums text-brand">+{sale.sellerCredits}</p>
               <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
                 EcoCredits earned
               </p>
             </div>
-            <div className="rounded-xl bg-background/60 p-4 text-center">
+            <div className="rounded-xl bg-surface p-4 text-center">
               <p className="text-2xl font-semibold tabular-nums text-foreground">
                 {sale.co2SavedKg}
                 <span className="text-sm text-muted-foreground">kg</span>

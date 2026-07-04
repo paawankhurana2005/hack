@@ -1,571 +1,337 @@
-'use client';
-
 import Link from 'next/link';
-import { useRef, useState } from 'react';
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-surface text-foreground selection:bg-brand selection:text-brand-foreground">
+    <div className="min-h-screen bg-background font-sans text-foreground">
       <Hero />
-      <PillarEyes />
-      <PillarBrain />
-      <PillarTrust />
-      <Impact />
-      <CTA />
-    </div>
-  );
-}
-
-function Pillar({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="border-l-2 border-brand/40 pl-5">
-      <div className="mb-2 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-        {title}
-      </div>
-      <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{body}</p>
+      <Flows />
+      <Dashboard />
+      <Footer />
     </div>
   );
 }
 
 function Hero() {
-  const heroRef = useRef<HTMLDivElement>(null);
-  const [mouse, setMouse] = useState({ x: 50, y: 50 });
   return (
-    <section
-      ref={heroRef}
-      onMouseMove={(e) => {
-        const r = heroRef.current?.getBoundingClientRect();
-        if (!r) return;
-        setMouse({
-          x: ((e.clientX - r.left) / r.width) * 100,
-          y: ((e.clientY - r.top) / r.height) * 100,
-        });
-      }}
-      className="relative overflow-hidden pb-24 pt-24"
-    >
-      <div
-        className="pointer-events-none absolute inset-0 transition-[background] duration-300"
-        style={{
-          background: `radial-gradient(600px circle at ${mouse.x}% ${mouse.y}%, color-mix(in oklab, oklch(var(--brand)) 12%, transparent), transparent 60%)`,
-        }}
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.18]"
-        style={{
-          backgroundImage:
-            'linear-gradient(to right, color-mix(in oklab, oklch(var(--foreground)) 8%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, oklch(var(--foreground)) 8%, transparent) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-          maskImage: 'radial-gradient(ellipse at center, black 40%, transparent 75%)',
-        }}
-      />
-
-      <div className="relative mx-auto max-w-5xl px-6">
-        <div className="text-center">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/10 px-3 py-1">
-            <span className="relative flex size-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75" />
-              <span className="relative inline-flex size-1.5 rounded-full bg-brand" />
-            </span>
-            <span className="font-mono text-[11px] uppercase tracking-wider text-brand">
-              Live
-            </span>
-          </div>
-
-          <h1 className="mb-8 text-balance text-5xl font-semibold leading-[0.95] tracking-tighter text-foreground md:text-7xl lg:text-[5.5rem]">
-            The landfill is a{' '}
-            <span className="relative inline-block">
-              <span className="italic text-muted-foreground">design flaw</span>
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 8" preserveAspectRatio="none">
-                <path
-                  d="M2 5 Q 50 1, 100 4 T 198 3"
-                  stroke="oklch(var(--brand))"
-                  strokeWidth="2"
-                  fill="none"
-                  strokeLinecap="round"
-                  className="underline-draw"
-                />
-              </svg>
-            </span>
-            .
-          </h1>
-
-          <p className="mx-auto mb-10 max-w-[52ch] text-pretty text-base text-muted-foreground md:text-lg">
-            We grade every return at the doorstep, route it to its best second life, and mint a trust
-            card that travels with the item — so nothing of value ever hits a landfill.
-          </p>
-
-          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/login"
-              className="group flex items-center gap-2 rounded-lg bg-brand py-2 pl-2 pr-4 font-medium text-brand-foreground ring-1 ring-brand/50 transition hover:shadow-[0_0_40px_rgba(234,179,8,0.35)] active:scale-95"
-            >
-              <span className="grid size-6 place-items-center rounded bg-brand-foreground/10 text-sm">
-                →
-              </span>
-              Try the demo
-            </Link>
-          </div>
-        </div>
-
-        {/* Kinetic centerpiece */}
-        <div className="relative mt-20 flex justify-center">
-          <div className="absolute inset-0 animate-glow rounded-full bg-brand/10 blur-[140px]" />
-          <div className="relative size-72 md:size-96">
-            <div className="absolute inset-0 rounded-full border border-border" />
-            <div
-              className="absolute inset-4 animate-spin-slow rounded-full border border-border/70"
-              style={{ borderStyle: 'dashed' }}
-            />
-            <div className="absolute inset-12 animate-spin-reverse rounded-full border border-border/40" />
-
-            {[0, 90, 180, 270].map((deg, i) => (
-              <div
-                key={deg}
-                className="absolute left-1/2 top-1/2 -ml-1 -mt-1 size-2"
-                style={{ transform: `rotate(${deg}deg) translateX(11rem)` }}
-              >
-                <div
-                  className={`size-2 rounded-full ${
-                    i === 1 ? 'bg-brand shadow-[0_0_12px_oklch(var(--brand))]' : 'bg-muted-foreground/50'
-                  }`}
-                />
-              </div>
-            ))}
-
-            <div className="absolute inset-0 grid place-items-center">
-              <div className="relative size-36 animate-float overflow-hidden rounded-3xl bg-card ring-1 ring-border md:size-44">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/landing/hero-item.jpg"
-                  alt="Returned product entering the loop"
-                  className="h-full w-full object-cover"
-                  width={512}
-                  height={512}
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-card/95 to-transparent p-2">
-                  <div className="font-mono text-[9px] uppercase tracking-widest text-brand">
-                    Input_Item · scanning
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* status strip */}
-        <div className="mt-16 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          <span>AI Grading</span>
-          <span className="text-border">/</span>
-          <span>Smart Routing</span>
-          <span className="text-border">/</span>
-          <span>Product Health Card</span>
-          <span className="text-border">/</span>
-          <span className="text-brand">Return Prevention</span>
+    <section className="mx-auto max-w-7xl px-6 pb-12 pt-20">
+      <div className="max-w-3xl">
+        <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-foreground/60">
+          <span className="size-1.5 animate-pulse rounded-full bg-orange" />
+          Amazon-native · Operational
+        </span>
+        <h1 className="text-6xl font-bold leading-[0.9] tracking-tighter sm:text-7xl">
+          Grade at the source. <br />
+          <span className="text-orange">Decide before it moves.</span>
+        </h1>
+        <p className="mt-8 max-w-xl text-lg leading-relaxed text-foreground/70">
+          ReLoop intercepts returns and unused inventory at the doorstep. Our AI evaluates
+          condition instantly to determine the most profitable — and most sustainable — next step.
+        </p>
+        <div className="mt-10 flex flex-wrap gap-3">
+          <Link
+            href="/sell"
+            className="rounded-full bg-navy px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-navy/90"
+          >
+            Try the consumer flow
+          </Link>
+          <Link
+            href="/seller"
+            className="rounded-full border border-hairline bg-white px-6 py-3 text-sm font-semibold transition-colors hover:bg-surface"
+          >
+            See seller dashboard →
+          </Link>
         </div>
       </div>
     </section>
   );
 }
 
-function PillarEyes() {
+function Flows() {
   return (
-    <section id="eyes" className="relative border-t border-border/50 py-32">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <span className="mb-4 block font-mono text-xs uppercase tracking-widest text-brand">
-            Pillar 01 / Perception
+    <section id="flows" className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-6 md:grid-cols-2">
+      {/* Sell flow */}
+      <Link
+        href="/sell"
+        className="group relative overflow-hidden rounded-3xl bg-surface p-8 transition-all hover:bg-stone-100"
+      >
+        <div className="mb-12">
+          <span className="inline-block rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
+            Consumer App
           </span>
-          <h2 className="mb-6 text-balance text-4xl font-semibold leading-[1.05] tracking-tight text-foreground md:text-5xl">
-            See value where others see waste.
-          </h2>
-          <p className="mb-8 max-w-[48ch] text-pretty text-muted-foreground">
-            A vision-language model inspects every return in real time — condition, authenticity, and
-            serial numbers in under a second.
-          </p>
-          <div className="space-y-3">
-            {[
-              ['A1', 'STRUCTURAL_INTEGRITY', 'PASS'],
-              ['A2', 'SERIAL_OCR', '8392-XX-A7'],
-              ['A3', 'ACCESSORIES_DETECTED', '3 of 3'],
-            ].map(([id, k, v]) => (
-              <div
-                key={id}
-                className="flex items-center gap-4 rounded-lg border border-border bg-card/40 p-3 backdrop-blur"
-              >
-                <div className="grid size-8 place-items-center rounded bg-brand/15 font-mono text-[10px] text-brand">
-                  {id}
-                </div>
-                <div className="flex-1 font-mono text-xs text-muted-foreground">{k}</div>
-                <div className="font-mono text-xs text-brand">{v}</div>
-              </div>
-            ))}
-          </div>
+          <h3 className="mt-4 text-3xl font-bold">Sell &amp; Scale</h3>
+          <p className="mt-2 text-foreground/60">AI-powered grading for unboxed items.</p>
         </div>
-
-        <div className="lg:col-span-7">
-          <div className="relative rounded-3xl bg-card p-3 shadow-2xl shadow-black/40 ring-1 ring-border">
-            <div className="flex items-center justify-between px-3 py-1.5">
-              <div className="flex gap-1.5">
-                <span className="size-2 rounded-full bg-muted-foreground/40" />
-                <span className="size-2 rounded-full bg-muted-foreground/40" />
-                <span className="size-2 rounded-full bg-brand/80" />
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-white shadow-xl shadow-black/5">
+          <div className="absolute inset-0 p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="font-mono text-[10px] uppercase text-foreground/40">
+                Camera Viewport · 88.2% Active
               </div>
-              <div className="font-mono text-[10px] tracking-wider text-muted-foreground">
-                grade.live ⌁ session_082
-              </div>
-              <div className="font-mono text-[10px] text-brand">REC ●</div>
+              <div className="h-2 w-2 animate-pulse rounded-full bg-orange" />
             </div>
-            <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-background">
+            <div className="relative mb-4 aspect-[4/3] w-full overflow-hidden rounded-lg outline outline-1 -outline-offset-1 outline-black/5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/landing/grading-scan.jpg"
-                alt="AI grading scan"
+                src="/landing/coffee-machine.jpg"
+                alt="Espresso machine being graded"
+                width={800}
+                height={600}
                 loading="lazy"
-                width={1280}
-                height={800}
                 className="h-full w-full object-cover"
               />
-              <div className="pointer-events-none absolute inset-0">
-                <div className="absolute left-[18%] top-[18%] h-28 w-28 border-l-2 border-t-2 border-brand/80" />
-                <div className="absolute right-[18%] top-[18%] h-28 w-28 border-r-2 border-t-2 border-brand/80" />
-                <div className="absolute bottom-[18%] left-[18%] h-28 w-28 border-b-2 border-l-2 border-brand/80" />
-                <div className="absolute bottom-[18%] right-[18%] h-28 w-28 border-b-2 border-r-2 border-brand/80" />
-                <div className="absolute inset-x-0 top-0 h-[2px] animate-scan bg-brand shadow-[0_0_24px_oklch(var(--brand))]" />
-                <div className="absolute right-3 top-3 rounded border border-brand/30 bg-background/70 px-2 py-1 font-mono text-[10px] text-brand backdrop-blur">
-                  1280×800 · 24fps
-                </div>
+              <div className="pointer-events-none absolute inset-x-4 top-1/2 h-px bg-orange/70 shadow-[0_0_12px_2px] shadow-orange/50" />
+              <div className="absolute left-3 top-3 rounded border border-orange/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-orange backdrop-blur-sm">
+                Scanning
               </div>
-              <div className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-xl border border-border bg-background/80 p-3 backdrop-blur">
-                <div className="flex items-center gap-4">
-                  <div className="font-mono text-[10px] text-muted-foreground">DETECTION 99.8%</div>
-                  <div className="font-mono text-[10px] text-brand">CLASS · GRADE_A_CERTIFIED</div>
-                </div>
-                <div className="hidden font-mono text-[10px] text-muted-foreground sm:block">
-                  latency 412ms
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function PillarBrain() {
-  const routes = [
-    { tag: '01', title: 'Resell', body: 'Instant pricing + Warehouse Deals listing.', meta: 'Est. Recovery', value: '84%', featured: false },
-    { tag: '02', title: 'Refurbish', body: 'Repairable flaws → regional centers.', meta: 'Path Logic', value: '≤ B+ grade', featured: true },
-    { tag: '03', title: 'Redistribute', body: 'Surplus rerouted to low-stock nodes.', meta: 'LCA Saved', value: '4.2 kg CO₂', featured: false },
-    { tag: '04', title: 'Donate', body: 'Auto-matched with verified non-profits.', meta: 'Tax Credit', value: '₹3,200 avg', featured: false },
-  ];
-  return (
-    <section id="brain" className="relative border-t border-border/50 bg-card/20 py-32">
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="mb-16 grid items-end gap-12 lg:grid-cols-12">
-          <div className="lg:col-span-7">
-            <span className="mb-4 block font-mono text-xs uppercase tracking-widest text-brand">
-              Pillar 02 / Intelligence
-            </span>
-            <h2 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight text-foreground md:text-5xl">
-              Smart routing. Maximum recovery. Zero guesswork.
-            </h2>
-          </div>
-          <div className="lg:col-span-5 lg:text-right">
-            <p className="font-mono text-sm text-muted-foreground">
-              <span className="text-brand">{'>'}</span> LLM explains. Rules decide.
-              <br />
-              <span className="text-brand">{'>'}</span> Every decision is auditable.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          {routes.map((r) => (
-            <div
-              key={r.tag}
-              className={`group relative rounded-2xl bg-card p-6 ring-1 transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-brand/10 ${
-                r.featured ? 'bg-gradient-to-b from-brand/10 to-card ring-brand/40' : 'ring-border'
-              }`}
-            >
-              <div className="mb-6 flex items-center justify-between">
-                <div
-                  className={`grid size-10 place-items-center rounded-lg font-mono text-sm ${
-                    r.featured ? 'bg-brand text-brand-foreground' : 'bg-muted text-brand'
-                  }`}
-                >
-                  {r.tag}
-                </div>
-                {r.featured && (
-                  <span className="rounded-full border border-brand/40 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-brand">
-                    Recommended
-                  </span>
-                )}
-              </div>
-              <h3 className="mb-2 text-xl font-semibold text-foreground">{r.title}</h3>
-              <p className="mb-6 min-h-[64px] text-pretty text-sm text-muted-foreground">{r.body}</p>
-              <div className="flex items-center justify-between border-t border-border/60 pt-4">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  {r.meta}
-                </span>
-                <span className="font-mono text-xs text-foreground">{r.value}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
-            <div className="mb-6 font-mono text-[10px] uppercase tracking-widest text-brand">
-              /api/sell/price · live trace
             </div>
             <div className="space-y-3">
-              {[
-                ['Retail estimate', '₹14,999', 'ReLoop AI'],
-                ['Market demand', 'HIGH', '0.91'],
-                ['Condition penalty', '× 0.85', 'grade A'],
-                ['Recency bonus', '× 1.04', '11 mo'],
-              ].map(([label, value, meta]) => (
-                <div
-                  key={label}
-                  className="flex items-center justify-between border-b border-border/40 py-2"
-                >
-                  <span className="text-xs text-muted-foreground">{label}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs text-foreground">{value}</span>
-                    <span className="rounded bg-background/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                      {meta}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              <div className="flex items-center justify-between pt-3">
-                <span className="text-xs font-medium text-foreground">Final listing</span>
-                <span className="text-lg font-semibold text-brand">₹13,259</span>
+              <div className="flex items-center justify-between border-b border-surface pb-2">
+                <span className="text-xs font-medium">Detected Item</span>
+                <span className="font-mono text-xs">Breville Precision Brewer</span>
               </div>
-            </div>
-          </div>
-          <div className="flex flex-col justify-between rounded-2xl bg-card p-6 ring-1 ring-border">
-            <div>
-              <div className="mb-4 font-mono text-[10px] uppercase tracking-widest text-brand">
-                routing_decision
+              <div className="flex items-center justify-between border-b border-surface pb-2">
+                <span className="text-xs font-medium">AI Condition Grade</span>
+                <span className="font-mono text-xs font-bold italic text-success">A — EXCELLENT</span>
               </div>
-              <div className="mb-2 text-3xl font-semibold tracking-tight text-foreground">
-                Refurbish → Resell
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Estimated Payout</span>
+                <span className="font-mono text-xs font-bold">$482.00</span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Buff + recert lifts grade A → A+, unlocking ₹1,900 in incremental recovery.
-              </p>
-            </div>
-            <div className="mt-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              <span className="size-1.5 animate-pulse rounded-full bg-brand" />
-              Confirmed · 0.41s
             </div>
           </div>
         </div>
-      </div>
+      </Link>
+
+      {/* Return flow */}
+      <Link href="/seller" className="group relative overflow-hidden rounded-3xl bg-navy p-8 text-white transition-all">
+        <div className="mb-12">
+          <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
+            Seller Hub
+          </span>
+          <h3 className="mt-4 text-3xl font-bold">Doorstep Routing</h3>
+          <p className="mt-2 text-white/60">Intelligent logic for high-volume returns.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="mb-8 flex h-8 w-8 items-center justify-center rounded-lg bg-orange">
+              <div className="size-4 border-2 border-white" />
+            </div>
+            <div className="text-xs font-bold uppercase tracking-tight">Route: Resale</div>
+            <div className="mt-1 text-[10px] text-white/40">Grade: A+ · High Local Demand</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 opacity-60">
+            <div className="mb-8 flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
+              <div className="size-4 border-2 border-white/60" />
+            </div>
+            <div className="text-xs font-bold uppercase tracking-tight">Route: Refurb</div>
+            <div className="mt-1 text-[10px] text-white/40">Grade: B− · Repairable Scuff</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 opacity-60">
+            <div className="mb-8 flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
+              <div className="size-4 rounded-full border-2 border-white/60" />
+            </div>
+            <div className="text-xs font-bold uppercase tracking-tight">Route: Donate</div>
+            <div className="mt-1 text-[10px] text-white/40">Grade: C · Local Partner</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 opacity-60">
+            <div className="mb-8 flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
+              <div className="size-4 rotate-45 border-2 border-white/60" />
+            </div>
+            <div className="text-xs font-bold uppercase tracking-tight">Route: Recycle</div>
+            <div className="mt-1 text-[10px] text-white/40">Grade: D · Materials Recovery</div>
+          </div>
+          <div className="col-span-2 rounded-2xl border border-white/10 bg-white/5 p-6">
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="font-mono text-2xl font-bold">$14.2k</div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-orange">
+                  Saved Logistical Loss · last 24h
+                </div>
+              </div>
+              <div className="flex h-12 w-28 items-end gap-1">
+                <div className="h-4 w-full bg-white/20" />
+                <div className="h-8 w-full bg-white/20" />
+                <div className="h-6 w-full bg-white/20" />
+                <div className="h-10 w-full bg-white/20" />
+                <div className="h-12 w-full bg-orange" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
     </section>
   );
 }
 
-function PillarTrust() {
+type Row = {
+  id: string;
+  item: string;
+  grade: 'A' | 'B+' | 'B' | 'C';
+  source: string;
+  route: string;
+  routeTone: 'orange' | 'navy' | 'muted';
+  recovery: string;
+};
+
+const ROWS: Row[] = [
+  { id: 'AMZ-9021-KLX', item: 'Kindle Paperwhite', grade: 'A', source: 'Doorstep Return', route: 'Direct Resale', routeTone: 'orange', recovery: '$124.50' },
+  { id: 'AMZ-8842-TRV', item: 'Anker PowerCore', grade: 'B+', source: 'Marketplace · Sell', route: 'Buyer Matched · 9.2km', routeTone: 'orange', recovery: '$48.20' },
+  { id: 'AMZ-7712-QPC', item: 'Bose QC45 Headphones', grade: 'B', source: 'Doorstep Return', route: 'Refurbish Hub · SEA-4', routeTone: 'navy', recovery: '$189.00' },
+  { id: 'AMZ-6610-DKR', item: 'Levoit Air Purifier', grade: 'C', source: 'Excess Inventory', route: 'Local Donation', routeTone: 'muted', recovery: '$0.00' },
+];
+
+function Dashboard() {
   return (
-    <section id="trust" className="overflow-hidden border-t border-border/50 py-32">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-20 px-6 lg:grid-cols-2">
-        <div className="relative order-2 lg:order-1">
-          <div className="absolute -inset-12 rounded-full bg-brand/10 blur-3xl" />
-          <div className="relative rotate-[-1.5deg] rounded-[32px] bg-background p-1 shadow-2xl shadow-black/50 ring-1 ring-border transition-transform duration-500 hover:rotate-0">
-            <div className="rounded-[28px] bg-card p-8">
-              <div className="mb-10 flex items-start justify-between">
-                <div>
-                  <div className="mb-1 font-mono text-[10px] uppercase text-muted-foreground">
-                    Health Card · ID
-                  </div>
-                  <div className="font-mono text-sm tracking-tight text-foreground">RLP-7729-XM4</div>
-                </div>
-                <div className="grid size-12 animate-glow place-items-center rounded-full border-2 border-brand font-mono text-[10px] font-semibold text-brand">
-                  VFD
-                </div>
-              </div>
-
-              <div className="mb-8 space-y-4">
-                {[
-                  ['Condition', 'Pristine (A+)'],
-                  ['Battery Health', '98% nominal'],
-                  ['Previous Loops', '01 · original owner'],
-                  ['Serial Verified', '✓ 6 of 6 digits'],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex items-end justify-between border-b border-border/50 pb-2">
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground">{k}</span>
-                    <span className="text-sm font-medium text-foreground">{v}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mb-4 rounded-xl bg-background/60 p-4">
-                <div className="mb-3 font-mono text-[10px] uppercase tracking-widest text-brand">
-                  Timeline
-                </div>
-                <div className="relative space-y-2.5 pl-4">
-                  <div className="absolute bottom-1 left-[5px] top-1 w-px bg-border" />
-                  {[
-                    ['14:00', 'Item dropped at Hub-4'],
-                    ['14:01', 'VLM grading complete'],
-                    ['14:02', 'Routed → resell'],
-                  ].map(([t, m]) => (
-                    <div key={t} className="relative flex gap-3 font-mono text-[11px] text-muted-foreground">
-                      <span className="absolute -left-4 top-1.5 size-2 rounded-full bg-brand ring-2 ring-card" />
-                      <span className="text-brand">{t}</span>
-                      <span>{m}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-background/60 p-4 font-mono text-[10px] leading-relaxed text-muted-foreground">
-                STAMPED · 14:02 UTC / SEATTLE-HUB-4
-                <br />
-                VALIDATED · LLAMA-3.2-VISION-B90
-                <br />
-                STATUS · <span className="text-brand">SECOND_LIFE_READY</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="order-1 lg:order-2">
-          <span className="mb-4 block font-mono text-xs uppercase tracking-widest text-brand">
-            Pillar 03 / Trust
-          </span>
-          <h2 className="mb-6 text-balance text-4xl font-semibold leading-[1.05] tracking-tight text-foreground md:text-5xl">
-            The Product Health Card.
-          </h2>
-          <p className="mb-8 max-w-[44ch] text-pretty text-muted-foreground">
-            Every item gets a digital twin — condition, history, and authenticity proof — making
-            resale as trusted as buying new.
-          </p>
-          <ul className="mb-8 space-y-3">
-            {[
-              'Transparent provenance',
-              'Instant model + serial verification',
-              'Residual-value prediction',
-              'Shareable & scannable',
-            ].map((t) => (
-              <li key={t} className="flex items-center gap-3 text-sm text-foreground">
-                <span className="size-1.5 rounded-full bg-brand" />
-                {t}
-              </li>
-            ))}
-          </ul>
-          <Link
-            href="/sell"
-            className="inline-flex items-center gap-2 text-sm font-medium text-brand transition-all hover:gap-3"
-          >
-            Create a Health Card
-            <span>→</span>
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Impact() {
-  return (
-    <section id="impact" className="border-y border-border/60 bg-card/10 py-24">
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="mb-10 flex items-center justify-between">
-          <span className="font-mono text-xs uppercase tracking-widest text-brand">
-            How ReLoop closes the loop
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            four pillars
-          </span>
-        </div>
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
-          <Pillar
-            title="Grade at the source"
-            body="Multimodal AI scores condition right at the doorstep — before the item ever moves."
-          />
-          <Pillar
-            title="Decide before it moves"
-            body="An explainable engine picks resale, refurbish, donate or recycle from value, cost, demand and carbon."
-          />
-          <Pillar
-            title="Trust that travels"
-            body="A verifiable Product Health Card carries condition, history and authenticity to the next owner."
-          />
-          <Pillar
-            title="Prevent the return"
-            body="Predict returns before they happen and stop the waste at the root."
-          />
-        </div>
-
-        <div className="relative mt-20 overflow-hidden border-y border-border/60 py-6">
-          <div className="flex animate-marquee gap-12 whitespace-nowrap">
-            {Array.from({ length: 2 }).map((_, k) => (
-              <div key={k} className="flex shrink-0 gap-12">
-                {[
-                  'Returns rerouted',
-                  'Items refurbished',
-                  'Donations matched',
-                  'Sellers listed',
-                  'Carbon avoided',
-                  'Trust cards minted',
-                ].map((t, i) => (
-                  <div key={`${k}-${i}`} className="flex items-center gap-4">
-                    <span className="size-1.5 rounded-full bg-brand" />
-                    <span className="font-mono text-sm uppercase tracking-widest text-muted-foreground">
-                      {t}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CTA() {
-  return (
-    <footer id="cta" className="py-32">
-      <div className="mx-auto max-w-4xl px-6 text-center">
-        <h2 className="mb-10 text-balance text-5xl font-semibold tracking-tighter text-foreground md:text-6xl">
-          Ready to close <span className="italic text-brand">the loop</span>?
-        </h2>
-        <div className="mb-16 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link
-            href="/return"
-            className="group flex items-center gap-2 rounded-lg bg-foreground py-2 pl-2 pr-4 font-medium text-background transition hover:opacity-90 active:scale-95"
-          >
-            <span className="grid size-6 place-items-center rounded bg-background/10 text-sm">→</span>
-            Start a Return
-          </Link>
-          <Link
-            href="/sell"
-            className="flex items-center gap-2 rounded-lg bg-card py-2 pl-2 pr-4 font-medium text-foreground ring-1 ring-border transition hover:bg-muted active:scale-95"
-          >
-            <span className="grid size-6 place-items-center rounded bg-foreground/5 text-sm">$</span>
-            Sell an item
-          </Link>
-        </div>
-        <div className="flex flex-col items-center justify-between gap-6 border-t border-border/60 pt-12 md:flex-row">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Built for the
+    <section id="dashboard" className="mx-auto mt-20 max-w-7xl px-6 pb-24">
+      <div className="rounded-3xl border border-surface bg-white p-8 md:p-12">
+        <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-orange">
+              Live · Seattle Cluster
             </span>
-            <span className="text-xs font-medium tracking-tight text-foreground">
-              Amazon NextGen Hackathon
-            </span>
+            <h2 className="mt-2 text-4xl font-bold tracking-tighter">Live Routing Engine</h2>
+            <p className="mt-2 text-foreground/60">
+              Current return operations across the Pacific Northwest logistics network.
+            </p>
           </div>
-          <div className="flex gap-6 text-xs text-muted-foreground">
-            <span className="text-foreground/70">AI Grading</span>
-            <span className="text-foreground/70">Smart Routing</span>
-            <span className="text-foreground/70">Health Card</span>
+          <div className="flex gap-6">
+            <Stat label="Active Couriers" value="1,204" />
+            <Stat label="Success Rate" value="99.8%" />
+            <Stat label="Recovery 7d" value="$2.4M" accent />
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          <div className="space-y-4">
+            <Step n="01" title="Visual Grading" body="AI verifies authenticity and wear in 4.2s." />
+            <Step n="02" title="Dynamic Pricing" body="Real-time matching with local secondary-market prices." />
+            <Step n="03" title="Hyper-local Routing" body="Item moves directly to a new buyer or the nearest refurb hub." accent />
+          </div>
+          <div className="lg:col-span-2">
+            <div className="relative aspect-[16/7] w-full overflow-hidden rounded-2xl bg-surface outline outline-1 -outline-offset-1 outline-black/5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/landing/network-topology.jpg"
+                alt="Network topology view"
+                width={1280}
+                height={560}
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute left-4 top-4 rounded border border-hairline bg-white/90 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-foreground/60 backdrop-blur-sm">
+                Network Topology · PNW
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pipeline table */}
+        <div className="mt-10 overflow-hidden rounded-2xl border border-surface">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-surface text-[10px] font-bold uppercase tracking-widest text-foreground/50">
+                  <th className="px-6 py-3 font-bold">Item</th>
+                  <th className="px-6 py-3 font-bold">Grade</th>
+                  <th className="px-6 py-3 font-bold">Source</th>
+                  <th className="px-6 py-3 font-bold">Routing Outcome</th>
+                  <th className="px-6 py-3 text-right font-bold">Recovery</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface">
+                {ROWS.map((r) => (
+                  <tr key={r.id} className="transition-colors hover:bg-surface/40">
+                    <td className="px-6 py-4">
+                      <div className="font-medium">{r.item}</div>
+                      <div className="font-mono text-[11px] text-foreground/40">{r.id}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <GradeBadge grade={r.grade} />
+                    </td>
+                    <td className="px-6 py-4 text-foreground/60">{r.source}</td>
+                    <td className="px-6 py-4">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`size-2 rounded-full ${
+                            r.routeTone === 'orange'
+                              ? 'bg-orange'
+                              : r.routeTone === 'navy'
+                                ? 'bg-navy'
+                                : 'bg-stone-300'
+                          }`}
+                        />
+                        {r.route}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right font-mono font-semibold">{r.recovery}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="text-right">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">{label}</div>
+      <div className={`font-mono text-lg font-bold ${accent ? 'text-orange' : ''}`}>{value}</div>
+    </div>
+  );
+}
+
+function Step({ n, title, body, accent }: { n: string; title: string; body: string; accent?: boolean }) {
+  return (
+    <div className="flex items-start gap-4">
+      <div
+        className={`grid size-12 shrink-0 place-items-center rounded-xl bg-surface font-mono text-sm font-bold ${
+          accent ? 'text-orange' : ''
+        }`}
+      >
+        {n}
+      </div>
+      <div className="pt-1">
+        <div className="text-sm font-bold">{title}</div>
+        <div className="text-xs leading-relaxed text-foreground/50">{body}</div>
+      </div>
+    </div>
+  );
+}
+
+function GradeBadge({ grade }: { grade: Row['grade'] }) {
+  const styles: Record<Row['grade'], string> = {
+    A: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    'B+': 'bg-amber-50 text-amber-700 ring-amber-200',
+    B: 'bg-amber-50 text-amber-700 ring-amber-200',
+    C: 'bg-stone-100 text-stone-600 ring-stone-200',
+  };
+  return (
+    <span className={`inline-flex rounded px-2 py-0.5 font-mono text-[11px] font-bold ring-1 ${styles[grade]}`}>
+      {grade}
+    </span>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="border-t border-surface bg-surface/50">
+      <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-6 py-10 md:flex-row md:items-center">
+        <div className="text-sm">
+          <span className="font-bold tracking-tight">
+            RE<span className="text-orange">LOOP</span>
+          </span>
+          <span className="ml-3 text-foreground/50">
+            Second life for Amazon returns and excess inventory.
+          </span>
+        </div>
+        <div className="flex gap-6 font-mono text-[10px] font-bold uppercase tracking-widest text-foreground/50">
+          <a href="#" className="hover:text-orange">System Status</a>
+          <a href="#" className="hover:text-orange">API Docs</a>
+          <a href="#" className="hover:text-orange">Governance</a>
         </div>
       </div>
     </footer>

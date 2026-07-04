@@ -76,11 +76,11 @@ export function DormantCard({
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-lg bg-background/60 p-3">
+          <div className="rounded-lg bg-surface p-3">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">You earn</p>
             <p className="mt-0.5 text-lg font-semibold tabular-nums text-brand">{formatMoney(q.lenderNet)}</p>
           </div>
-          <div className="rounded-lg bg-background/60 p-3">
+          <div className="rounded-lg bg-surface p-3">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">~ / month</p>
             <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
               {formatMoney(signal.projectedMonthlyEarn)}

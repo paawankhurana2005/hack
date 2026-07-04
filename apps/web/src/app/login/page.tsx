@@ -1,11 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useRole } from '@/lib/role-context';
 import { ACCOUNTS, findAccountByHandle } from '@/lib/accounts';
 import { login as apiLogin } from '@/lib/api-client';
 import { ApiRequestError } from '@/lib/api-client';
-import { Eyebrow, GridBackdrop } from '@/components/ui/section';
 
 export default function LoginPage() {
   const { setAccount } = useRole();
@@ -61,108 +61,169 @@ export default function LoginPage() {
   const sellers = ACCOUNTS.filter((a) => a.kind === 'seller');
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-surface px-6 py-20">
-      <GridBackdrop />
-      <div className="pointer-events-none absolute inset-0 -z-0">
-        <div className="absolute left-1/2 top-1/3 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/10 blur-[140px]" />
-      </div>
+    <div className="grid min-h-screen grid-cols-1 bg-background font-sans text-foreground lg:grid-cols-2">
+      {/* Left: form */}
+      <div className="flex flex-col px-6 py-8 sm:px-12 lg:px-16">
+        <Link href="/" className="text-xl font-bold tracking-tight">
+          RE<span className="text-orange">LOOP</span>
+        </Link>
 
-      <div className="relative w-full max-w-md text-center">
-        <div className="mb-6 flex items-center justify-center gap-2.5">
-          <div className="relative grid size-7 place-items-center rounded-full bg-brand">
-            <div className="size-3 rounded-full border-2 border-brand-foreground" />
-            <div className="absolute inset-0 rounded-full bg-brand opacity-50 blur-md" />
-          </div>
-          <span className="text-lg font-semibold tracking-tight text-foreground">ReLoop</span>
-        </div>
+        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-12">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-foreground/40">
+            Sign in · demo
+          </span>
+          <h1 className="mt-3 text-4xl font-bold tracking-tighter">Welcome back.</h1>
+          <p className="mt-2 text-sm text-foreground/60">
+            Sign in with a demo username and password. Pick an account below to fill them in.
+          </p>
 
-        <Eyebrow className="mb-4">Sign in · demo</Eyebrow>
-        <h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-          Who are you?
-        </h1>
-        <p className="mx-auto mt-3 max-w-sm text-pretty text-muted-foreground">
-          Sign in with a demo username and password. Pick an account below to fill them in.
-        </p>
+          <form onSubmit={submit} className="mt-10 space-y-5">
+            <div>
+              <label className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-foreground/60">
+                Username
+              </label>
+              <input
+                autoFocus
+                value={handle}
+                onChange={(e) => {
+                  setHandle(e.target.value);
+                  setError('');
+                }}
+                placeholder="username"
+                autoComplete="username"
+                className="w-full rounded-xl border border-hairline bg-white px-4 py-3 font-mono text-sm outline-none transition-colors focus:border-navy focus:ring-2 focus:ring-orange/20"
+              />
+            </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block font-mono text-[10px] font-bold uppercase tracking-widest text-foreground/60">
+                  Password
+                </label>
+              </div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError('');
+                }}
+                placeholder="password"
+                autoComplete="current-password"
+                className="w-full rounded-xl border border-hairline bg-white px-4 py-3 font-mono text-sm outline-none transition-colors focus:border-navy focus:ring-2 focus:ring-orange/20"
+              />
+            </div>
 
-        <form onSubmit={submit} className="mt-8 space-y-3">
-          <div className="flex items-center gap-2 rounded-xl bg-card p-2 ring-1 ring-border focus-within:ring-brand/50">
-            <span className="pl-2 font-mono text-sm text-muted-foreground">@</span>
-            <input
-              autoFocus
-              value={handle}
-              onChange={(e) => {
-                setHandle(e.target.value);
-                setError('');
-              }}
-              placeholder="username"
-              autoComplete="username"
-              className="flex-1 bg-transparent py-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
-            />
-          </div>
+            {error && <p className="text-xs text-destructive">{error}</p>}
 
-          <div className="flex items-center gap-2 rounded-xl bg-card p-2 ring-1 ring-border focus-within:ring-brand/50">
-            <span className="pl-2 font-mono text-sm text-muted-foreground">·</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError('');
-              }}
-              placeholder="password"
-              autoComplete="current-password"
-              className="flex-1 bg-transparent py-2 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
-            />
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand py-2 pl-2 pr-4 text-sm font-medium text-brand-foreground ring-1 ring-brand/50 transition hover:shadow-[0_0_30px_rgba(234,179,8,0.25)] active:scale-95 disabled:opacity-60"
+              className="w-full rounded-xl bg-navy py-3 text-sm font-semibold text-white transition-colors hover:bg-navy/90 disabled:opacity-60"
             >
-              <span className="grid size-6 place-items-center rounded bg-brand-foreground/10">→</span>
-              {busy ? 'Signing in…' : 'Enter'}
+              {busy ? 'Signing in…' : 'Continue →'}
             </button>
-          </div>
-          {error && <p className="text-left text-xs text-destructive">{error}</p>}
-        </form>
+          </form>
 
-        {/* Available accounts — click to fill username + password */}
-        <div className="mt-8 space-y-3 text-left">
-          <div>
-            <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-brand">Shoppers</p>
-            <div className="flex flex-wrap gap-2">
-              {users.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => pickHandle(a.handle)}
-                  className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-brand hover:text-brand"
-                >
-                  {a.handle}
-                  <span className="ml-1.5 text-muted-foreground/50">· {a.name.split(' ')[0]}</span>
-                </button>
-              ))}
+          {/* Available accounts — click to fill username + password */}
+          <div className="mt-8 space-y-4 text-left">
+            <div>
+              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-orange">
+                Shoppers
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {users.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => pickHandle(a.handle)}
+                    className="rounded-full border border-hairline px-3 py-1 font-mono text-[11px] text-foreground/60 transition-colors hover:border-navy hover:text-navy"
+                  >
+                    {a.handle}
+                    <span className="ml-1.5 text-foreground/40">· {a.name.split(' ')[0]}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-brand">Sellers</p>
-            <div className="flex flex-wrap gap-2">
-              {sellers.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => pickHandle(a.handle)}
-                  className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-brand hover:text-brand"
-                >
-                  {a.handle}
-                  <span className="ml-1.5 text-muted-foreground/50">· {a.name}</span>
-                </button>
-              ))}
+            <div>
+              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-orange">
+                Sellers
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {sellers.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => pickHandle(a.handle)}
+                    className="rounded-full border border-hairline px-3 py-1 font-mono text-[11px] text-foreground/60 transition-colors hover:border-navy hover:text-navy"
+                  >
+                    {a.handle}
+                    <span className="ml-1.5 text-foreground/40">· {a.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
+            <p className="pt-1 font-mono text-[10px] text-foreground/40">
+              Password for each demo account is the username + “123” (e.g. aarav / aarav123).
+            </p>
           </div>
-          <p className="pt-1 font-mono text-[10px] text-muted-foreground/60">
-            Password for each demo account is the username + “123” (e.g. aarav / aarav123).
-          </p>
         </div>
+
+        <div className="font-mono text-[10px] uppercase tracking-widest text-foreground/40">
+          © 2026 ReLoop · Operational
+        </div>
+      </div>
+
+      {/* Right: brand panel */}
+      <div className="relative hidden overflow-hidden bg-navy lg:block">
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+          }}
+        />
+        <div className="relative flex h-full flex-col justify-between p-12 text-white">
+          <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-orange">
+            <span className="size-1.5 animate-pulse rounded-full bg-orange" />
+            Live · Seattle Cluster
+          </div>
+
+          <div>
+            <h2 className="text-5xl font-bold leading-[0.95] tracking-tighter">
+              Grade at the source. <br />
+              <span className="text-orange">Decide before it moves.</span>
+            </h2>
+            <p className="mt-6 max-w-md text-white/60">
+              Last 24h, ReLoop sellers recovered{' '}
+              <span className="font-mono font-bold text-white">$2.4M</span> from inventory that
+              would have been warehoused or written off.
+            </p>
+
+            <div className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t border-white/10 pt-8">
+              <BrandStat label="Couriers" value="1,204" />
+              <BrandStat label="Routed 24h" value="8,491" />
+              <BrandStat label="Success" value="99.8%" accent />
+            </div>
+          </div>
+
+          <div className="font-mono text-[10px] uppercase tracking-widest text-white/40">
+            Amazon-native · SOC 2 Type II
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BrandStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div>
+      <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-white/40">
+        {label}
+      </div>
+      <div className={`mt-1 font-mono text-xl font-bold ${accent ? 'text-orange' : 'text-white'}`}>
+        {value}
       </div>
     </div>
   );

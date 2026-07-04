@@ -8,10 +8,10 @@ const base =
 
 const variants: Record<Variant, string> = {
   primary:
-    'bg-brand text-brand-foreground ring-1 ring-brand/50 hover:bg-brand-strong hover:shadow-[0_0_30px_rgba(234,179,8,0.25)]',
+    'bg-orange text-white hover:bg-orange-hover hover:shadow-[0_8px_24px_-6px_rgba(255,153,0,0.5)]',
   secondary:
-    'border border-border bg-transparent text-foreground hover:border-brand hover:text-brand',
-  ghost: 'bg-transparent text-muted-foreground hover:text-brand',
+    'border border-hairline bg-white text-foreground hover:border-navy hover:text-navy',
+  ghost: 'bg-transparent text-muted-foreground hover:text-orange',
 };
 
 interface ButtonProps {

@@ -124,7 +124,7 @@ export function HealthCard({
           )}
 
           {/* Timeline */}
-          <div className="mt-5 rounded-xl bg-background/60 p-4">
+          <div className="mt-5 rounded-xl bg-surface p-4">
             <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-brand">History</p>
             <ol className="relative space-y-3 pl-4">
               <span className="absolute bottom-1 left-[5px] top-1 w-px bg-border" />
