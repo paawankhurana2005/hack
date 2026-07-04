@@ -3,7 +3,10 @@
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
-    "noEmit": true
+    "noEmit": true,
+    // Timer globals (setTimeout/clearTimeout) used in pipeline.ts — DOM lib
+    // declares them without pulling in @types/node.
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src"]
 }
