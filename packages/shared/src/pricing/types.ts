@@ -99,7 +99,8 @@ export type PricingReasonCode =
   | 'save_no_purchase'
   | 'deadline_pressure'
   | 'initial_listing'
-  | 'heartbeat_staleness';
+  | 'heartbeat_staleness'
+  | 'seller_markdown';
 
 /** Demand events that can trigger a reprice. */
 export type DemandEventType =
@@ -110,7 +111,11 @@ export type DemandEventType =
   | 'dwell_threshold'
   | 'save_no_purchase'
   | 'heartbeat'
-  | 'initial_listing';
+  | 'initial_listing'
+  /** Spec 023: seller manually approves a discounted price (e.g. "slightly
+   *  damaged but resellable"). payload: { approvedPrice: number } in whole
+   *  rupees. Always significant — a deliberate seller action, never filtered. */
+  | 'seller_markdown';
 
 export type DemandEvent = {
   type: DemandEventType;

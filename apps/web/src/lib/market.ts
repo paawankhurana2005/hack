@@ -60,6 +60,15 @@ export function getShopEntries(viewerId: string | null): ShopEntry[] {
   return allEntries().filter((e) => e.sellerId !== viewerId);
 }
 
+/**
+ * Spec 023: return-sourced, hub-verified items only — the curated "Returned &
+ * Verified" page. Reuses the existing `openBox` flag (already correctly set by
+ * `fromListing` above); no new data plumbing.
+ */
+export function getReturnedShopEntries(viewerId: string | null): ShopEntry[] {
+  return getShopEntries(viewerId).filter((e) => e.openBox);
+}
+
 /** Resolve a single entry by id (no viewer filter — used by the detail page). */
 export function findShopEntry(id: string): ShopEntry | undefined {
   return allEntries().find((e) => e.id === id);

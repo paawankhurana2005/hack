@@ -1,6 +1,7 @@
 // Return flow — contracts for the 5-step return experience.
 // These are distinct from the scaffold-era GradingResult/RoutingDecision (sell flow).
 
+import type { ConditionGrade } from './common.js';
 import type { RoutingFactor } from './routing.js';
 
 export type ReturnReason =
@@ -27,6 +28,19 @@ export interface ReturnGradingResult {
 }
 
 export type Grade = 'A' | 'B' | 'C' | 'Salvage';
+
+/**
+ * Spec 023: bridges the Sell flow's ConditionGrade (new|like-new|good|fair|poor,
+ * what the trained CV grader and VlmProvider produce) onto the Return flow's
+ * Grade (A|B|C|Salvage, what the routing engine expects). The two flows never
+ * shared a grading provider before this spec.
+ */
+export function conditionGradeToReturnGrade(g: ConditionGrade): Grade {
+  if (g === 'new' || g === 'like-new') return 'A';
+  if (g === 'good') return 'B';
+  if (g === 'fair') return 'C';
+  return 'Salvage'; // poor
+}
 
 /**
  * Spec 016.1: defect vocabulary for defect-level refurb economics. Free-text
@@ -83,6 +97,11 @@ export interface ReturnRoutingDecision {
   // 3P/warehouse/return_to_seller — no Amazon-owned counterfactual to fund against.
   voucherEcoCredits?: number;
   voucherFactors?: RoutingFactor[];
+  // Spec 023: illustrative coordinates for the Intelligent Bridge map — present
+  // for local_resale|refurbish|donate|recycle|liquidate. Does NOT change any
+  // EV/economics number above; purely a visualization of the existing decision.
+  origin?: { lat: number; lng: number };
+  destination?: { lat: number; lng: number; label: string };
 }
 
 /** A single path's expected value + signed term contributions (paise). */
@@ -245,4 +264,40 @@ export interface ReturnStateTransition {
   at: string; // ISO timestamp
   evidence?: CheckpointEvidence;
   decision?: ReturnRoutingDecision; // present when this checkpoint re-routed
+}
+
+// --- Spec 022: frontend↔backend wiring --------------------------------------
+// /api/grade and /api/route both fall back to a bare `{ fallback: true,
+// decision: 'warehouse' }` shape on an unexpected server-side error — distinct
+// from (and rarer than) the engines' own graceful-degradation paths (which
+// already produce a fully-typed result with template reasoning). Callers must
+// discriminate on `'fallback' in result` before assuming the happy-path shape.
+export type ReturnGradeResponse = ReturnGradingResult | { fallback: true; decision: 'warehouse' };
+export type ReturnRouteResponse = ReturnRoutingDecision | { fallback: true; decision: 'warehouse' };
+
+// --- Spec 023: GET /api/matching/status/:returnId — previously untyped ad hoc
+// JSON in the route handler. `candidates` are illustrative geo data for the
+// seller's nearby-buyers map, derived at read-time (not stored) from BuyerDoc +
+// pincode coordinates; PII (buyer.contact) is intentionally omitted.
+export interface MatchCandidateGeo {
+  buyerId: string;
+  city: string;
+  lat: number;
+  lng: number;
+  distanceKm: number;
+  matchScore: number;
+  response: 'pending' | 'accepted' | 'declined' | 'timeout';
+}
+
+export interface MatchStatusResponse {
+  sessionId: string;
+  returnId: string;
+  status: 'searching' | 'notifying' | 'matched' | 'expired' | 'warehouse_fallback';
+  offeredPrice: number;
+  candidateCount: number;
+  currentCandidateIndex: number;
+  matchedBuyerId: string | null;
+  matchedAt: Date | string | null;
+  pickupDeadline: Date | string;
+  candidates: MatchCandidateGeo[];
 }

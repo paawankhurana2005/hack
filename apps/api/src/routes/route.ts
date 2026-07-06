@@ -7,9 +7,11 @@ import type {
   ReturnRoutingDecision,
   ReturnStateTransition,
 } from '@reloop/shared';
-import { nvidiaChat } from '../lib/nvidia-client.js';
+import { nvidiaChat } from '../services/nvidia/client.js';
+import { config } from '../config.js';
 import { MOCK_MODE } from '../lib/env.js';
 import { computeRouting } from '../lib/routing-engine.js';
+import { getReqId } from '../lib/logger.js';
 
 const TEXT_MODEL = 'meta/llama-3.1-70b-instruct';
 
@@ -50,6 +52,7 @@ async function narrateRouting(
     radiusKm: number;
     co2SavedKg: number;
   },
+  reqId: string | undefined,
 ): Promise<string> {
   const userMsg = JSON.stringify({
     decision: computed.decision,
@@ -60,7 +63,7 @@ async function narrateRouting(
     co2SavedKg: computed.co2SavedKg,
   });
 
-  return nvidiaChat({
+  return nvidiaChat(config, {
     model: TEXT_MODEL,
     messages: [
       { role: 'system', content: NARRATION_SYSTEM },
@@ -68,6 +71,7 @@ async function narrateRouting(
     ],
     maxTokens: 64,
     temperature: 0.3,
+    traceMeta: { name: 'route.narrate', reqId },
   });
 }
 
@@ -150,7 +154,7 @@ export async function routeHandler(req: Request, res: Response): Promise<void> {
       );
     } else {
       try {
-        reasoning = await narrateRouting(computed);
+        reasoning = await narrateRouting(computed, getReqId(req));
       } catch {
         reasoning = buildFallbackReasoning(
           computed.decision,
@@ -179,6 +183,8 @@ export async function routeHandler(req: Request, res: Response): Promise<void> {
       radiusKm: computed.radiusKm,
       voucherEcoCredits: computed.voucherEcoCredits,
       voucherFactors: computed.voucherFactors,
+      origin: computed.origin,
+      destination: computed.destination,
     };
 
     res.json(result);
@@ -268,6 +274,8 @@ export async function checkpointHandler(req: Request, res: Response): Promise<vo
       radiusKm: computed.radiusKm,
       voucherEcoCredits: computed.voucherEcoCredits,
       voucherFactors: computed.voucherFactors,
+      origin: computed.origin,
+      destination: computed.destination,
     };
     const transition: ReturnStateTransition = {
       from: (from as ReturnItemState) ?? 'routed',

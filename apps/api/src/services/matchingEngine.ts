@@ -181,13 +181,17 @@ function sendNotification(
   price: number,
 ): void {
   // TODO: wire to a real SMS/email/push provider (Twilio/SES/FCM). For now this
-  // is the entire "notification system" — a console log a human can read.
+  // is the entire "notification system" — a structured log line a human can read.
   const acceptLink = `https://reloop-woad.vercel.app/buyer/match/${randomUUID()}`;
-  // eslint-disable-next-line no-console
-  console.log(
-    `[notify] → ${buyer.name} (${buyer.contact} via ${buyer.notification_preference}): ` +
-      `${product.category} · Grade ${product.grade} · ₹${price} — respond at ${acceptLink}`,
-  );
+  log('info', 'buyer notified', {
+    buyerName: buyer.name,
+    contact: buyer.contact,
+    via: buyer.notification_preference,
+    category: product.category,
+    grade: product.grade,
+    price,
+    acceptLink,
+  });
 }
 
 /** Called when a seller accepts local routing. Idempotent: replaying on an

@@ -47,6 +47,15 @@ export function ActivityFeed({ events, thinking }: { events: AgentEvent[]; think
                       {meta.label}
                     </span>
                     <p className={`text-sm leading-snug ${meta.text}`}>{e.text}</p>
+                    {e.factors && e.factors.length > 0 && (
+                      <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                        {e.factors.map((f) => (
+                          <li key={f.label} className="font-mono text-[10px] text-muted-foreground">
+                            {f.label}: <span className="text-foreground">{f.value}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     {e.priceFromCents !== undefined && e.priceToCents !== undefined && (
                       <p className="mt-0.5 font-mono text-[11px] tabular-nums text-brand">
                         ₹{Math.round(e.priceFromCents / 100).toLocaleString('en-IN')} → ₹

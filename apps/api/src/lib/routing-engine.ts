@@ -20,6 +20,8 @@ import {
   tagDefects,
   type RoutingEvProfile,
 } from '@reloop/shared';
+import { getPincodeCoordinates, getRegionCluster } from './regionCluster.js';
+import { hubLocationFor, type HubDecisionType } from './hub-locations.js';
 
 export interface RoutingInputs {
   grade: ReturnGradingResult['grade'];
@@ -42,6 +44,9 @@ export interface RoutingInputs {
   customerTrust?: number;
   /** Wardrobing/photo-reuse flag — hard-blocks returnless refund. */
   wardrobingFlag?: boolean;
+  /** Spec 023: origin PIN for the Bridge map. No pincode reaches this flow yet
+   *  (mirrors the existing '560001' demo default in SellerReturnDetail.tsx). */
+  pincode?: string;
 }
 
 export interface RoutingComputed {
@@ -63,7 +68,22 @@ export interface RoutingComputed {
   // Spec 015: only set for 1P items diverted from the warehouse (Track A scope).
   voucherEcoCredits?: number;
   voucherFactors?: RoutingFactor[];
+  // Spec 023: illustrative map coordinates — see hub-locations.ts.
+  origin?: { lat: number; lng: number };
+  destination?: { lat: number; lng: number; label: string };
 }
+
+// Demo default when no real pincode reaches this flow yet — mirrors the
+// existing '560001' fallback in SellerReturnDetail.tsx.
+const DEMO_PINCODE = '560001';
+
+const MAP_DECISIONS = new Set<HubDecisionType>([
+  'local_resale',
+  'refurbish',
+  'liquidate',
+  'donate',
+  'recycle',
+]);
 
 interface MockPricing {
   residualValue: number; // rupees
@@ -91,7 +111,7 @@ const NEAREST_FC_KM = 45;
 // needed for carbon accounting (spec 015) but the return flow has no catalog
 // lookup yet. Mirrors the real category split in the return-flow mock fixtures
 // (B09 → electronics, B08 → apparel/fashion, B07 → kitchenware/home).
-function getCategory(sku: string): ItemCategory {
+export function skuToCategory(sku: string): ItemCategory {
   const prefix = sku.slice(0, 3);
   if (prefix === 'B09') return 'electronics';
   if (prefix === 'B08') return 'fashion';
@@ -123,7 +143,7 @@ export function computeRouting(inputs: RoutingInputs): RoutingComputed {
       ...(inputs.grade && inputs.grade !== 'Salvage'
         ? { gradePosterior: posteriorFromPointGrade(inputs.grade, inputs.confidence) }
         : {}),
-      category: getCategory(inputs.sku),
+      category: skuToCategory(inputs.sku),
       nearestFcKm: NEAREST_FC_KM,
       sealed: inputs.packagingSealed ?? false,
       skuActive: true, // catalog lookup in prod; mock: known SKUs stay live
@@ -143,8 +163,16 @@ export function computeRouting(inputs: RoutingInputs): RoutingComputed {
   // — see specs/015-carbon-inset-vouchers.md).
   const voucher =
     inputs.sellerType === '1P'
-      ? computeReturnVoucherCredits(getCategory(inputs.sku), r.decision, r.co2SavedKg, r.evByPath)
+      ? computeReturnVoucherCredits(skuToCategory(inputs.sku), r.decision, r.co2SavedKg, r.evByPath)
       : null;
+
+  // Spec 023: illustrative origin/destination for the Bridge map — does not
+  // feed back into any EV/economics number above.
+  const pincode = inputs.pincode ?? DEMO_PINCODE;
+  const origin = getPincodeCoordinates(pincode);
+  const destination = MAP_DECISIONS.has(r.decision as HubDecisionType)
+    ? hubLocationFor(getRegionCluster(pincode), r.decision as HubDecisionType)
+    : null;
 
   return {
     decision: r.decision,
@@ -163,5 +191,7 @@ export function computeRouting(inputs: RoutingInputs): RoutingComputed {
     warehouseDistanceKm: r.warehouseDistanceKm,
     voucherEcoCredits: voucher?.ecoCredits,
     voucherFactors: voucher?.factors,
+    origin,
+    ...(destination ? { destination } : {}),
   };
 }

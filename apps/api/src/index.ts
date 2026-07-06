@@ -10,6 +10,7 @@ import { MOCK_MODE } from './lib/env.js';
 import { requestLogger, log } from './lib/logger.js';
 import { NvidiaVlmProvider } from './services/grading/nvidia-provider.js';
 import { LocalModelProvider } from './services/grading/local-model-provider.js';
+import { FallbackVlmProvider } from './services/grading/fallback-provider.js';
 import { GradingService } from './services/grading/grading-service.js';
 import type { VlmProvider } from './services/grading/types.js';
 import { VlmReferenceComparator } from './services/grading/vlm-reference-comparator.js';
@@ -33,7 +34,7 @@ import { isMongoConfigured, getDb } from './lib/mongo.js';
 import { ensurePricingIndexes } from './lib/collections.js';
 import { scheduleDemandAggregation } from './jobs/computeDemandIndex.js';
 import { scheduleMatchingCascade } from './jobs/matchingCascade.js';
-import { gradeHandler } from './routes/grade.js';
+import { createGradeHandler } from './routes/grade.js';
 import { checkpointHandler, routeHandler } from './routes/route.js';
 import { healthCardHandler } from './routes/health-card.js';
 
@@ -85,13 +86,17 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', mockMode: MOCK_MODE });
 });
 
-// GRADER=local routes grading to OUR trained model (ml/grading/serve.py) instead of
-// the hosted VLM. Reference comparison stays on the VLM comparator (the local model's
-// embedding-diff is exposed via serve.py separately).
+// GRADING_PROVIDER=trained-local routes grading to OUR trained model
+// (ml/grading/serve.py) as primary, falling back to the NVIDIA-hosted VLM
+// automatically on error/timeout (spec 023). Reference comparison stays on the
+// VLM comparator (the local model's embedding-diff is exposed via serve.py
+// separately). GRADING_PROVIDER=chat-vlm (Render/prod) skips the trained model
+// entirely — no Flask server runs there.
+const nvidiaGradingProvider = new NvidiaVlmProvider(config);
 const gradingProvider: VlmProvider =
-  process.env.GRADER === 'local'
-    ? new LocalModelProvider(process.env.LOCAL_GRADER_URL ?? 'http://127.0.0.1:8000')
-    : new NvidiaVlmProvider(config);
+  config.GRADING_PROVIDER === 'trained-local'
+    ? new FallbackVlmProvider(new LocalModelProvider(config.GRADING_MODEL_URL), nvidiaGradingProvider)
+    : nvidiaGradingProvider;
 const gradingService = new GradingService(
   gradingProvider,
   new VlmReferenceComparator(config),
@@ -133,6 +138,7 @@ app.use('/api/return-pricing', createReturnPricingRouter());
 app.use('/api/returns', createReturnsRouter());
 app.use('/api/matching', createMatchingRouter());
 
+const gradeHandler = createGradeHandler(gradingService);
 app.post('/api/grade', (req, res) => { void gradeHandler(req, res); });
 app.post('/api/route', (req, res) => { void routeHandler(req, res); });
 app.post('/api/return/checkpoint', (req, res) => { void checkpointHandler(req, res); });

@@ -6,6 +6,7 @@
   "scripts": {
     "dev:web": "pnpm --filter @reloop/web dev",
     "dev:api": "pnpm --filter @reloop/api dev",
+    "dev:grader": "cd ml/grading && python serve.py",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "eval": "pnpm --filter @reloop/api eval",

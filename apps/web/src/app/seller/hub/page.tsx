@@ -34,6 +34,7 @@ import {
 import { getBatches, stageReturnIntoLot, type BulkBatch } from '@/lib/mocks/bulk-exchange-store';
 import { addListing } from '@/lib/listings-store';
 import { ensureAgent } from '@/lib/agent-store';
+import { createReturnHealthCard } from '@/lib/api-client';
 import { demandCurve, SKU_TO_STORE_PRODUCT } from '@/lib/demand-graph';
 import { findStoreProduct } from '@/mock/store-products';
 import { currentAccountId } from '@/lib/storage';
@@ -120,14 +121,18 @@ const round50 = (paise: number) => Math.max(5000, Math.round(paise / 5000) * 500
  * so the agent escalates back to the Bridge exactly when local resale stops
  * beating "send it up the chain".
  */
-function birthReturnListing(
+async function birthReturnListing(
   ret: SubmittedReturn,
   benchGrade: Grade,
   benchResult: ReturnType<typeof decideRoute>,
   category: ItemCategory,
-): string {
+  packagingSealed: boolean,
+  sellerApprovedPriceCents?: number,
+): Promise<string> {
   const retailCents = ret.priceCents;
-  const listedCents = round50(retailCents * LIST_FRAC[benchGrade]);
+  // Spec 023: a seller's own call on a "slightly damaged but resellable" item
+  // overrides the engine's grade-based default list price outright.
+  const listedCents = sellerApprovedPriceCents ?? round50(retailCents * LIST_FRAC[benchGrade]);
   const comparableCents = Math.round(retailCents * 0.6); // same clearing proxy the bench profile uses
   const storeProductId = ret.sku ? SKU_TO_STORE_PRODUCT[ret.sku] : undefined;
   const storeProduct = storeProductId ? findStoreProduct(storeProductId) : undefined;
@@ -142,6 +147,9 @@ function birthReturnListing(
   const floorCents = Math.max(
     Math.round(listedCents * 0.4),
     Math.min(Math.max(0, salvageEv), Math.round(listedCents * 0.85)),
+    // A seller-approved price is a floor, never just a starting point — the
+    // agent's own reprice loop must not discount below what the seller called.
+    sellerApprovedPriceCents ?? 0,
   );
 
   const dg = demandCurve({
@@ -158,6 +166,31 @@ function birthReturnListing(
   const itemId = `item_ret_${ret.returnId}`;
   const sellerId = currentAccountId();
   const driverScan = ret.transitions?.find((t) => t.to === 'pickup_verified');
+
+  // Bench verification supersedes the doorstep grade — regenerate the Health
+  // Card's narrative summary against the human-verified evidence rather than
+  // reusing the doorstep-time card. Falls back to a deterministic template so
+  // dispatch is never blocked on an LLM call; the `history` provenance below
+  // (which the API doesn't know about) is always kept regardless of outcome.
+  let cardSummary = `Doorstep-graded ${benchGrade}, physically verified at the local hub bench. ${
+    ret.gradingResult?.defects[0] ?? 'No notable defects.'
+  }`;
+  try {
+    const card = await createReturnHealthCard({
+      gradingResult: {
+        grade: benchGrade,
+        confidence: 0.98,
+        defects: ret.gradingResult?.defects ?? [],
+        authenticityMatch: ret.gradingResult?.authenticityMatch ?? true,
+        wardrobingFlag: ret.gradingResult?.wardrobingFlag ?? false,
+        functionallyVerifiable: ret.gradingResult?.functionallyVerifiable ?? true,
+        rawReason: ret.reason,
+      },
+    });
+    if (!('fallback' in card)) cardSummary = card.summary;
+  } catch {
+    // Enrichment only — the hand-built summary above is a perfectly good fallback.
+  }
 
   const listing: CasualListing = {
     id: listingId,
@@ -179,11 +212,10 @@ function birthReturnListing(
       title: ret.productName,
       grade: CONDITION_OF[benchGrade],
       confidence: 0.98, // human-verified at the bench
-      summary: `Doorstep-graded ${benchGrade}, physically verified at the local hub bench. ${
-        ret.gradingResult?.defects[0] ?? 'No notable defects.'
-      }`,
+      summary: cardSummary,
       detectedIssues: ret.gradingResult?.defects ?? [],
       authenticityVerified: ret.gradingResult?.authenticityMatch ?? true,
+      packagingSealed,
       listingPrice: money(listedCents),
       history: [
         { label: 'Graded at the doorstep', at: ret.submittedAt },
@@ -225,6 +257,11 @@ export default function HubBenchPage() {
   const [benchGrade, setBenchGrade] = useState<Grade>('A');
   const [sealIntact, setSealIntact] = useState(false);
   const [functionalPass, setFunctionalPass] = useState(true);
+  const [dispatching, setDispatching] = useState(false);
+  // Spec 023: seller's own price call for a "slightly damaged but resellable"
+  // item — seeds the listing's price/floor at birth instead of the engine's
+  // grade-based default. Empty = use the engine's suggested price.
+  const [approvedPriceInput, setApprovedPriceInput] = useState('');
 
   useEffect(() => {
     const all = getSubmittedReturns().filter((r) => r.routingDecision !== null);
@@ -243,6 +280,7 @@ export default function HubBenchPage() {
     setBenchGrade(g && g !== null ? g : 'B');
     setSealIntact(selected.gradingResult?.packagingSealed ?? false);
     setFunctionalPass(selected.gradingResult?.functionallyVerifiable ?? true);
+    setApprovedPriceInput('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
@@ -301,8 +339,9 @@ export default function HubBenchPage() {
     });
   }
 
-  function handleConfirmDispatch() {
+  async function handleConfirmDispatch() {
     if (!selected?.routingDecision || !benchResult) return;
+    setDispatching(true);
     const aiGrade = selected.gradingResult?.grade ?? null;
     const overrode = aiGrade !== benchGrade;
     const decision: ReturnRoutingDecision = {
@@ -347,7 +386,19 @@ export default function HubBenchPage() {
     // Spec 016 Stage 7: local resale doesn't end at "dispatched" — an autonomous
     // agent takes over the listing (reprice via spec-014, escalate via the Bridge).
     if (benchResult.decision === 'local_resale') {
-      birthReturnListing(selected, benchGrade, benchResult, categoryOf(selected));
+      const approvedRupees = Number(approvedPriceInput);
+      const sellerApprovedPriceCents =
+        Number.isFinite(approvedRupees) && approvedRupees > 0
+          ? Math.round(approvedRupees * 100)
+          : undefined;
+      await birthReturnListing(
+        selected,
+        benchGrade,
+        benchResult,
+        categoryOf(selected),
+        sealIntact,
+        sellerApprovedPriceCents,
+      );
     }
     // Spec 016.1: liquidate-bound items join the open hub pallet for their
     // category — the lot engine re-prices the pallet and re-runs ship-vs-wait
@@ -359,6 +410,7 @@ export default function HubBenchPage() {
       );
       linkLot(selected.returnId, lot.id);
     }
+    setDispatching(false);
     refresh();
   }
 
@@ -604,6 +656,28 @@ export default function HubBenchPage() {
                   </label>
                 </div>
 
+                {benchResult.decision === 'local_resale' && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Approve a list price (₹, optional)
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="decimal"
+                      value={approvedPriceInput}
+                      onChange={(e) => setApprovedPriceInput(e.target.value)}
+                      placeholder={`engine suggests ${Math.round(
+                        round50(selected.priceCents * LIST_FRAC[benchGrade]) / 100,
+                      )}`}
+                      className="w-40 rounded-full bg-secondary px-3 py-1 text-sm text-foreground ring-1 ring-border focus:outline-none focus:ring-brand/50"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      For a "slightly damaged but resellable" item — becomes the list price and floor.
+                    </span>
+                  </div>
+                )}
+
                 {/* Live re-evaluation preview */}
                 <div
                   className={`mt-4 rounded-xl p-3 ring-1 ${
@@ -646,10 +720,11 @@ export default function HubBenchPage() {
 
                 <button
                   type="button"
-                  onClick={handleConfirmDispatch}
-                  className="mt-4 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground transition-opacity hover:opacity-90"
+                  disabled={dispatching}
+                  onClick={() => void handleConfirmDispatch()}
+                  className="mt-4 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  Confirm &amp; dispatch
+                  {dispatching ? 'Dispatching…' : 'Confirm & dispatch'}
                 </button>
               </div>
             )}

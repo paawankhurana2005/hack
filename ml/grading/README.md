@@ -63,6 +63,27 @@ python -m reloop_grading.train --config configs/default.yaml \
 python -m reloop_grading.evaluate --checkpoint runs/grading/grading_model.pt
 ```
 
+## Serving (spec 023 — wired into apps/api)
+`serve.py` puts a trained checkpoint behind a tiny Flask server matching the
+exact `VlmAssessment` contract `apps/api`'s `VlmProvider` expects — this is
+what both the Sell and Return flows call for grading when `GRADING_PROVIDER`
+is not overridden away from its `trained-local` default.
+
+```bash
+# from repo root
+pnpm dev:grader   # shells into ml/grading && python serve.py
+# or directly:
+cd ml/grading && GRADING_CKPT=~/Downloads/grading_model.pt python serve.py
+```
+
+Requires a one-time `pip install -r requirements.txt` in this directory —
+pnpm does not manage the Python environment. `apps/api` points at
+`GRADING_MODEL_URL` (default `http://127.0.0.1:8000`) and automatically falls
+back to the NVIDIA-hosted VLM if this server is slow or unreachable (see
+`apps/api/src/services/grading/fallback-provider.ts`). Render/production sets
+`GRADING_PROVIDER=chat-vlm` in its dashboard env, since nothing deploys this
+Flask server there today.
+
 ## Tests
 ```bash
 python tests/test_schema.py          # torch-free contract tests

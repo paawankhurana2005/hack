@@ -26,6 +26,12 @@ export interface ProductHealthCard {
   summary: string;
   detectedIssues: string[];
   authenticityVerified: boolean;
+  /**
+   * Spec 023: set for return-sourced items (undefined for fresh Sell-flow
+   * items, which always ship their original packaging). false surfaces a
+   * "packaging not included" badge on the marketplace card.
+   */
+  packagingSealed?: boolean;
   /** Recommended resale price carried onto the card. */
   listingPrice?: Money;
   history: HealthCardEvent[];

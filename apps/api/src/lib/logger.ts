@@ -17,6 +17,12 @@ export function log(level: Level, msg: string, fields: Record<string, unknown> =
   else console.log(line);
 }
 
+/** Read the request id `requestLogger` attached, for correlating a handler's
+ *  own log lines with its access-log entry. */
+export function getReqId(req: Request): string | undefined {
+  return (req as Request & { reqId?: string }).reqId;
+}
+
 /** Express middleware: tag each request with an id and log method/path/status/ms. */
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const headerId = req.headers['x-request-id'];

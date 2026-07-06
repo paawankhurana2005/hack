@@ -1,34 +1,36 @@
 #!/usr/bin/env python3
-"""Generate the ReLoop Return-Pipeline technical deck (Amazon-native styling).
+"""Generate the ReLoop deck — plain-language, intuitive walkthrough of the idea.
 
 Run:  python3 deck/build_deck.py
 Out:  deck/ReLoop-Return-Pipeline.pptx
+
+Voice: explain it to a smart friend. No jargon left unexplained. Follow one
+returned item through the whole story.
 """
 from pptx import Presentation
-from pptx.util import Inches, Pt, Emu
+from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.oxml.ns import qn
 
 # --- Amazon-native design tokens ------------------------------------------------
-INK      = RGBColor(0x13, 0x1A, 0x22)  # deep squid ink (backgrounds)
-NAVY     = RGBColor(0x23, 0x2F, 0x3E)  # Amazon navy (surfaces)
-PANEL    = RGBColor(0x2C, 0x3A, 0x4B)  # raised panel
-PANEL2   = RGBColor(0x37, 0x47, 0x57)  # lighter panel / table header
-ORANGE   = RGBColor(0xFF, 0x99, 0x00)  # Amazon orange (accent)
-ORANGE_D = RGBColor(0xEC, 0x72, 0x11)  # darker orange
+INK      = RGBColor(0x13, 0x1A, 0x22)
+NAVY     = RGBColor(0x23, 0x2F, 0x3E)
+PANEL    = RGBColor(0x2C, 0x3A, 0x4B)
+PANEL2   = RGBColor(0x37, 0x47, 0x57)
+ORANGE   = RGBColor(0xFF, 0x99, 0x00)
+ORANGE_D = RGBColor(0xEC, 0x72, 0x11)
 WHITE    = RGBColor(0xFF, 0xFF, 0xFF)
-FOG      = RGBColor(0xD5, 0xDB, 0xDB)  # body text
-MUTED    = RGBColor(0x9B, 0xA7, 0xB0)  # captions
-GREEN    = RGBColor(0x2E, 0xC4, 0x8D)  # savings / positive
-RED      = RGBColor(0xF2, 0x6D, 0x6D)  # cost / negative
-CODEBG   = RGBColor(0x0C, 0x12, 0x18)  # terminal panel
-CODEFG   = RGBColor(0xCF, 0xE8, 0xD6)  # terminal text
+FOG      = RGBColor(0xD5, 0xDB, 0xDB)
+MUTED    = RGBColor(0x9B, 0xA7, 0xB0)
+GREEN    = RGBColor(0x2E, 0xC4, 0x8D)
+RED      = RGBColor(0xF2, 0x6D, 0x6D)
+CODEBG   = RGBColor(0x0C, 0x12, 0x18)
+CODEFG   = RGBColor(0xCF, 0xE8, 0xD6)
 CYAN     = RGBColor(0x5D, 0xC8, 0xE8)
 
-FONT   = "Arial"
-MONO   = "Consolas"
+FONT = "Arial"
+MONO = "Consolas"
 
 EMU_W, EMU_H = Inches(13.333), Inches(7.5)
 
@@ -56,16 +58,13 @@ def rect(s, x, y, w, h, color, line=None, line_w=1.0, radius=False):
     if line is not None:
         shp.line.color.rgb = line; shp.line.width = Pt(line_w)
     if radius:
-        try:
-            shp.adjustments[0] = 0.06
-        except Exception:
-            pass
+        try: shp.adjustments[0] = 0.06
+        except Exception: pass
     shp.shadow.inherit = False
     return shp
 
 def txt(s, x, y, w, h, runs, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
         space_after=4, line_spacing=1.05, wrap=True):
-    """runs: list of paragraphs; each paragraph is list of (text, size, color, bold, font, italic)."""
     tb = s.shapes.add_textbox(x, y, w, h)
     tf = tb.text_frame
     tf.word_wrap = wrap
@@ -84,36 +83,45 @@ def txt(s, x, y, w, h, runs, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
             r.font.bold = bold; r.font.name = font; r.font.italic = italic
     return tb
 
-def R(t, size=14, color=FOG, bold=False, font=FONT, italic=False):
+def Rn(t, size=14, color=FOG, bold=False, font=FONT, italic=False):
     return (t, size, color, bold, font, italic)
 
 def kicker(s, text):
-    txt(s, Inches(0.7), Inches(0.42), Inches(11), Inches(0.4),
-        [[R(text.upper(), 12.5, ORANGE, True, FONT)]])
-
-def title(s, text, y=0.72, size=30, w=12.0):
-    txt(s, Inches(0.7), Inches(y), Inches(w), Inches(1.0),
-        [[R(text, size, WHITE, True, FONT)]], line_spacing=1.0)
+    txt(s, Inches(0.7), Inches(0.42), Inches(11.5), Inches(0.4),
+        [[Rn(text.upper(), 12.5, ORANGE, True, FONT)]])
 
 def accent_bar(s, x=0.7, y=0.34, w=0.55):
     rect(s, Inches(x), Inches(y), Inches(w), Inches(0.06), ORANGE)
 
-def footer(s, n, tag):
-    txt(s, Inches(0.7), Inches(7.08), Inches(8), Inches(0.3),
-        [[R("ReLoop", 9, ORANGE, True), R("  ·  the intelligence layer for Amazon's returns pipeline", 9, MUTED, False)]])
-    txt(s, Inches(11.5), Inches(7.08), Inches(1.2), Inches(0.3),
-        [[R(tag + "   " + str(n).zfill(2), 9, MUTED, False)]], align=PP_ALIGN.RIGHT)
+def title(s, text, y=0.72, size=30, w=12.2):
+    txt(s, Inches(0.7), Inches(y), Inches(w), Inches(1.1),
+        [[Rn(text, size, WHITE, True, FONT)]], line_spacing=1.0)
 
-def code_panel(s, x, y, w, h, lines, title_txt=None, fs=10.5):
+def footer(s, n):
+    txt(s, Inches(0.7), Inches(7.08), Inches(9), Inches(0.3),
+        [[Rn("ReLoop", 9, ORANGE, True), Rn("  ·  grade at the doorstep, decide before the item moves", 9, MUTED, False)]])
+    txt(s, Inches(11.9), Inches(7.08), Inches(0.9), Inches(0.3),
+        [[Rn(str(n).zfill(2), 9, MUTED, False)]], align=PP_ALIGN.RIGHT)
+
+def bullets(s, x, y, w, h, items, fs=15, gap=9, lead=ORANGE, headcolor=WHITE):
+    paras = []
+    for it in items:
+        if isinstance(it, tuple):
+            head, rest = it
+            paras.append([Rn("•  ", fs, lead, True), Rn(head, fs, headcolor, True), Rn(rest, fs, FOG, False)])
+        else:
+            paras.append([Rn("•  ", fs, lead, True), Rn(it, fs, FOG, False)])
+    txt(s, x, y, w, h, paras, space_after=gap, line_spacing=1.12)
+
+def code_panel(s, x, y, w, h, lines, title_txt=None, fs=11):
     rect(s, x, y, w, h, CODEBG, line=PANEL2, line_w=1.0, radius=True)
-    # traffic dots + title
     dy = y + Inches(0.12)
     for i, c in enumerate((RED, ORANGE, GREEN)):
         d = s.shapes.add_shape(MSO_SHAPE.OVAL, x + Inches(0.18 + i*0.22), dy, Inches(0.11), Inches(0.11))
         _set_fill(d, c); d.shadow.inherit = False
     if title_txt:
         txt(s, x + Inches(1.0), dy - Inches(0.02), w - Inches(1.2), Inches(0.24),
-            [[R(title_txt, 9.5, MUTED, False, MONO)]])
+            [[Rn(title_txt, 9.5, MUTED, False, MONO)]])
     body_y = y + Inches(0.42)
     tb = s.shapes.add_textbox(x + Inches(0.22), body_y, w - Inches(0.44), h - Inches(0.55))
     tf = tb.text_frame; tf.word_wrap = True
@@ -126,37 +134,15 @@ def code_panel(s, x, y, w, h, lines, title_txt=None, fs=10.5):
     return tb
 
 def screenshot_ph(s, x, y, w, h, cmd, caption):
-    box = rect(s, x, y, w, h, NAVY, line=ORANGE, line_w=1.5, radius=True)
-    # dashed look via a label
+    rect(s, x, y, w, h, NAVY, line=ORANGE, line_w=1.5, radius=True)
     txt(s, x, y + Inches(0.28), w, Inches(0.4),
-        [[R("📸  PASTE SCREENSHOT HERE", 13, ORANGE, True, FONT)]], align=PP_ALIGN.CENTER)
-    txt(s, x + Inches(0.3), y + Inches(0.78), w - Inches(0.6), Inches(0.5),
-        [[R("Run:  ", 11, MUTED, True, FONT), R(cmd, 11, CODEFG, False, MONO)]], align=PP_ALIGN.CENTER)
-    txt(s, x + Inches(0.3), y + h - Inches(0.62), w - Inches(0.6), Inches(0.5),
-        [[R(caption, 10.5, FOG, False, FONT, True)]], align=PP_ALIGN.CENTER)
+        [[Rn("📸  PASTE SCREENSHOT HERE", 13, ORANGE, True, FONT)]], align=PP_ALIGN.CENTER)
+    txt(s, x + Inches(0.3), y + Inches(0.82), w - Inches(0.6), Inches(0.5),
+        [[Rn("Run:  ", 11, MUTED, True, FONT), Rn(cmd, 11, CODEFG, False, MONO)]], align=PP_ALIGN.CENTER)
+    txt(s, x + Inches(0.3), y + h - Inches(0.66), w - Inches(0.6), Inches(0.5),
+        [[Rn(caption, 10.5, FOG, False, FONT, True)]], align=PP_ALIGN.CENTER)
 
-def chip(s, x, y, text, w=None, color=PANEL2, tcolor=FOG):
-    w = w or Inches(1.7)
-    c = rect(s, x, y, w, Inches(0.42), color, radius=True)
-    tf = c.text_frame; tf.word_wrap = False
-    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-    p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
-    r = p.add_run(); r.text = text; r.font.size = Pt(11); r.font.color.rgb = tcolor
-    r.font.bold = True; r.font.name = FONT
-    return c
-
-def bullets(s, x, y, w, h, items, fs=14.5, gap=7, lead=ORANGE):
-    paras = []
-    for it in items:
-        if isinstance(it, tuple):
-            head, rest = it
-            paras.append([R("▸  ", fs, lead, True), R(head, fs, WHITE, True), R(rest, fs, FOG, False)])
-        else:
-            paras.append([R("▸  ", fs, lead, True), R(it, fs, FOG, False)])
-    txt(s, x, y, w, h, paras, space_after=gap, line_spacing=1.08)
-
-def simple_table(s, x, y, w, rows, col_w, header=True, fs=11.5, row_h=0.42, header_color=ORANGE_D):
-    """rows: list of list[str]. col_w: list of Inches fractions summing to w."""
+def simple_table(s, x, y, rows, col_w, header=True, fs=12, row_h=0.5, header_color=ORANGE_D):
     cy = y
     for ri, row in enumerate(rows):
         cx = x
@@ -167,717 +153,508 @@ def simple_table(s, x, y, w, rows, col_w, header=True, fs=11.5, row_h=0.42, head
             cellbox = rect(s, cx, cy, cwi, rh, bg)
             tf = cellbox.text_frame; tf.word_wrap = True
             tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-            tf.margin_left = Pt(6); tf.margin_right = Pt(5)
+            tf.margin_left = Pt(8); tf.margin_right = Pt(6)
             tf.margin_top = Pt(1); tf.margin_bottom = Pt(1)
             p = tf.paragraphs[0]; p.alignment = PP_ALIGN.LEFT
             r = p.add_run(); r.text = cell
-            r.font.name = FONT
-            r.font.size = Pt(fs if not (header and ri==0) else fs)
+            r.font.name = FONT; r.font.size = Pt(fs)
             r.font.bold = (header and ri == 0)
             r.font.color.rgb = WHITE if (header and ri == 0) else FOG
             cx += cwi
         cy += rh
     return cy
 
+def step_card(s, x, y, w, h, num, head, body, numcolor=ORANGE):
+    rect(s, x, y, w, h, PANEL, radius=True)
+    circ = s.shapes.add_shape(MSO_SHAPE.OVAL, x + Inches(0.25), y + Inches(0.25), Inches(0.6), Inches(0.6))
+    _set_fill(circ, numcolor); circ.shadow.inherit = False
+    tf = circ.text_frame; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
+    r = p.add_run(); r.text = num; r.font.size = Pt(22); r.font.bold = True; r.font.color.rgb = INK; r.font.name = FONT
+    txt(s, x + Inches(0.25), y + Inches(1.0), w - Inches(0.5), Inches(0.5),
+        [[Rn(head, 17, WHITE, True)]])
+    txt(s, x + Inches(0.25), y + Inches(1.5), w - Inches(0.5), h - Inches(1.7),
+        [[Rn(body, 13, FOG)]], line_spacing=1.16)
+
 
 # ================================================================================
-# SLIDE 1 — Title
+# 1 — Title
 # ================================================================================
 s = slide(INK)
 rect(s, 0, 0, EMU_W, Inches(0.14), ORANGE)
 rect(s, 0, Inches(7.36), EMU_W, Inches(0.14), ORANGE)
 txt(s, Inches(0.9), Inches(1.55), Inches(11.5), Inches(0.5),
-    [[R("AMAZON HACKATHON  ·  RETURN PIPELINE", 14, ORANGE, True)]])
-txt(s, Inches(0.9), Inches(2.15), Inches(11.6), Inches(1.6),
-    [[R("ReLoop", 62, WHITE, True)]], line_spacing=1.0)
-txt(s, Inches(0.9), Inches(3.35), Inches(11.6), Inches(1.2),
-    [[R("The intelligence layer for Amazon's returns pipeline.", 26, FOG, False)],
-     [R("Grade at the doorstep — decide the item's best next life ", 26, FOG, False),
-      R("before it moves.", 26, ORANGE, True)]], line_spacing=1.12, space_after=2)
-txt(s, Inches(0.9), Inches(5.5), Inches(11), Inches(0.6),
-    [[R("“The landfill is a design flaw.”", 18, MUTED, False, FONT, True)]])
-txt(s, Inches(0.9), Inches(6.35), Inches(11.5), Inches(0.5),
-    [[R("Deterministic glass-box routing engine  ·  our own DINOv2 grader  ·  Product Health Card  ·  live at ", 12, MUTED, False),
-      R("reloop-woad.vercel.app", 12, CYAN, True)]])
+    [[Rn("AMAZON HACKATHON  ·  THE RETURNS PROBLEM", 14, ORANGE, True)]])
+txt(s, Inches(0.9), Inches(2.15), Inches(11.6), Inches(1.4),
+    [[Rn("ReLoop", 62, WHITE, True)]], line_spacing=1.0)
+txt(s, Inches(0.9), Inches(3.4), Inches(11.7), Inches(1.6),
+    [[Rn("When you return something, we figure out its ", 27, FOG, False),
+      Rn("best next home", 27, ORANGE, True),
+      Rn(" right at your front door — ", 27, FOG, False),
+      Rn("before", 27, ORANGE, True),
+      Rn(" it travels anywhere.", 27, FOG, False)]], line_spacing=1.16)
+txt(s, Inches(0.9), Inches(5.7), Inches(11), Inches(0.6),
+    [[Rn("The smart layer that sits on top of Amazon's returns — so far less gets wasted.", 17, MUTED, False, FONT, True)]])
+txt(s, Inches(0.9), Inches(6.45), Inches(11.5), Inches(0.5),
+    [[Rn("Live demo:  ", 12, MUTED, False), Rn("reloop-woad.vercel.app", 12, CYAN, True)]])
 
 # ================================================================================
-# SLIDE 2 — The problem: Amazon's returns machine today
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "The problem")
-title(s, "Amazon already resells returns — but decides at the worst moment")
-txt(s, Inches(0.7), Inches(1.7), Inches(12), Inches(0.7),
-    [[R("Renewed · Resale · Grade-and-Resell all grade ", 15, FOG, False),
-      R("AFTER", 15, ORANGE, True),
-      R(" the linehaul. Every leg is spent, weeks of value decay — ", 15, FOG, False),
-      R("then", 15, ORANGE, True),
-      R(" anyone decides what the item is worth.", 15, FOG, False)]], line_spacing=1.1)
-
-rows = [
-    ["Leg (today's journey)", "Cost / dwell accrued", "ReLoop's effect"],
-    ["1  Click Return → label issued", "—", "Grades HERE, routes before anything moves"],
-    ["2  Pickup → delivery station", "Last-mile (spent either way)", "Driver checkpoint rides along free; local items STOP here"],
-    ["3  Station → sortation center", "First avoidable leg", "DELETED for local routes"],
-    ["4  Sortation → RLC linehaul", "The big 580 km freight leg", "DELETED for local routes"],
-    ["5  RLC queue → inspection", "Days-to-weeks of dwell = decay", "Replaced by a 10-min hub bench in-city"],
-    ["6  Manual grade → disposition", "Decision made LAST, costs sunk", "Made FIRST (stage 0–3), re-checked at checkpoints"],
-    ["7  Execute (often a 2nd linehaul)", "Another leg", "Restock → nearest FC; pallets batch at the hub"],
-]
-cw = [Inches(3.9), Inches(3.5), Inches(4.5)]
-simple_table(s, Inches(0.7), Inches(2.5), Inches(11.9), rows, cw, fs=10.5, row_h=0.475)
-txt(s, Inches(0.7), Inches(6.55), Inches(12), Inches(0.5),
-    [[R("Net today: ", 13, ORANGE, True), R("5–7 touches · 2–6 weeks · only ", 13, FOG),
-      R("10–20% ever restocked", 13, WHITE, True),
-      R(". Every leg from #3 on is avoidable — if the decision exists before leg #3.", 13, FOG)]])
-footer(s, 2, "PROBLEM")
-
-# ================================================================================
-# SLIDE 3 — The insight
+# 2 — What happens when you return something?
 # ================================================================================
 s = slide()
-accent_bar(s); kicker(s, "The insight")
-title(s, "Information-timing arbitrage")
-txt(s, Inches(0.7), Inches(1.75), Inches(11.9), Inches(1.0),
-    [[R("Information only has value if it changes a decision before money is spent.", 20, WHITE, True, FONT, True)]],
-    line_spacing=1.1)
-txt(s, Inches(0.7), Inches(2.75), Inches(11.9), Inches(1.1),
-    [[R("Use ", 15, FOG), R("noisier information (doorstep photos)", 15, ORANGE, True),
-      R(" at the moment of maximum leverage, instead of ", 15, FOG),
-      R("perfect information (physical inspection)", 15, CYAN, True),
-      R(" after every cost is already sunk. Inspection still happens — it just moves to the cheapest node that precedes irreversibility.", 15, FOG)]],
-    line_spacing=1.15)
-
-# two panels
-p1 = rect(s, Inches(0.7), Inches(4.1), Inches(5.75), Inches(2.5), PANEL, radius=True)
-txt(s, Inches(1.0), Inches(4.32), Inches(5.2), Inches(0.4), [[R("WHY RETURN, NOT TRADE-IN", 12.5, ORANGE, True)]])
-bullets(s, Inches(1.0), Inches(4.85), Inches(5.25), Inches(1.7), [
-    ("Trade-In: ", "destination is fixed (Amazon's facility) whatever the grade — doorstep AI changes nothing physical. Pure cost."),
-    ("Return: ", "the destination IS the decision. Doorstep AI changes where the item physically goes."),
-], fs=12.5, gap=6)
-
-p2 = rect(s, Inches(6.85), Inches(4.1), Inches(5.75), Inches(2.5), PANEL, radius=True)
-txt(s, Inches(7.15), Inches(4.32), Inches(5.2), Inches(0.4), [[R("BOUNDED DOWNSIDE BY DESIGN", 12.5, ORANGE, True)]])
-bullets(s, Inches(7.15), Inches(4.85), Inches(5.25), Inches(1.7), [
-    "Every wrong local decision degrades to “send it up the chain” — what happens to 100% of items today.",
-    ("The bar: ", "P(correct)·savings > P(wrong)·correction. Correction = a shelf move at a hub, not a lost item."),
-], fs=12.5, gap=6)
-footer(s, 3, "INSIGHT")
-
-# ================================================================================
-# SLIDE 4 — Thesis
-# ================================================================================
-s = slide(NAVY)
-accent_bar(s); kicker(s, "The thesis")
-title(s, "Grade at the source. Decide before the item moves.")
-txt(s, Inches(0.7), Inches(1.85), Inches(11.9), Inches(0.9),
-    [[R("Amazon's current workflow is the engine's ", 17, FOG),
-      R("fallback", 17, ORANGE, True),
-      R(", not its competitor. We are the missing front end of programs Amazon already runs.", 17, FOG)]],
-    line_spacing=1.15)
-# three big stat cards
-cards = [
-    ("Decide FIRST", "The route is chosen at stage 0–3 — at the doorstep — then re-checked at two physical checkpoints while redirect is still cheap."),
-    ("Delete the legs", "Locally-routed items stop at the in-city delivery station. Zero new transport legs added; sortation + 580 km linehaul deleted."),
-    ("Glass-box engine", "One deterministic expected-value optimizer. Logic decides, the LLM only narrates. Every destroy has a replayable reason."),
+accent_bar(s); kicker(s, "Start with something familiar")
+title(s, "What actually happens after you click “Return”?")
+txt(s, Inches(0.7), Inches(1.7), Inches(11.9), Inches(0.65),
+    [[Rn("You hand the package back and forget about it. Behind the scenes, it goes on a surprisingly long trip:", 15.5, FOG)]])
+journey = [
+    ("Picked up", "a driver collects it from your door"),
+    ("Local depot", "it stops at a nearby station — just passing through"),
+    ("Sorting center", "trucked to a bigger hub to be batched up"),
+    ("Returns center", "hauled hundreds of km away — often 500km+"),
+    ("Waits in line", "sits for days or weeks before anyone looks at it"),
+    ("Finally graded", "only NOW does a person decide what it's worth"),
 ]
-x = Inches(0.7)
-for i, (h, b) in enumerate(cards):
-    cx = Inches(0.7 + i * 4.05)
-    rect(s, cx, Inches(3.0), Inches(3.8), Inches(3.2), PANEL, radius=True)
-    rect(s, cx, Inches(3.0), Inches(3.8), Inches(0.12), ORANGE, radius=False)
-    txt(s, cx + Inches(0.3), Inches(3.35), Inches(3.2), Inches(0.6), [[R(h, 19, WHITE, True)]])
-    txt(s, cx + Inches(0.3), Inches(4.15), Inches(3.25), Inches(2.0), [[R(b, 13.5, FOG)]], line_spacing=1.18)
-footer(s, 4, "THESIS")
-
-# ================================================================================
-# SLIDE 5 — Architecture / four pillars
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "Architecture")
-title(s, "Four pillars · ML for perception, rules for the decision")
-# pillars row
-pillars = [
-    ("AI Grading", "“the eyes”", "Our own DINOv2 grader → a grade DISTRIBUTION + defect tags. VLM narrates defects; OCR anchors identity."),
-    ("Smart Routing", "“the brain”", "Deterministic, explainable EV engine over {value, cost, demand, carbon}. Glass-box on purpose."),
-    ("Health Card", "“the trust”", "Verifiable condition, history & authenticity that travels with the item to its next owner. CARFAX for a product."),
-    ("Prevention", "“the upstream”", "Predict returns before they happen — the cheapest return is the one that never occurs."),
-]
-for i, (h, sub, b) in enumerate(pillars):
-    cx = Inches(0.7 + i * 3.02)
-    rect(s, cx, Inches(1.75), Inches(2.82), Inches(2.55), PANEL, radius=True)
-    txt(s, cx + Inches(0.22), Inches(1.95), Inches(2.5), Inches(0.4), [[R(h, 16, ORANGE, True)]])
-    txt(s, cx + Inches(0.22), Inches(2.35), Inches(2.5), Inches(0.32), [[R(sub, 11.5, MUTED, False, FONT, True)]])
-    txt(s, cx + Inches(0.22), Inches(2.78), Inches(2.45), Inches(1.5), [[R(b, 11.5, FOG)]], line_spacing=1.14)
-
-# stack diagram
-txt(s, Inches(0.7), Inches(4.55), Inches(12), Inches(0.35), [[R("THE STACK — pnpm monorepo, strict TypeScript, no  any", 12.5, ORANGE, True)]])
-stack = [
-    ("apps/web", "Next.js App Router + Tailwind — Return flow, Hub Bench, Shop, seller dashboard", CYAN),
-    ("apps/api", "Node + Express — grading, /api/route + /api/return/checkpoint, pricing, matching cron", GREEN),
-    ("packages/shared", "Single source of truth for data contracts: routing-ev.ts, liquidation-lot.ts, return.ts", ORANGE),
-    ("ml/", "DINOv2 grader (perception) · XGBoost + Thompson-bandit pricing (spec 014) · return-risk", MUTED),
-]
-yy = Inches(4.92)
-for name, desc, col in stack:
-    rect(s, Inches(0.7), yy, Inches(11.9), Inches(0.46), PANEL2, radius=True)
-    txt(s, Inches(0.9), yy + Inches(0.06), Inches(2.4), Inches(0.36), [[R(name, 12.5, col, True, MONO)]])
-    txt(s, Inches(3.4), yy + Inches(0.08), Inches(9.0), Inches(0.36), [[R(desc, 12, FOG)]])
-    yy += Inches(0.53)
-footer(s, 5, "ARCH")
-
-# ================================================================================
-# SLIDE 6 — The EV formula
-# ================================================================================
-s = slide(NAVY)
-accent_bar(s); kicker(s, "The decision engine")
-title(s, "One expected-value optimization, per returned item")
-# formula panel
-rect(s, Inches(0.7), Inches(1.72), Inches(11.9), Inches(1.95), CODEBG, line=ORANGE, line_w=1.25, radius=True)
-txt(s, Inches(1.1), Inches(1.98), Inches(11.2), Inches(0.5),
-    [[R("EV(r) = Σ", 20, WHITE, True, MONO), R("g", 12, ORANGE, True, MONO),
-      R(" P(g│evidence)·recovery(r,g)·decay(t", 20, WHITE, True, MONO), R("r", 12, ORANGE, True, MONO),
-      R(")", 20, WHITE, True, MONO)]], line_spacing=1.0, wrap=False)
-txt(s, Inches(1.1), Inches(2.62), Inches(11.2), Inches(0.5),
-    [[R("        − logistics(r) − handling(r)", 20, FOG, False, MONO)]], line_spacing=1.0, wrap=False)
-txt(s, Inches(1.1), Inches(3.08), Inches(11.2), Inches(0.5),
-    [[R("        − ", 20, FOG, False, MONO),
-      R("E[correction_cost(r)]", 20, ORANGE, True, MONO),
-      R(" − λ·CO₂(r)", 20, FOG, False, MONO)]], line_spacing=1.0, wrap=False)
-
-txt(s, Inches(0.7), Inches(3.82), Inches(11.9), Inches(0.4),
-    [[R("Choose r ∈ {restock, local_resale, refurbish, liquidate, donate, recycle, warehouse, return_to_seller, returnless_refund}", 11.5, MUTED, False, MONO)]])
-
-txt(s, Inches(0.7), Inches(4.3), Inches(12), Inches(0.35), [[R("THREE TERMS ARE THE UPGRADE OVER A NAÏVE ROUTER", 12.5, ORANGE, True)]])
-three = [
-    ("P(g│evidence) — posterior, not a point grade", "Routes differ in error-sensitivity. Restock is brutal on a wrong A; donation barely cares. Recovery is an expectation over the grade distribution."),
-    ("decay(t_r) — time is a P&L line", "Each route has an expected time-to-cash; category-specific weekly decay makes the engine SEE that weeks of returns-center dwell burn money."),
-    ("E[correction_cost(r)] — being wrong has a price", "= (posterior mass below the grade the route needs) × that route's redirect cost. This is what makes the confidence gates θ_r derived, not hand-picked."),
-]
-yy = Inches(4.66)
-for h, b in three:
-    rect(s, Inches(0.7), yy, Inches(11.9), Inches(0.7), PANEL, radius=True)
-    txt(s, Inches(0.95), yy + Inches(0.08), Inches(11.4), Inches(0.3), [[R(h, 13, WHITE, True)]])
-    txt(s, Inches(0.95), yy + Inches(0.37), Inches(11.4), Inches(0.3), [[R(b, 11.5, FOG)]])
-    yy += Inches(0.78)
-footer(s, 6, "ENGINE")
-
-# ================================================================================
-# SLIDE 7 — Hard-constraint ladder
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "Layer 1 of 2 — never optimized away")
-title(s, "The hard-constraint ladder (safety · legal · policy)")
-txt(s, Inches(0.7), Inches(1.7), Inches(11.9), Inches(0.55),
-    [[R("An ordered, first-match ladder evaluated ", 14, FOG),
-      R("before", 14, ORANGE, True),
-      R(" any EV math. It can force a path and is audited for 100% conformance every build.", 14, FOG)]])
-ladder = [
-    ["3P seller not opted in", "→ return_to_seller"],
-    ["counterfeit / not-as-described", "→ return_to_seller (policy)"],
-    ["hazmat / restricted", "→ recycle (certified disposal only)"],
-    ["wrong item", "→ warehouse (inventory reconciliation)"],
-    ["authenticity mismatch", "→ warehouse (manual verification)"],
-    ["high-value + unverified", "→ warehouse (fraud/verification gate)"],
-    ["reason ↔ grade mismatch", "→ warehouse (fraud review)"],
-    ["salvage / ungradeable", "→ recycle"],
-    ["arrived damaged", "→ recycle"],
-]
-yy = Inches(2.45)
-for i, (cond, act) in enumerate(ladder):
-    rect(s, Inches(0.7), yy, Inches(7.7), Inches(0.42), PANEL if i%2 else PANEL2, radius=True)
-    txt(s, Inches(0.9), yy + Inches(0.06), Inches(0.4), Inches(0.3), [[R(str(i+1), 12, ORANGE, True, MONO)]])
-    txt(s, Inches(1.35), yy + Inches(0.05), Inches(4.6), Inches(0.32), [[R(cond, 12, WHITE, True)]])
-    txt(s, Inches(5.5), yy + Inches(0.05), Inches(2.8), Inches(0.32), [[R(act, 11.5, GREEN)]])
-    yy += Inches(0.5)
-
-# proof panel on right
-screenshot_ph(s, Inches(8.7), Inches(2.45), Inches(3.9), Inches(2.4),
-              "pnpm eval", "Routing hard-rule conformance — forced-path accuracy 100.0% (N=8)")
-txt(s, Inches(8.7), Inches(5.05), Inches(3.9), Inches(1.6),
-    [[R("Determinism is a business requirement", 13, ORANGE, True)],
-     [R("Every destroy and every denied local route needs a replayable reason for seller disputes and ESG audits. The ladder is that record.", 12, FOG)]],
-    line_spacing=1.15, space_after=6)
-footer(s, 7, "ENGINE")
-
-# ================================================================================
-# SLIDE 8 — EV argmax + glass-box (scenario A screenshot)
-# ================================================================================
-s = slide(NAVY)
-accent_bar(s); kicker(s, "Layer 2 of 2 — argmax EV")
-title(s, "Every path priced, every term signed — glass-box")
-txt(s, Inches(0.7), Inches(1.65), Inches(6.4), Inches(0.5),
-    [[R("Sealed changed-mind electronics. The engine prices all 8 paths and picks the max. Restock wins — straight to the nearest FC, deleting the returns-center hop.", 12.5, FOG)]],
-    line_spacing=1.14)
-
-# pre-rendered EV table (real numbers) as fallback content
-ev_lines = [
-    ("decision: restock        (localMargin ₹1,952)", ORANGE),
-    ("", FOG),
-    ("restock         ₹1,956 ✓ CHOSEN", GREEN),
-    ("  Restock at full recovery      +₹2,299", CODEFG),
-    ("  Grade uncertainty discount      −₹21", RED),
-    ("  Value decay (4d to cash)        −₹26", RED),
-    ("  FC inbound 45km                 −₹90", RED),
-    ("  Receive + shelve               −₹150", RED),
-    ("  Expected correction cost        −₹55", RED),
-    ("local_resale    ₹1,952", CODEFG),
-    ("refurbish       ₹1,733  (not viable)", MUTED),
-    ("liquidate         ₹893", CODEFG),
-    ("donate            ₹182", CODEFG),
-    ("warehouse        −₹465   ← today's flow", RED),
-]
-code_panel(s, Inches(0.7), Inches(2.55), Inches(6.4), Inches(4.05), ev_lines,
-           title_txt="POST /api/route  →  evBreakdown", fs=10.5)
-
-screenshot_ph(s, Inches(7.35), Inches(2.55), Inches(5.25), Inches(2.9),
-              "curl /api/route  (Scenario A)", "The full evBreakdown JSON — every path's signed EV terms. This is the glass box.")
-txt(s, Inches(7.35), Inches(5.65), Inches(5.25), Inches(1.2),
-    [[R("Warehouse is −₹465", 13, ORANGE, True),
-      R(" — the honest 580 km freight makes today's default the worst commercial option. Every better route is pure margin.", 13, FOG)]],
-    line_spacing=1.15)
-footer(s, 8, "ENGINE")
-
-# ================================================================================
-# SLIDE 9 — Confidence gates / graceful degradation
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "Decision under uncertainty")
-title(s, "Confidence gates θ_r — graceful degradation to today's flow")
-txt(s, Inches(0.7), Inches(1.65), Inches(11.9), Inches(0.5),
-    [[R("θ_r is ", 13.5, FOG), R("derived from correction cost", 13.5, ORANGE, True),
-      R(", not arbitrary — its ordering mirrors redirect-cost ordering exactly. Low confidence collapses the eligible set toward the cheapest-to-correct path.", 13.5, FOG)]],
-    line_spacing=1.12)
-gates = [
-    ["restock", "0.85", "second return + trust (~₹700 on a ₹2.5k item)"],
-    ["local_resale", "0.60", "hub shelf move (₹40)"],
-    ["refurbish", "0.50", "wasted bench slot (₹80, pre-buyer)"],
-    ["donate", "0.30", "being wrong is nearly free"],
-    ["liquidate", "0.20", "pallet re-sort (₹15) — cheapest commercial gate"],
-    ["recycle / warehouse", "ungated", "the absolute fallback — always available"],
-]
-cw = [Inches(2.5), Inches(1.3), Inches(3.5)]
-hdr = [["Route", "θ_r", "Redirect cost (why)"]]
-simple_table(s, Inches(0.7), Inches(2.4), Inches(7.3), hdr + gates, cw, fs=11.5, row_h=0.46)
-
-screenshot_ph(s, Inches(8.3), Inches(2.4), Inches(4.3), Inches(2.7),
-              "curl /api/route  (Scenario B)", "confidence 0.35 → local_resale & refurbish GATED OUT; collapses to the liquidate pallet.")
-txt(s, Inches(8.3), Inches(5.3), Inches(4.3), Inches(1.6),
-    [[R("The money line", 13.5, ORANGE, True)],
-     [R("A wrong grade on a manifested pallet costs ~₹15 to re-sort — vs a 580 km round trip. Low confidence collapses toward the ", 12, FOG),
-      R("cheapest correction, not the most expensive one.", 12, WHITE, True)]],
-    line_spacing=1.14, space_after=6)
-txt(s, Inches(0.7), Inches(5.75), Inches(7.3), Inches(0.9),
-    [[R("gateReason", 11.5, ORANGE, True, MONO),
-      R(" is returned per path, so the UI shows a path's full EV next to WHY it was gated — the glass box never hides the road not taken.", 12.5, FOG)]],
-    line_spacing=1.14)
-footer(s, 9, "ENGINE")
-
-# ================================================================================
-# SLIDE 10 — The state machine
-# ================================================================================
-s = slide(NAVY)
-accent_bar(s); kicker(s, "The backbone")
-title(s, "A return is a lifecycle, not one decision")
-txt(s, Inches(0.7), Inches(1.6), Inches(11.9), Inches(0.5),
-    [[R("The engine re-runs at every physical checkpoint — information improves and redirect cost rises as the item moves.", 13.5, FOG)]])
-# flow of states
-flow = ["INITIATED", "EVIDENCE_CAPTURED", "ROUTED (TTL)", "PICKUP_VERIFIED", "AT_LOCAL_HUB", "HUB_VERIFIED"]
-x = Inches(0.7); yy = Inches(2.35)
-wgap = Inches(1.98)
-for i, st in enumerate(flow):
-    cx = Inches(0.7 + i*1.98)
-    c = rect(s, cx, yy, Inches(1.8), Inches(0.7), PANEL2 if i<3 else ORANGE_D, radius=True)
-    tf = c.text_frame; tf.word_wrap = True; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+x0 = 0.7
+for i, (h, b) in enumerate(journey):
+    cx = Inches(x0 + i * 2.0)
+    rect(s, cx, Inches(2.55), Inches(1.82), Inches(1.75), PANEL, radius=True)
+    circ = s.shapes.add_shape(MSO_SHAPE.OVAL, cx + Inches(0.68), Inches(2.72), Inches(0.46), Inches(0.46))
+    _set_fill(circ, ORANGE if i == 5 else PANEL2); circ.shadow.inherit = False
+    tf = circ.text_frame; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
-    r = p.add_run(); r.text = st; r.font.size = Pt(9.5); r.font.bold=True; r.font.color.rgb = WHITE; r.font.name=FONT
-    if i < len(flow)-1:
-        txt(s, cx + Inches(1.8), yy + Inches(0.16), Inches(0.2), Inches(0.4), [[R("›", 20, ORANGE, True)]])
-
-# execution states
-txt(s, Inches(0.7), Inches(3.35), Inches(12), Inches(0.3), [[R("EXECUTION (each still re-enters the engine on failure):", 12, MUTED, True)]])
-exe = ["LISTED_LOCAL→SOLD", "REFURB_QUEUE", "RESTOCK_OUTBOUND", "PALLET_STAGING", "DONATION_BATCH", "RECYCLE_BATCH", "RL_OUTBOUND (fallback)"]
-xx = Inches(0.7)
-for e in exe:
-    w = Inches(0.14 + 0.092*len(e))
-    chip(s, xx, Inches(3.72), e, w=w, color=PANEL)
-    xx += w + Inches(0.14)
-
-# two properties
-p1 = rect(s, Inches(0.7), Inches(4.55), Inches(5.85), Inches(2.0), PANEL, radius=True)
-txt(s, Inches(0.95), Inches(4.75), Inches(5.4), Inches(0.35), [[R("EVERY TRANSITION RE-INVOKES THE ENGINE", 12.5, ORANGE, True)]])
-txt(s, Inches(0.95), Inches(5.2), Inches(5.45), Inches(1.3),
-    [[R("“Demand changed while routing was planned” stops being an edge case — it's just a re-evaluation at the next checkpoint. Static fallback chains are replaced by “re-run the engine from the current state.”", 12.5, FOG)]], line_spacing=1.16)
-p2 = rect(s, Inches(6.75), Inches(4.55), Inches(5.85), Inches(2.0), PANEL, radius=True)
-txt(s, Inches(7.0), Inches(4.75), Inches(5.4), Inches(0.35), [[R("EVERY STATE HAS A COST-TO-REDIRECT", 12.5, ORANGE, True)]])
-txt(s, Inches(7.0), Inches(5.2), Inches(5.45), Inches(1.3),
-    [[R("At ROUTED it's zero. At AT_LOCAL_HUB it's a shelf move. At SOLD it's a buyer notification. The engine reasons about ", 12.5, FOG),
-      R("commitment", 12.5, WHITE, True), R(", not just value — and a decision TTL forces re-evaluation on expiry.", 12.5, FOG)]], line_spacing=1.16)
-footer(s, 10, "LIFECYCLE")
+    r = p.add_run(); r.text = str(i+1); r.font.size = Pt(15); r.font.bold = True
+    r.font.color.rgb = INK if i == 5 else WHITE; r.font.name = FONT
+    txt(s, cx + Inches(0.12), Inches(3.3), Inches(1.6), Inches(0.35),
+        [[Rn(h, 12.5, WHITE if i < 5 else ORANGE, True)]], align=PP_ALIGN.CENTER)
+    txt(s, cx + Inches(0.12), Inches(3.62), Inches(1.6), Inches(0.65),
+        [[Rn(b, 9.5, FOG)]], align=PP_ALIGN.CENTER, line_spacing=1.05)
+    if i < 5:
+        txt(s, cx + Inches(1.72), Inches(3.15), Inches(0.3), Inches(0.4), [[Rn("›", 22, ORANGE, True)]])
+rect(s, Inches(0.7), Inches(4.75), Inches(11.9), Inches(1.5), NAVY, line=ORANGE, line_w=1.25, radius=True)
+txt(s, Inches(1.0), Inches(5.0), Inches(11.3), Inches(1.1),
+    [[Rn("The catch:  ", 18, ORANGE, True),
+      Rn("the single most important decision — ", 18, WHITE, True),
+      Rn("“what should we do with this item?” — happens ", 18, FOG),
+      Rn("dead last", 18, ORANGE, True),
+      Rn(", after all the driving is already paid for and weeks of value have quietly leaked away.", 18, FOG)]],
+    line_spacing=1.2)
+footer(s, 2)
 
 # ================================================================================
-# SLIDE 11 — Checkpoints + live re-route
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "Money shot — checkpoints")
-title(s, "Two human checkpoints keep the AI honest — live re-route")
-txt(s, Inches(0.7), Inches(1.65), Inches(6.2), Inches(1.0),
-    [[R("Driver scan (30s at the door) + hub bench (10 min in-city). When the human disagrees with the AI, the ", 12.5, FOG),
-      R("same engine re-runs instantly", 12.5, ORANGE, True),
-      R(" — the wrong grade is caught before any buyer is exposed. Correction cost: one shelf move.", 12.5, FOG)]],
-    line_spacing=1.14)
-
-reroute = [
-    ("BEFORE  — doorstep, sealed grade A", MUTED),
-    ("  POST /api/route", CODEFG),
-    ("  → decision: restock   ttlHours: 24", GREEN),
-    ("", FOG),
-    ("AFTER  — hub bench: observedGrade B,", MUTED),
-    ("         seal broken → engine re-runs", MUTED),
-    ("  POST /api/return/checkpoint", CODEFG),
-    ("  → decision: local_resale", ORANGE),
-    ("  → 'Hub bench overrode grade A → B;", CODEFG),
-    ("     engine re-ran and routed to", CODEFG),
-    ("     local_resale.'", CODEFG),
-    ("  → transition: at_local_hub →", CYAN),
-    ("     hub_verified", CYAN),
-]
-code_panel(s, Inches(0.7), Inches(3.0), Inches(6.2), Inches(3.6), reroute,
-           title_txt="live re-route (Scenario D)", fs=11)
-
-screenshot_ph(s, Inches(7.15), Inches(1.7), Inches(5.45), Inches(2.75),
-              "Hub Bench → toggle seal",
-              "The decision flips restock → local_resale on screen as you break the seal.")
-rect(s, Inches(7.15), Inches(4.7), Inches(5.45), Inches(1.9), PANEL, radius=True)
-txt(s, Inches(7.4), Inches(4.9), Inches(5.0), Inches(0.35), [[R("THE FLYWHEEL — the data moat", 12.5, ORANGE, True)]])
-txt(s, Inches(7.4), Inches(5.35), Inches(5.0), Inches(1.2),
-    [[R("Every bench verdict is a free labelled training pair (photos → verified grade). Our DINOv2 grader improves as a ", 12.5, FOG),
-      R("byproduct of operations", 12.5, WHITE, True),
-      R(" — graded pallets and audited destruction are second-order wins nobody gets without grading at source.", 12.5, FOG)]],
-    line_spacing=1.15)
-footer(s, 11, "LIFECYCLE")
-
-# ================================================================================
-# SLIDE 12 — the 8 destinations
+# 3 — Why that's a huge, expensive problem
 # ================================================================================
 s = slide(NAVY)
-accent_bar(s); kicker(s, "Stage 6 — destinations")
-title(s, "Where the money is — eight routes, one engine")
-rows = [
-    ["Route", "Trigger", "vs Amazon today", "Saved / earned"],
-    ["Restock", "Sealed / verified-A + benign reason + SKU live", "Rides to RLC, dwells weeks, maybe restocks", "Straight to nearest FC; deletes hop + dwell"],
-    ["Local resale", "Grade A/B, mid-value, demand clears", "Liquidated for cents or resold weeks later", "60–80% of clearing; zero linehaul; cash in days"],
-    ["Refurbish", "Defect with positive uplift", "G&R grades at FC, no repair at source", "₹300 cable → B→A worth +₹1,500; re-enters resale"],
-    ["Liquidate", "Functional, low unit EV, or high uncertainty", "Residual after items sit at the RLC", "Manifested pallets → top of the band; FC hop gone"],
-    ["Donate", "All commercial EVs < donation credit", "Same, after full RL cost sunk", "Half handling, zero freight, CSR credit"],
-    ["Recycle", "Forced (hazmat) or materials > handling", "Same, after two truck rides", "Local certified drop; commodity + carbon credit"],
-    ["Destroy", "Legally required only", "A real % die by default", "Engine KPI is SHRINKING this — logged reason"],
-    ["Standard RL", "Low conf / fraud / opt-out (fallback)", "Identical to today", "Zero, by design — the graceful-degradation guarantee"],
+accent_bar(s); kicker(s, "Why it matters")
+title(s, "That long trip is expensive — and most items lose")
+txt(s, Inches(0.7), Inches(1.75), Inches(11.9), Inches(0.6),
+    [[Rn("Returns are enormous, and today's process wrings very little value back out of them.", 15.5, FOG)]])
+stats = [
+    ("1.2–1.5 billion", "packages returned every year"),
+    ("$40–88 billion", "what returns cost the industry, yearly"),
+    ("only 10–20%", "of returns ever make it back onto a shelf to be resold"),
+    ("the rest", "mostly sold off cheap to liquidators — or thrown away"),
 ]
-cw = [Inches(1.55), Inches(3.35), Inches(3.4), Inches(3.6)]
-simple_table(s, Inches(0.7), Inches(1.7), Inches(11.9), rows, cw, fs=10.0, row_h=0.545)
-footer(s, 12, "ROUTES")
-
-# ================================================================================
-# SLIDE 13 — Honest economics (spec 021)
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "Spec 021 — honest economics")
-title(s, "We priced the engine against real Amazon returns economics")
-txt(s, Inches(0.7), Inches(1.65), Inches(11.9), Inches(0.45),
-    [[R("Every constant is grounded in how Amazon's own machine actually prices things — no fictions.", 13.5, FOG)]])
-research = [
-    ("FBA Liquidations nets sellers 5–10% of ASP", "paid 30–90 days out; Amazon sells to liquidators at 20–30¢ on the retail dollar."),
-    ("~$27 to process a $100 return", "restock + shipping + inspection labor — for cheap items this exceeds every recovery path."),
-    ("Returns fraud runs 9–15%", "so any refund-without-return lever must hard-gate on trust + fraud, never on value alone."),
-    ("Manifested pallets clear materially higher", "than mystery lots — the exact premium a Health-Card manifest earns."),
-]
-yy = Inches(2.35)
-for h, b in research:
-    rect(s, Inches(0.7), yy, Inches(5.85), Inches(1.0), PANEL, radius=True)
-    txt(s, Inches(0.95), yy + Inches(0.12), Inches(5.4), Inches(0.4), [[R(h, 12.5, ORANGE, True)]])
-    txt(s, Inches(0.95), yy + Inches(0.5), Inches(5.4), Inches(0.45), [[R(b, 11, FOG)]], line_spacing=1.1)
-    yy += Inches(1.08)
-
-txt(s, Inches(6.8), Inches(2.3), Inches(5.8), Inches(0.35), [[R("WHAT CHANGED IN THE ENGINE", 12.5, ORANGE, True)]])
-bullets(s, Inches(6.8), Inches(2.75), Inches(5.8), Inches(4.0), [
-    ("Warehouse repriced: ", "the flat 60%-recovery fiction is gone. Now a mixture — 15%×85% restock-after-inspection + 85%×20% FC liquidation, then 21-day dwell decay."),
-    ("liquidate is first-class: ", "a Health-Card-manifested hub pallet with its own lot engine (next slide)."),
-    ("E[correction_cost] built: ", "the EV term that was documented but never implemented — now real and visible."),
-    ("Defect-level refurb: ", "a DEFECT_REPAIR_TABLE (tag → repair ₹ + grade delta) replaces grade-level fractions."),
-    ("returnless_refund: ", "when every movement path loses money and trust/fraud/value gates pass — refund, keep the item."),
-], fs=12, gap=8)
-footer(s, 13, "ECONOMICS")
-
-# ================================================================================
-# SLIDE 14 — Liquidation lot engine
-# ================================================================================
-s = slide(NAVY)
-accent_bar(s); kicker(s, "Liquidation lot engine")
-title(s, "Manifested pallets: a real secondary-market auction")
-txt(s, Inches(0.7), Inches(1.6), Inches(6.1), Inches(1.15),
-    [[R("Deterministic, glass-box like routing. A pallet = a grade histogram + a manifest. Per-buyer bid curves (refurbisher, wholesaler, NGO, fashion) auction it; the Health-Card manifest premium is what grading-at-source earns. A closed-form ship-vs-wait breakeven decides pickup timing.", 12.5, FOG)]],
-    line_spacing=1.16)
-lot = [
-    ("Pallet: 30 electronics · avg ₹2,400 · 90% manifest", MUTED),
-    ("Winning buyer:  refurbisher", ORANGE),
-    ("  gross            ₹31,877", CODEFG),
-    ("  Amazon take 10%   ₹3,188", RED),
-    ("  seller proceeds  ₹28,689", GREEN),
-    ("  14× grade B @ 34%  +₹11,424", CODEFG),
-    ("  Manifest premium   +₹9,893", GREEN),
-    ("2nd-best (auto re-match): wholesaler ₹23,803", CODEFG),
-    ("", FOG),
-    ("Manifested (90%):  ₹28,689", GREEN),
-    ("Mystery lot (0%):  ₹19,786", RED),
-    ("Premium earned:    ₹8,904  (+45%)", ORANGE),
-    ("", FOG),
-    ("ship-vs-wait  n* = ceil(sqrt(F·λ/(δ·v)))", CYAN),
-    ("  40/40 → shipNow=true (pallet full)", CODEFG),
-]
-code_panel(s, Inches(0.7), Inches(2.85), Inches(6.1), Inches(3.8), lot,
-           title_txt="tsx src/scripts/lot-trace.ts", fs=10)
-
-screenshot_ph(s, Inches(7.05), Inches(1.6), Inches(5.55), Inches(2.5),
-              "tsx src/scripts/lot-trace.ts",
-              "The pallet buyer auction + the +45% manifest premium + ship-vs-wait verdict.")
-rect(s, Inches(7.05), Inches(4.35), Inches(5.55), Inches(2.3), PANEL, radius=True)
-txt(s, Inches(7.3), Inches(4.55), Inches(5.1), Inches(0.35), [[R("WHY THIS IS A MOAT", 12.5, ORANGE, True)]])
-bullets(s, Inches(7.3), Inches(5.0), Inches(5.1), Inches(1.6), [
-    "A returns center can't reprice a queue. We turn a mystery lot into a graded, transparent pallet a buyer can inspect.",
-    ("+45% recovery ", "on the same physical units, purely from the manifest the doorstep grade already produced."),
-], fs=11.5, gap=6)
-footer(s, 14, "ECONOMICS")
-
-# ================================================================================
-# SLIDE 15 — Returnless refund
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "The best route is no route")
-title(s, "Returnless refund — hard-gated, deterministic")
-txt(s, Inches(0.7), Inches(1.65), Inches(11.9), Inches(0.85),
-    [[R("Amazon's real lever, decided by math instead of ad hoc. When ", 13.5, FOG),
-      R("every movement path has negative EV", 13.5, ORANGE, True),
-      R(" and all gates pass, refund and let the customer keep the item — zero legs, zero handling, zero carbon.", 13.5, FOG)]],
-    line_spacing=1.14)
-gates2 = [
-    ("Value gate", "never for items ≥ ₹800 — high value must be physically recovered."),
-    ("Fraud gate", "any wardrobing / photo-reuse / auth-mismatch signal hard-blocks it."),
-    ("Trust gate", "customerTrust × confidence must clear 0.5 (the pickup-refund lever)."),
-    ("All-paths-negative", "excluded from the argmax; fires ONLY when even the best real route loses money."),
-]
-yy = Inches(2.6)
-for i, (h, b) in enumerate(gates2):
-    yrow = Inches(2.6 + i * 0.86)
-    rect(s, Inches(0.7), yrow, Inches(6.7), Inches(0.78), PANEL, radius=True)
-    txt(s, Inches(0.95), yrow + Inches(0.1), Inches(6.2), Inches(0.32), [[R(h, 12.5, ORANGE, True)]])
-    txt(s, Inches(0.95), yrow + Inches(0.44), Inches(6.25), Inches(0.32), [[R(b, 11, FOG)]], line_spacing=1.05)
-
-screenshot_ph(s, Inches(7.65), Inches(2.6), Inches(4.95), Inches(2.55),
-              "pnpm test:edge",
-              "all-paths-negative + trust → returnless_refund")
-rect(s, Inches(7.65), Inches(5.4), Inches(4.95), Inches(1.6), PANEL, radius=True)
-txt(s, Inches(7.9), Inches(5.58), Inches(4.5), Inches(0.35), [[R("THREE NEGATIVE CONTROLS PASS", 12, ORANGE, True)]])
-bullets(s, Inches(7.9), Inches(6.0), Inches(4.5), Inches(1.0), [
-    "no trust signal → ineligible, stays a real route",
-    "high value → must be physically recovered",
-    "fraud signal → blocked",
-], fs=11, gap=4)
-txt(s, Inches(0.7), Inches(6.2), Inches(6.7), Inches(0.7),
-    [[R("Opt-in via ", 11.5, FOG), R("customerTrust", 11.5, CYAN, True, MONO),
-      R(" — existing demo flows are byte-unaffected unless a caller supplies it.", 11.5, FOG)]],
-    line_spacing=1.1)
-footer(s, 15, "ECONOMICS")
-
-# ================================================================================
-# SLIDE 16 — Listing Agent + Demand Graph
-# ================================================================================
-s = slide(NAVY)
-accent_bar(s); kicker(s, "Stage 7 — the autonomous executor")
-title(s, "“Listed locally” is a state that still has to be won")
-bullets(s, Inches(0.7), Inches(1.75), Inches(6.0), Inches(4.5), [
-    ("The Listing Agent ", "(spec 008) is born the moment the hub bench confirms local_resale: it mints a Health Card from the return's own checkpoints and spawns on a real marketplace listing."),
-    ("Floor = route-elsewhere EV. ", "The agent's hard price floor is seeded from max(warehouse, liquidate) EV — it escalates exactly when local resale stops beating “send it up the chain.” Spec-016 economics drive spec-014 escalation with zero new logic."),
-    ("Event-driven repricing (spec 014). ", "Significant events (comp undercut, view-velocity drop, dwell) hit an XGBoost reward model + Thompson bandit + deterministic guardrails. A returns center cannot reprice a queue — this is the unique capability."),
-    ("Escalation re-enters the Bridge. ", "listed_local → donation_batch | recycle_batch through the same state machine. Items never rot on a shelf."),
-], fs=12, gap=9)
-
-rect(s, Inches(7.0), Inches(1.75), Inches(5.6), Inches(4.8), PANEL, radius=True)
-txt(s, Inches(7.25), Inches(1.95), Inches(5.1), Inches(0.35), [[R("THE DEMAND GRAPH — additive on Amazon's rec system", 12, ORANGE, True)]])
-txt(s, Inches(7.25), Inches(2.45), Inches(5.15), Inches(1.1),
-    [[R("Amazon already knows who searched, wishlisted, or bought similar near the hub. We score that intent instead of inventing a marketplace:", 12, FOG)]], line_spacing=1.14)
-rect(s, Inches(7.25), Inches(3.55), Inches(5.1), Inches(0.85), CODEBG, radius=True)
-txt(s, Inches(7.45), Inches(3.68), Inches(4.8), Inches(0.65),
-    [[R("matchScore = intentWeight", 11, CODEFG, False, MONO)],
-     [R("  (searched .65 / wishlist .8 / bought .9)", 10, MUTED, False, MONO)],
-     [R("  × distanceDecay × priceFit", 11, CODEFG, False, MONO)]], line_spacing=1.05, space_after=1)
-txt(s, Inches(7.25), Inches(4.6), Inches(5.1), Inches(1.8),
-    [[R("Buyer surfaces: ", 12, ORANGE, True),
-      R("the exact product page shows “Open-box near you · doorstep graded · hub verified · X% off · delivered today,” with the recommendation layer speaking (“this is on your wish list”). The purchase runs a real cross-account transaction that closes the lifecycle: listed_local → sold → delivered_to_buyer, EcoCredits in both ledgers, agent retires.", 12, FOG)]],
-    line_spacing=1.16)
-footer(s, 16, "EXECUTOR")
-
-# ================================================================================
-# SLIDE 17 — Notifications & cascading
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "Notifications & cascading")
-title(s, "Stateful, restart-safe buyer matching — a cron cascade")
-txt(s, Inches(0.7), Inches(1.65), Inches(11.9), Inches(0.55),
-    [[R("No fragile ", 13.5, FOG), R("setTimeout", 13.5, CYAN, True, MONO),
-      R(" chains. Timeouts are detected from stored timestamps, so match state survives a server restart. One node-cron pass every 30 minutes.", 13.5, FOG)]],
-    line_spacing=1.12)
-casc = [
-    ("handleTimeouts", "a notified buyer who didn't respond within the 2-hour window → mark timeout, cascade to the next candidate. Runs off notified_at, never a live timer."),
-    ("retrySearches", "sessions with no candidates left → re-run findCandidates in case new buyers registered; throttled to once / 2h via updated_at."),
-    ("handleExpiry", "pickup window closed without a match → status = warehouse_fallback, item's local_routing_accepted = false. The item never waits forever."),
-]
-yy = Inches(2.4)
-for h, b in casc:
-    rect(s, Inches(0.7), yy, Inches(7.4), Inches(1.15), PANEL, radius=True)
-    txt(s, Inches(0.95), yy + Inches(0.14), Inches(6.9), Inches(0.35), [[R(h + "()", 13, ORANGE, True, MONO)]])
-    txt(s, Inches(0.95), yy + Inches(0.52), Inches(6.9), Inches(0.55), [[R(b, 11.5, FOG)]], line_spacing=1.12)
-    yy += Inches(1.25)
-
-log_lines = [
-    ('{"level":"info","msg":"matching', CODEFG),
-    (' cascade scheduled",', CODEFG),
-    (' "cron":"*/30 * * * *"}', CYAN),
-    ('{"level":"warn","msg":"match', CODEFG),
-    (' session expired — falling back', CODEFG),
-    (' to warehouse","returnId":...}', ORANGE),
-    ('{"level":"info","msg":"matching', CODEFG),
-    (' cascade complete",', CODEFG),
-    (' "timeoutsAdvanced":1,', CYAN),
-    (' "searchesRetried":2,', CYAN),
-    (' "candidatesFound":1,', CYAN),
-    (' "sessionsExpired":0}', CYAN),
-]
-code_panel(s, Inches(8.3), Inches(2.4), Inches(4.3), Inches(3.75), log_lines,
-           title_txt="structured cron logs", fs=10)
-txt(s, Inches(0.7), Inches(6.45), Inches(11.9), Inches(0.5),
-    [[R("Every cron pass emits a summary line + a request id per API call — greppable now, ingestible into CloudWatch/Datadog later with no code change.", 11.5, MUTED, False)]])
-footer(s, 17, "SCALE")
-
-# ================================================================================
-# SLIDE 18 — Edge cases -> owning mechanism
-# ================================================================================
-s = slide(NAVY)
-accent_bar(s); kicker(s, "Robustness")
-title(s, "Every edge case maps to an owning mechanism")
-rows = [
-    ["Edge case", "Owning mechanism"],
-    ["Package opened / packaging missing", "Normal case — completeness vector + seal check move the posterior; hub repack is the default workflow"],
-    ["Accessories / cables missing", "VLM manifest check → refurb (uplift positive) or grade-down"],
-    ["Low AI confidence", "θ_r gates shrink the eligible set toward liquidate/warehouse — no special-case path"],
-    ["AI grade wrong", "Caught at driver scan / hub bench before buyer exposure; bounded correction; verdict becomes a training label"],
-    ["Customer hides damage", "Driver checkpoint + refund timed to trust×confidence + photo-reuse / capture attestation"],
-    ["Local buyer rejects", "Item still in-city; re-enters at hub; one local trip"],
-    ["No nearby buyer", "Demand curve priced it → engine chose another route; unsold listing → dwell expiry → re-run"],
-    ["Demand shifts mid-route", "Decision TTL; re-evaluated at each checkpoint while redirect is cheap"],
-    ["Unsellable after inspection", "Hub cascade: pallet → donate → recycle, same building"],
-    ["Special-handling category", "Hard ladder, evaluated first, never EV-optimized"],
-]
-cw = [Inches(4.0), Inches(7.9)]
-simple_table(s, Inches(0.7), Inches(1.65), Inches(11.9), rows, cw, fs=10.5, row_h=0.46)
-footer(s, 18, "ROBUST")
-
-# ================================================================================
-# SLIDE 19 — Scalability & production posture
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "Scalability & production posture")
-title(s, "Honest scope — what's real, what's mocked, what's next")
-col1 = [
-    ("Deterministic + pure ", "core engine (routing-ev, liquidation-lot) — no randomness, replayable, unit-tested. Scales as pure compute."),
-    ("Structured JSON logging ", "one line/event with a reqId per request (X-Request-Id echoed) — CloudWatch/Datadog-ready."),
-    ("Hardening ", "helmet security headers, per-IP rate limiting (300/min), bcrypt auth, input validation on every route."),
-    ("Restart-safe jobs ", "cron cascade + demand rollup detect state from timestamps, not in-memory timers."),
-    ("Drift watchdog ", "PSI monitor → auto-fallback when input distribution shifts (proven in eval)."),
-]
-col2 = [
-    ("Per-item greedy + batch-at-hub ", "is the honest scope. Fleet-level assignment (pickup batching, pallet consolidation, hub capacity) is a real production concern — documented, deliberately not built."),
-    ("Mocked for reproducibility: ", "SKU-prefix economic profile, per-category demand & decay params, secondary-market bid curves — same posture as the existing pricing mock."),
-    ("Real: ", "grading/pricing model calls, the full EV + lot engines, the state machine, checkpoint re-evaluation, MongoDB persistence, the reprice bandit."),
-]
-rect(s, Inches(0.7), Inches(1.7), Inches(5.85), Inches(4.9), PANEL, radius=True)
-txt(s, Inches(0.95), Inches(1.9), Inches(5.4), Inches(0.35), [[R("PRODUCTION-SHAPED TODAY", 12.5, GREEN, True)]])
-bullets(s, Inches(0.95), Inches(2.4), Inches(5.4), Inches(4.0), col1, fs=11.5, gap=8, lead=GREEN)
-
-rect(s, Inches(6.75), Inches(1.7), Inches(5.85), Inches(4.9), PANEL, radius=True)
-txt(s, Inches(7.0), Inches(1.9), Inches(5.4), Inches(0.35), [[R("SCOPED / NEXT (stated plainly)", 12.5, ORANGE, True)]])
-bullets(s, Inches(7.0), Inches(2.4), Inches(5.4), Inches(4.0), col2, fs=11.5, gap=9, lead=ORANGE)
-footer(s, 19, "SCALE")
-
-# ================================================================================
-# SLIDE 20 — Validation / proof
-# ================================================================================
-s = slide(NAVY)
-accent_bar(s); kicker(s, "Validation")
-title(s, "Reproducible proof — no network, no key, one command each")
-# metric tiles
-tiles = [
-    ("51 / 51", "edge-case matrix passes", "pnpm test:edge"),
-    ("100%", "routing hard-rule conformance", "pnpm eval"),
-    ("100%", "argmax-EV optimality", "pnpm eval"),
-    ("5.3%", "pricing MAPE (₹186 MAE)", "pnpm eval"),
-    ("0.771", "return-risk AUC vs 0.715 prior", "pnpm eval"),
-    ("0.099→0.024", "calibration ECE (temp-scaled)", "pnpm eval"),
-]
-for i, (big, lab, cmd) in enumerate(tiles):
-    cx = Inches(0.7 + (i%3)*4.05)
-    cy = Inches(1.75 + (i//3)*1.55)
-    rect(s, cx, cy, Inches(3.8), Inches(1.38), PANEL, radius=True)
-    rect(s, cx, cy, Inches(0.1), Inches(1.38), ORANGE)
-    txt(s, cx+Inches(0.3), cy+Inches(0.15), Inches(3.4), Inches(0.5), [[R(big, 24, ORANGE, True)]])
-    txt(s, cx+Inches(0.3), cy+Inches(0.72), Inches(3.4), Inches(0.35), [[R(lab, 11.5, WHITE, True)]])
-    txt(s, cx+Inches(0.3), cy+Inches(1.02), Inches(3.4), Inches(0.3), [[R(cmd, 10, MUTED, False, MONO)]])
-
-screenshot_ph(s, Inches(0.7), Inches(4.95), Inches(11.9), Inches(1.65),
-              "pnpm eval   &&   pnpm test:edge",
-              "The full deterministic eval report + the 51/51 edge-case matrix — the baseline every later ML phase must beat.")
-footer(s, 20, "PROOF")
-
-# ================================================================================
-# SLIDE 21 — Deployment
-# ================================================================================
-s = slide()
-accent_bar(s); kicker(s, "Deployment")
-title(s, "Live, auto-deployed, wired end-to-end")
-dep = [
-    ("Web — Vercel", "reloop-woad.vercel.app", "Next.js (apps/web). NEXT_PUBLIC_API_BASE_URL baked in at build."),
-    ("API — Render", "reloop-api-po73.onrender.com", "Express (apps/api) via tsx. NVIDIA_API_KEY + WEB_ORIGIN (CORS)."),
-    ("Data — MongoDB", "cloud state sync", "Per-user + shared state, returns, match sessions, pricing indexes."),
-]
-yy = Inches(1.9)
-for h, url, b in dep:
-    rect(s, Inches(0.7), yy, Inches(11.9), Inches(1.1), PANEL, radius=True)
-    txt(s, Inches(0.95), yy+Inches(0.15), Inches(4.0), Inches(0.35), [[R(h, 14, ORANGE, True)]])
-    txt(s, Inches(0.95), yy+Inches(0.55), Inches(4.5), Inches(0.35), [[R(url, 12, CYAN, True, MONO)]])
-    txt(s, Inches(5.5), yy+Inches(0.32), Inches(6.9), Inches(0.55), [[R(b, 12, FOG)]], line_spacing=1.12)
-    yy += Inches(1.28)
+for i, (big, lab) in enumerate(stats):
+    cx = Inches(0.7 + (i % 2) * 6.05)
+    cy = Inches(2.5 + (i // 2) * 1.65)
+    rect(s, cx, cy, Inches(5.85), Inches(1.45), PANEL, radius=True)
+    rect(s, cx, cy, Inches(0.1), Inches(1.45), ORANGE)
+    txt(s, cx + Inches(0.35), cy + Inches(0.2), Inches(5.3), Inches(0.6), [[Rn(big, 27, ORANGE, True)]])
+    txt(s, cx + Inches(0.35), cy + Inches(0.82), Inches(5.3), Inches(0.5), [[Rn(lab, 13.5, FOG)]], line_spacing=1.1)
 txt(s, Inches(0.7), Inches(6.0), Inches(11.9), Inches(0.7),
-    [[R("Both auto-deploy from ", 12.5, FOG), R("main", 12.5, CYAN, True, MONO),
-      R(". Pre-push gate: ", 12.5, FOG), R("pnpm -r typecheck", 12.5, WHITE, True, MONO),
-      R(" (strict, no any) + ", 12.5, FOG), R("web build", 12.5, WHITE, True, MONO),
-      R(". @reloop/shared ships as TS source — API runs raw via tsx.", 12.5, FOG)]], line_spacing=1.14)
-footer(s, 21, "DEPLOY")
+    [[Rn("Every wasted item is money burned twice: ", 14.5, ORANGE, True),
+      Rn("once on the trucking, and again on the value that could have been recovered if we'd acted sooner.", 14.5, FOG)]],
+    line_spacing=1.15)
+footer(s, 3)
 
 # ================================================================================
-# SLIDE 22 — Close
+# 4 — The simple idea
+# ================================================================================
+s = slide()
+accent_bar(s); kicker(s, "The idea")
+title(s, "So… what if we decided at your front door instead?")
+txt(s, Inches(0.7), Inches(1.8), Inches(11.9), Inches(1.0),
+    [[Rn("The whole problem is that we decide ", 19, FOG),
+      Rn("after", 19, ORANGE, True),
+      Rn(" the item has travelled. ReLoop flips it: look at the item the moment it's returned, and pick its best next step ", 19, FOG),
+      Rn("before it moves an inch.", 19, ORANGE, True)]], line_spacing=1.2)
+# before / after contrast
+rect(s, Inches(0.7), Inches(3.5), Inches(5.85), Inches(2.9), PANEL, radius=True)
+txt(s, Inches(1.0), Inches(3.75), Inches(5.3), Inches(0.4), [[Rn("TODAY", 14, MUTED, True)]])
+bullets(s, Inches(1.0), Inches(4.25), Inches(5.3), Inches(2.0), [
+    "Ship it far away first",
+    "Let it sit and lose value",
+    "Then decide what it's worth",
+    "Usually too late to do anything clever",
+], fs=14, gap=10, lead=RED, headcolor=FOG)
+rect(s, Inches(6.85), Inches(3.5), Inches(5.75), Inches(2.9), PANEL, radius=True)
+rect(s, Inches(6.85), Inches(3.5), Inches(5.75), Inches(0.12), ORANGE)
+txt(s, Inches(7.15), Inches(3.75), Inches(5.3), Inches(0.4), [[Rn("WITH RELOOP", 14, ORANGE, True)]])
+bullets(s, Inches(7.15), Inches(4.25), Inches(5.3), Inches(2.0), [
+    "Decide at the doorstep, instantly",
+    "Keep valuable items local and fresh",
+    "Skip the pointless long-distance trip",
+    "Only the items that truly need it travel",
+], fs=14, gap=10, lead=GREEN, headcolor=WHITE)
+footer(s, 4)
+
+# ================================================================================
+# 5 — How it works in three steps
+# ================================================================================
+s = slide(NAVY)
+accent_bar(s); kicker(s, "The whole thing in three steps")
+title(s, "Snap a photo → the AI decides → the item finds its best home")
+step_card(s, Inches(0.7), Inches(1.95), Inches(3.8), Inches(4.4), "1",
+          "Look at it",
+          "You take a few photos at the door. An AI reads the item's condition — like a really fast, really consistent inspector.")
+step_card(s, Inches(4.75), Inches(1.95), Inches(3.8), Inches(4.4), "2",
+          "Think it through",
+          "A decision engine weighs every option — resell nearby, repair, restock, donate, recycle — and picks the one that recovers the most value for THIS item.")
+step_card(s, Inches(8.8), Inches(1.95), Inches(3.8), Inches(4.4), "3",
+          "Send it the right way",
+          "The item goes straight to its best next home. Two quick human checks along the way make sure the AI got it right.")
+footer(s, 5)
+
+# ================================================================================
+# 6 — Step 1: the eyes (grading), and honesty about uncertainty
+# ================================================================================
+s = slide()
+accent_bar(s); kicker(s, "Step 1 — the eyes")
+title(s, "An AI reads the item's condition from photos")
+bullets(s, Inches(0.7), Inches(1.9), Inches(6.1), Inches(3.5), [
+    ("Trained to judge condition. ", "It looks at the photos and figures out how good a shape the item is in — brand-new, lightly used, worn, or beyond saving."),
+    ("It spots the details. ", "Missing charger? Scratched screen? Torn box? It notices, and lists them."),
+    ("And here's the important part — ", "it's honest about how sure it is. Instead of one confident guess, it says things like “probably like-new, maybe lightly used.”"),
+], fs=14.5, gap=12)
+rect(s, Inches(7.05), Inches(1.9), Inches(5.55), Inches(4.4), PANEL, radius=True)
+txt(s, Inches(7.35), Inches(2.15), Inches(5.0), Inches(0.5), [[Rn("Why “how sure” matters", 15, ORANGE, True)]])
+txt(s, Inches(7.35), Inches(2.7), Inches(5.0), Inches(1.4),
+    [[Rn("A confident wrong guess is dangerous — imagine selling a scratched phone to someone as “like new.” ", 13.5, FOG),
+      Rn("By keeping track of its own doubt, the engine can play it safe when the photos aren't clear.", 13.5, WHITE, True)]],
+    line_spacing=1.2)
+rect(s, Inches(7.35), Inches(4.35), Inches(4.95), Inches(1.75), CODEBG, radius=True)
+txt(s, Inches(7.6), Inches(4.55), Inches(4.5), Inches(0.35), [[Rn("what the AI hands over:", 11, MUTED, False, MONO)]])
+txt(s, Inches(7.6), Inches(4.95), Inches(4.6), Inches(1.1),
+    [[Rn("“70% like-new, 20% lightly used,", 12.5, CODEFG, False, MONO)],
+     [Rn(" 10% worn — fairly confident.", 12.5, CODEFG, False, MONO)],
+     [Rn(" Note: box looks a bit scuffed.”", 12.5, CYAN, False, MONO)]], line_spacing=1.15, space_after=1)
+footer(s, 6)
+
+# ================================================================================
+# 7 — Step 2: the brain (plain), glass box
+# ================================================================================
+s = slide(NAVY)
+accent_bar(s); kicker(s, "Step 2 — the brain")
+title(s, "It thinks like a smart shopkeeper — and shows its work")
+txt(s, Inches(0.7), Inches(1.7), Inches(11.9), Inches(0.9),
+    [[Rn("For each item it asks a simple question about every option: ", 15.5, FOG),
+      Rn("“how much money do we actually get back this way, after all the costs?”", 15.5, WHITE, True),
+      Rn(" — then it picks the winner.", 15.5, FOG)]], line_spacing=1.18)
+things = [
+    ("What it's worth", "the resale value for the condition it's in"),
+    ("The costs to get there", "trucking, handling, repairs — subtracted honestly"),
+    ("Who wants it nearby", "is there real demand close by, right now?"),
+    ("Time", "things lose value while they sit — that counts as a cost too"),
+    ("The planet", "carbon saved by not trucking it far is worth money here"),
+    ("Cost of a mistake", "how expensive it'd be to fix a wrong call on this path"),
+]
+for i, (h, b) in enumerate(things):
+    cx = Inches(0.7 + (i % 3) * 4.05)
+    cy = Inches(2.75 + (i // 3) * 1.35)
+    rect(s, cx, cy, Inches(3.8), Inches(1.2), PANEL, radius=True)
+    txt(s, cx + Inches(0.25), cy + Inches(0.16), Inches(3.4), Inches(0.35), [[Rn(h, 13.5, ORANGE, True)]])
+    txt(s, cx + Inches(0.25), cy + Inches(0.55), Inches(3.4), Inches(0.6), [[Rn(b, 11.5, FOG)]], line_spacing=1.1)
+rect(s, Inches(0.7), Inches(5.65), Inches(11.9), Inches(0.95), NAVY, line=ORANGE, line_w=1.25, radius=True)
+txt(s, Inches(1.0), Inches(5.85), Inches(11.3), Inches(0.6),
+    [[Rn("No black box. ", 15, ORANGE, True),
+      Rn("It's plain arithmetic and clear rules — you can read exactly why it chose what it chose. The AI only writes the one-line explanation; the ", 14.5, FOG),
+      Rn("rules do the deciding.", 14.5, WHITE, True)]], line_spacing=1.15)
+footer(s, 7)
+
+# ================================================================================
+# 8 — See the brain think (real example, plain)
+# ================================================================================
+s = slide()
+accent_bar(s); kicker(s, "See it in action")
+title(s, "A real example: a returned wireless speaker")
+txt(s, Inches(0.7), Inches(1.65), Inches(6.2), Inches(0.9),
+    [[Rn("Sealed box, “changed my mind.” The engine lays out every option with real rupee values and picks the best. Here, ", 13, FOG),
+      Rn("putting it straight back on the shelf", 13, WHITE, True),
+      Rn(" wins.", 13, FOG)]], line_spacing=1.16)
+ev = [
+    ("Best option chosen:  put it back on sale", ORANGE),
+    ("", FOG),
+    ("Back on the shelf     +₹1,956   ← winner", GREEN),
+    ("Resell nearby         +₹1,952", CODEFG),
+    ("Repair & resell       +₹1,734", CODEFG),
+    ("Sell in a graded lot    +₹893", CODEFG),
+    ("Donate                  +₹182", CODEFG),
+    ("", FOG),
+    ("Ship it far away        −₹465   ← today's", RED),
+    ("                                  default", RED),
+]
+code_panel(s, Inches(0.7), Inches(2.7), Inches(6.2), Inches(3.7), ev,
+           title_txt="the engine's math, in rupees", fs=12.5)
+screenshot_ph(s, Inches(7.15), Inches(1.7), Inches(5.45), Inches(2.75),
+              "curl /api/route  (the speaker)",
+              "The engine's full option-by-option breakdown, live.")
+rect(s, Inches(7.15), Inches(4.7), Inches(5.45), Inches(1.7), PANEL, radius=True)
+txt(s, Inches(7.4), Inches(4.9), Inches(5.0), Inches(0.4), [[Rn("The punchline", 14, ORANGE, True)]])
+txt(s, Inches(7.4), Inches(5.35), Inches(5.0), Inches(1.0),
+    [[Rn("Today's default — shipping it far away — is the ", 13.5, FOG),
+      Rn("worst", 13.5, WHITE, True),
+      Rn(" option here (it loses money). Every smarter choice is money we get to keep.", 13.5, FOG)]],
+    line_spacing=1.18)
+footer(s, 8)
+
+# ================================================================================
+# 9 — What if the AI is unsure or wrong? (safety net)
+# ================================================================================
+s = slide(NAVY)
+accent_bar(s); kicker(s, "The obvious worry")
+title(s, "“But what if the AI gets it wrong?”")
+txt(s, Inches(0.7), Inches(1.7), Inches(11.9), Inches(0.6),
+    [[Rn("Fair question. Three things make a wrong call cheap and rare — not a disaster.", 15.5, FOG)]])
+safety = [
+    ("When unsure, it plays safe", "The less confident the AI is, the more cautious the option it's allowed to pick. Shaky photos never lead to a bold, risky choice."),
+    ("Two humans double-check", "A 30-second look by the pickup driver, then a 10-minute check at the local station. If a person disagrees, the plan updates on the spot — before any buyer sees the item."),
+    ("Worst case = today", "If nothing local makes sense, it just does exactly what Amazon does now: send it up the chain. So we can only do better, never worse."),
+]
+for i, (h, b) in enumerate(safety):
+    cy = Inches(2.5 + i * 1.35)
+    rect(s, Inches(0.7), cy, Inches(11.9), Inches(1.2), PANEL, radius=True)
+    circ = s.shapes.add_shape(MSO_SHAPE.OVAL, Inches(0.95), cy + Inches(0.32), Inches(0.55), Inches(0.55))
+    _set_fill(circ, ORANGE); circ.shadow.inherit = False
+    tf = circ.text_frame; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
+    r = p.add_run(); r.text = str(i+1); r.font.size = Pt(18); r.font.bold = True; r.font.color.rgb = INK; r.font.name = FONT
+    txt(s, Inches(1.75), cy + Inches(0.16), Inches(10.5), Inches(0.4), [[Rn(h, 15.5, ORANGE, True)]])
+    txt(s, Inches(1.75), cy + Inches(0.58), Inches(10.6), Inches(0.55), [[Rn(b, 13, FOG)]], line_spacing=1.12)
+footer(s, 9)
+
+# ================================================================================
+# 10 — the live re-route moment
+# ================================================================================
+s = slide()
+accent_bar(s); kicker(s, "The best part to watch")
+title(s, "When a human disagrees, the plan changes instantly")
+txt(s, Inches(0.7), Inches(1.7), Inches(6.1), Inches(1.5),
+    [[Rn("At the local station, a worker opens the “sealed” box and finds the seal broken. They tap that in — and the engine ", 14.5, FOG),
+      Rn("re-decides on the spot.", 14.5, WHITE, True),
+      Rn(" “Put it back on the shelf” is off the table, so it instantly switches to “resell nearby.”", 14.5, FOG)]],
+    line_spacing=1.2)
+flow = [
+    ("BEFORE — box looked sealed", MUTED),
+    ("   plan: put it back on the shelf", GREEN),
+    ("", FOG),
+    ("Worker: “actually, seal's broken”", CYAN),
+    ("", FOG),
+    ("AFTER — engine re-decides instantly", MUTED),
+    ("   new plan: resell it nearby", ORANGE),
+    ("", FOG),
+    ("The mistake was caught before any", CODEFG),
+    ("buyer saw it. Fixing it cost one", CODEFG),
+    ("shelf move — not a lost parcel.", CODEFG),
+]
+code_panel(s, Inches(0.7), Inches(3.35), Inches(6.1), Inches(3.15), flow,
+           title_txt="live re-route", fs=12)
+screenshot_ph(s, Inches(7.15), Inches(1.85), Inches(5.45), Inches(2.6),
+              "Hub screen → flip the seal",
+              "Watch the decision switch on screen in real time.")
+rect(s, Inches(7.15), Inches(4.7), Inches(5.45), Inches(1.8), PANEL, radius=True)
+txt(s, Inches(7.4), Inches(4.9), Inches(5.0), Inches(0.4), [[Rn("Bonus: it gets smarter over time", 14, ORANGE, True)]])
+txt(s, Inches(7.4), Inches(5.35), Inches(5.0), Inches(1.1),
+    [[Rn("Every time a human confirms or corrects the AI, that becomes a free training example. ", 13.5, FOG),
+      Rn("The AI's eyes improve just by doing the job.", 13.5, WHITE, True)]],
+    line_spacing=1.18)
+footer(s, 10)
+
+# ================================================================================
+# 11 — where items end up (menu)
+# ================================================================================
+s = slide(NAVY)
+accent_bar(s); kicker(s, "The happy endings")
+title(s, "Where your item can go — instead of the landfill")
+rows = [
+    ["The good next home", "When it's picked", "Why it's better"],
+    ["Back on the shelf", "Sealed / like-new, still wanted", "Sold again quickly — no long trip, no weeks lost"],
+    ["Resold to someone nearby", "Good condition, buyers close by", "Recovers far more value; cash back in days"],
+    ["Repaired, then resold", "One cheap fix makes it worth more", "A ₹300 cable can add ₹1,500 of value"],
+    ["Bundled into a graded lot", "Cheaper or uncertain items", "Sold in clearly-labelled boxes that fetch more"],
+    ["Donated", "Nobody's buying, but it's usable", "Goodwill + tax credit instead of the bin"],
+    ["Recycled", "Truly finished, or legally required", "Materials recovered, done responsibly"],
+    ["Thrown away", "Legally the only option", "The number we're trying to SHRINK — every case logged"],
+]
+cw = [Inches(3.5), Inches(3.9), Inches(4.5)]
+simple_table(s, Inches(0.7), Inches(1.75), rows, cw, fs=11.5, row_h=0.585)
+footer(s, 11)
+
+# ================================================================================
+# 12 — trust / Health Card
+# ================================================================================
+s = slide()
+accent_bar(s); kicker(s, "The trust question — would a stranger buy it?")
+title(s, "Every item carries a “health record” — like CARFAX for a car")
+txt(s, Inches(0.7), Inches(1.8), Inches(6.1), Inches(3.5),
+    [[Rn("People happily buy used cars from strangers because of CARFAX — a trusted history report. Used stuff online is scary because there's no such thing.", 15, FOG)]],
+    line_spacing=1.22)
+bullets(s, Inches(0.7), Inches(3.3), Inches(6.1), Inches(3.0), [
+    ("A Health Card ", "travels with each item: its verified condition, photos, and every check it passed."),
+    ("It's Amazon-backed, ", "not a random seller's word — so a buyer can actually trust it."),
+    ("And it follows the item ", "to its next owner, and the one after that."),
+], fs=14, gap=11)
+rect(s, Inches(7.05), Inches(1.9), Inches(5.55), Inches(4.4), PANEL, radius=True)
+rect(s, Inches(7.05), Inches(1.9), Inches(5.55), Inches(0.12), ORANGE)
+txt(s, Inches(7.35), Inches(2.2), Inches(5.0), Inches(0.45), [[Rn("PRODUCT HEALTH CARD", 14, ORANGE, True)]])
+card_lines = [
+    ("✓ Condition: like-new (verified)", GREEN),
+    ("✓ Checked at pickup", GREEN),
+    ("✓ Checked at the local station", GREEN),
+    ("✓ Genuine — serial matches", GREEN),
+    ("• Photos included", FOG),
+    ("• Owner 2 of 2 · CO₂ saved so far", FOG),
+]
+yy = Inches(2.85)
+for t, c in card_lines:
+    txt(s, Inches(7.5), yy, Inches(4.9), Inches(0.4), [[Rn(t, 14, c, False)]])
+    yy += Inches(0.55)
+footer(s, 12)
+
+# ================================================================================
+# 13 — it keeps working on its own
+# ================================================================================
+s = slide(NAVY)
+accent_bar(s); kicker(s, "It doesn't stop at “list it”")
+title(s, "A little agent keeps working until the item sells")
+bullets(s, Inches(0.7), Inches(1.95), Inches(6.1), Inches(4.2), [
+    ("It watches each local listing ", "and adjusts the price toward what similar items are actually selling for — something a warehouse queue can never do."),
+    ("It finds the right buyers ", "by tapping into who nearby already searched for, wishlisted, or bought similar things."),
+    ("It knows when to give up gracefully. ", "If resale truly isn't working, it doesn't let the item rot — it hands it back to the engine, which donates or recycles it instead."),
+], fs=15, gap=13)
+rect(s, Inches(7.05), Inches(1.95), Inches(5.55), Inches(4.2), PANEL, radius=True)
+txt(s, Inches(7.35), Inches(2.2), Inches(5.0), Inches(0.5), [[Rn("Where a buyer sees it", 15, ORANGE, True)]])
+txt(s, Inches(7.35), Inches(2.75), Inches(5.0), Inches(1.5),
+    [[Rn("Right on the normal product page: ", 13.5, FOG),
+      Rn("“Open-box near you — checked, guaranteed, X% off, delivered today.”", 13.5, WHITE, True),
+      Rn("  With a gentle nudge if it's already on their wish list.", 13.5, FOG)]],
+    line_spacing=1.2)
+rect(s, Inches(7.35), Inches(4.45), Inches(4.95), Inches(1.5), CODEBG, radius=True)
+txt(s, Inches(7.6), Inches(4.65), Inches(4.5), Inches(1.2),
+    [[Rn("A returns warehouse can't", 13, CODEFG, False, MONO)],
+     [Rn("negotiate a price or chase a", 13, CODEFG, False, MONO)],
+     [Rn("buyer. This little agent does —", 13, CYAN, False, MONO)],
+     [Rn("every single day.", 13, CYAN, False, MONO)]], line_spacing=1.12, space_after=1)
+footer(s, 13)
+
+# ================================================================================
+# 14 — where the money comes from
+# ================================================================================
+s = slide()
+accent_bar(s); kicker(s, "Follow the money")
+title(s, "Why this actually saves and makes money")
+money = [
+    ("Skip the long trip", "For local items, we delete the sorting hop, the 500km+ haul, and the weeks of waiting. That's pure saved cost."),
+    ("Sell before value drops", "Electronics and fashion lose value fast. Selling in days instead of weeks keeps more of the price."),
+    ("Repairs that pay off", "A tiny fix can bump an item up a grade — the engine only does it when the math clearly works."),
+    ("Better liquidation", "Clearly-labelled, graded boxes sell for more than “mystery pallets,” because buyers can see what's inside."),
+]
+for i, (h, b) in enumerate(money):
+    cx = Inches(0.7 + (i % 2) * 6.05)
+    cy = Inches(1.95 + (i // 2) * 2.15)
+    rect(s, cx, cy, Inches(5.85), Inches(1.9), PANEL, radius=True)
+    rect(s, cx, cy, Inches(0.1), Inches(1.9), GREEN)
+    txt(s, cx + Inches(0.35), cy + Inches(0.22), Inches(5.3), Inches(0.45), [[Rn(h, 16, GREEN, True)]])
+    txt(s, cx + Inches(0.35), cy + Inches(0.75), Inches(5.3), Inches(1.0), [[Rn(b, 13.5, FOG)]], line_spacing=1.18)
+footer(s, 14)
+
+# ================================================================================
+# 15 — honest homework + returnless
+# ================================================================================
+s = slide(NAVY)
+accent_bar(s); kicker(s, "We did our homework")
+title(s, "Grounded in real numbers — even the “just keep it” case")
+txt(s, Inches(0.7), Inches(1.75), Inches(11.9), Inches(0.6),
+    [[Rn("We didn't invent the economics — every figure comes from how Amazon's returns actually work.", 15, FOG)]])
+facts = [
+    ("Liquidation really pays cents", "Sellers get back only ~5–10% of an item's price through bulk liquidation. We priced against that reality, not a fantasy."),
+    ("Processing can cost more than the item", "It can cost ~$27 to process a $100 return. For cheap items, every option loses money — so we handle that too."),
+]
+for i, (h, b) in enumerate(facts):
+    cy = Inches(2.4 + i * 1.15)
+    rect(s, Inches(0.7), cy, Inches(6.6), Inches(1.0), PANEL, radius=True)
+    txt(s, Inches(0.95), cy + Inches(0.13), Inches(6.1), Inches(0.4), [[Rn(h, 13.5, ORANGE, True)]])
+    txt(s, Inches(0.95), cy + Inches(0.52), Inches(6.15), Inches(0.45), [[Rn(b, 11.5, FOG)]], line_spacing=1.08)
+rect(s, Inches(7.55), Inches(2.4), Inches(5.05), Inches(3.5), PANEL, radius=True)
+rect(s, Inches(7.55), Inches(2.4), Inches(5.05), Inches(0.12), ORANGE)
+txt(s, Inches(7.85), Inches(2.7), Inches(4.5), Inches(0.5), [[Rn("The clever last resort", 15, ORANGE, True)]])
+txt(s, Inches(7.85), Inches(3.25), Inches(4.5), Inches(2.4),
+    [[Rn("Sometimes the smartest move is to just let you keep the item and refund you — no pickup at all.", 14, WHITE, True)],
+     [Rn("", 6, FOG)],
+     [Rn("It's a real Amazon tactic. We only do it for low-value items, from trusted customers, with no fraud signs — never as a loophole.", 13, FOG)]],
+    line_spacing=1.2, space_after=6)
+txt(s, Inches(0.7), Inches(4.9), Inches(6.6), Inches(1.0),
+    [[Rn("The point: ", 13.5, ORANGE, True),
+      Rn("the engine is honest about what each path is really worth — so it never talks itself into a losing move.", 13.5, FOG)]],
+    line_spacing=1.16)
+footer(s, 15)
+
+# ================================================================================
+# 16 — is it real?
+# ================================================================================
+s = slide()
+accent_bar(s); kicker(s, "Is any of this real?")
+title(s, "Yes — and you can run it yourself")
+txt(s, Inches(0.7), Inches(1.7), Inches(11.9), Inches(0.6),
+    [[Rn("This isn't a mockup. The engine, the grading, the decisions — all built and working. A few numbers that prove it:", 15, FOG)]])
+proof = [
+    ("51 / 51", "tricky situations handled correctly"),
+    ("100%", "always picks the best option in tests"),
+    ("100%", "never breaks the safety & legal rules"),
+    ("Live", "real website + working demo accounts"),
+]
+for i, (big, lab) in enumerate(proof):
+    cx = Inches(0.7 + i * 3.02)
+    rect(s, cx, Inches(2.5), Inches(2.82), Inches(1.5), PANEL, radius=True)
+    rect(s, cx, Inches(2.5), Inches(2.82), Inches(0.1), ORANGE)
+    txt(s, cx + Inches(0.25), Inches(2.72), Inches(2.4), Inches(0.6), [[Rn(big, 26, ORANGE, True)]])
+    txt(s, cx + Inches(0.25), Inches(3.35), Inches(2.45), Inches(0.6), [[Rn(lab, 12, FOG)]], line_spacing=1.1)
+screenshot_ph(s, Inches(0.7), Inches(4.35), Inches(11.9), Inches(2.0),
+              "pnpm eval   &&   pnpm test:edge",
+              "The full self-test report — everything green, reproducible from scratch on any laptop.")
+footer(s, 16)
+
+# ================================================================================
+# 17 — why only Amazon / close
+# ================================================================================
+s = slide(NAVY)
+accent_bar(s); kicker(s, "Why this is Amazon's to win")
+title(s, "Amazon already owns the rails — we add the missing piece")
+bullets(s, Inches(0.7), Inches(2.0), Inches(11.9), Inches(2.6), [
+    ("The trucks, stations, and resale stores already exist. ", "ReLoop doesn't rebuild any of that — it just adds a brain at the very start."),
+    ("The trust is already there. ", "Every item is Amazon-checked and guaranteed — not a stranger's promise. This is why it's not just another used-goods app."),
+    ("It's a safe bet. ", "Worst case, it does exactly what happens today. Every good early decision on top of that is pure upside."),
+], fs=15.5, gap=15)
+rect(s, Inches(0.7), Inches(5.15), Inches(11.9), Inches(1.25), NAVY, line=ORANGE, line_w=1.5, radius=True)
+txt(s, Inches(1.0), Inches(5.45), Inches(11.3), Inches(0.7),
+    [[Rn("In one line:  ", 17, ORANGE, True),
+      Rn("look at the item at your door, decide its best next home before it moves — and waste far less.", 17, WHITE, True)]],
+    line_spacing=1.15)
+footer(s, 17)
+
+# ================================================================================
+# 18 — final
 # ================================================================================
 s = slide(INK)
 rect(s, 0, 0, EMU_W, Inches(0.14), ORANGE)
 rect(s, 0, Inches(7.36), EMU_W, Inches(0.14), ORANGE)
-txt(s, Inches(0.9), Inches(2.0), Inches(11.6), Inches(2.2),
-    [[R("Amazon built the resale rails.", 34, WHITE, True)],
-     [R("ReLoop gives them eyes at the doorstep", 34, FOG, False)],
-     [R("and a brain that decides before the truck rolls.", 34, ORANGE, True)]],
-    line_spacing=1.15, space_after=4)
-txt(s, Inches(0.9), Inches(4.75), Inches(11.6), Inches(0.6),
-    [[R("The return pipeline, rewired — the Amazon way.", 18, FOG, False, FONT, True)]])
-txt(s, Inches(0.9), Inches(6.0), Inches(11.6), Inches(0.5),
-    [[R("reloop-woad.vercel.app", 15, CYAN, True), R("      ·      ", 15, MUTED, False),
-      R("“The landfill is a design flaw.”", 15, MUTED, False, FONT, True)]])
+txt(s, Inches(0.9), Inches(2.15), Inches(11.6), Inches(1.0), [[Rn("ReLoop", 52, WHITE, True)]])
+txt(s, Inches(0.9), Inches(3.4), Inches(11.6), Inches(1.4),
+    [[Rn("Grade at the doorstep.", 30, FOG, False)],
+     [Rn("Decide before the item moves.", 30, ORANGE, True)]], line_spacing=1.2, space_after=4)
+txt(s, Inches(0.9), Inches(5.5), Inches(11.6), Inches(0.6),
+    [[Rn("“The landfill is a design flaw.”", 18, MUTED, False, FONT, True)]])
+txt(s, Inches(0.9), Inches(6.3), Inches(11.6), Inches(0.5),
+    [[Rn("reloop-woad.vercel.app", 15, CYAN, True)]])
 
 prs.save("deck/ReLoop-Return-Pipeline.pptx")
 print("saved deck/ReLoop-Return-Pipeline.pptx with", len(prs.slides._sldIdLst), "slides")

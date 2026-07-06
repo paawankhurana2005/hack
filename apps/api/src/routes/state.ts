@@ -11,6 +11,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { ApiError } from '@reloop/shared';
 import { getDb, isMongoConfigured } from '../lib/mongo.js';
+import { getReqId, log } from '../lib/logger.js';
 
 const COLLECTION = 'state';
 
@@ -51,8 +52,7 @@ export function createStateRouter(): Router {
       return res.json(doc ?? { scope, data: {}, updatedAt: null });
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'unknown error';
-      // eslint-disable-next-line no-console
-      console.error('[reloop/api] state get failed:', detail);
+      log('error', 'state get failed', { reqId: getReqId(req), scope, detail });
       return res.status(503).json(apiError('state_unavailable', 'Could not reach the state database'));
     }
   });
@@ -81,8 +81,7 @@ export function createStateRouter(): Router {
       return res.json({ ok: true, updatedAt });
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'unknown error';
-      // eslint-disable-next-line no-console
-      console.error('[reloop/api] state put failed:', detail);
+      log('error', 'state put failed', { reqId: getReqId(req), scope, detail });
       return res.status(503).json(apiError('state_unavailable', 'Could not reach the state database'));
     }
   });

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getLocalRoutingListings, type ExchangeItem, type MatchedBuyer } from '@/lib/mocks/exchange-store';
+import { getLocalRoutingListings, coordsForBuyer, type ExchangeItem, type MatchedBuyer } from '@/lib/mocks/exchange-store';
+import { LeafletMap } from '@/components/map/LeafletMap';
 
 function minutesAgo(iso: string) {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -195,6 +196,22 @@ export default function ListingDetailPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Nearby-buyers map */}
+        {sorted.length > 0 && (
+          <div className="overflow-hidden rounded-2xl ring-1 ring-border">
+            <LeafletMap
+              center={coordsForBuyer(sorted[0]!)}
+              zoom={12}
+              markers={sorted.map((b) => ({
+                ...coordsForBuyer(b),
+                label: b.buyerId,
+                popup: `${b.city ?? 'Local area'} · ${b.distanceKm}km away`,
+                tone: b.responded ? 'success' : 'brand',
+              }))}
+            />
           </div>
         )}
 

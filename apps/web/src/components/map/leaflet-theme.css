@@ -1,0 +1,36 @@
+/* Retint Leaflet's default white/blue chrome to match the app's light
+   navy-ink-on-white-surface + orange-accent palette (see globals.css). */
+
+.leaflet-container {
+  font-family: inherit;
+  background: oklch(var(--surface));
+}
+
+.leaflet-control-zoom a {
+  background-color: oklch(var(--card)) !important;
+  color: oklch(var(--navy)) !important;
+  border-color: oklch(var(--border)) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: oklch(var(--secondary)) !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: oklch(var(--card));
+  color: oklch(var(--card-foreground));
+  border-radius: 0.75rem;
+}
+
+.leaflet-popup-tip {
+  background: oklch(var(--card));
+}
+
+.leaflet-control-attribution {
+  background: oklch(var(--surface) / 0.85) !important;
+  color: oklch(var(--muted-foreground)) !important;
+}
+
+.leaflet-control-attribution a {
+  color: oklch(var(--navy)) !important;
+}

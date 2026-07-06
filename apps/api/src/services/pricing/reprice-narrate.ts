@@ -21,9 +21,13 @@ export function fallbackNarration(decision: PricingDecision): string {
     deadline_pressure: `nudged ${direction} ₹${amount} — the seller deadline is approaching`,
     initial_listing: `set from the ₹${Math.round(decision.anchorPrice)} local median and current demand`,
     heartbeat_staleness: `nudged ${direction} ₹${amount} — no activity in the last day`,
+    seller_markdown: `set to ₹${decision.finalPrice} on the seller's approved markdown`,
   };
 
-  const verb = decision.reasonCode === 'initial_listing' ? 'Listed' : 'Repriced';
+  const verb =
+    decision.reasonCode === 'initial_listing' || decision.reasonCode === 'seller_markdown'
+      ? 'Listed'
+      : 'Repriced';
   return `${verb} at ₹${decision.finalPrice}: ${reasonMap[decision.reasonCode]}.`;
 }
 

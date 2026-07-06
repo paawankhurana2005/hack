@@ -49,6 +49,11 @@ export function ShopCard({
               Open-box · doorstep graded
             </span>
           )}
+          {card.packagingSealed === false && !sold && (
+            <span className="absolute bottom-3 right-3 rounded-full bg-orange/90 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white backdrop-blur">
+              Packaging not included
+            </span>
+          )}
           {sold && (
             <span className="absolute inset-0 grid place-items-center">
               <span className="rounded-full border border-border bg-background/80 px-4 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground backdrop-blur">

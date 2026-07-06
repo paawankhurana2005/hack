@@ -9,7 +9,7 @@ import {
   type SubmittedReturn,
 } from '@/lib/mocks/return-store';
 import { createLocalRoutingListing, RESCUE_WINDOW_HOURS } from '@/lib/mocks/exchange-store';
-import { upsertReturnRecord } from '@/lib/api-client';
+import { upsertReturnRecord, initiateMatching, ApiRequestError } from '@/lib/api-client';
 import { earnSeller } from '@/lib/credits-store';
 import { Card } from '@/components/ui/card';
 
@@ -116,6 +116,35 @@ function HealthCardOverlay({
 
         {grading ? (
           <div className="space-y-4">
+            {/* Health Card narrative — the trust layer, minted at the return click */}
+            {ret.healthCard && (
+              <div className="rounded-lg border border-brand/30 bg-brand/5 p-3">
+                {'fallback' in ret.healthCard ? (
+                  <p className="text-sm text-muted-foreground">{ret.healthCard.summary}</p>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-foreground">{ret.healthCard.summary}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 flex-1 rounded-full bg-secondary">
+                        <div
+                          className="h-1.5 rounded-full bg-success"
+                          style={{ width: `${ret.healthCard.trustScore}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold text-success">
+                        {ret.healthCard.trustScore}/100 trust
+                      </span>
+                    </div>
+                    {ret.healthCard.notVerified.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Not verified from photos: {ret.healthCard.notVerified.join('; ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Grade */}
             <div className="space-y-3">
               {grading.grade && (
@@ -213,6 +242,8 @@ export function SellerReturnDetail({ returnId }: Props) {
   const [ret, setRet] = useState<SubmittedReturn | null | 'loading'>('loading');
   const [showHealthCard, setShowHealthCard] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [matchInfo, setMatchInfo] = useState<{ candidateCount: number; sessionId: string } | null>(null);
   const [completing, setCompleting] = useState(false);
   const [photoIdx, setPhotoIdx] = useState(0);
 
@@ -251,54 +282,71 @@ export function SellerReturnDetail({ returnId }: Props) {
   const isSellerApproved = ret.status === 'seller_approved';
   const isDealComplete = ret.status === 'deal_completed';
 
-  function handleApprove() {
+  // Spec 022: approval is now a real, sequenced backend action — the return
+  // record must land before matching is initiated (initiateMatchSession looks
+  // it up by returnId and needs its pincode), and neither call is swallowed
+  // anymore. Local status only flips once matching has actually started, so
+  // the seller is never shown a false "approved" state.
+  async function handleApprove() {
     if (!ret || ret === 'loading') return;
     const currentRet = ret;
     const currentGrading = grading;
     const currentRouting = routing;
+
+    if (!currentGrading?.grade || currentGrading.grade === 'Salvage' || currentRouting?.decision !== 'local_resale') {
+      setApproveError('This return is missing the grading data needed to start local matching.');
+      return;
+    }
+
     setApproving(true);
-    setTimeout(() => {
+    setApproveError(null);
+    setMatchInfo(null);
+
+    try {
+      const nowMs = Date.now();
+      await upsertReturnRecord({
+        returnId: currentRet.returnId,
+        productName: currentRet.productName,
+        category: currentRet.category.toLowerCase(),
+        // No pincode on returns yet — default to a launch zone for the demo.
+        region_cluster: 'Bengaluru',
+        pincode: '560001',
+        base_price: Math.round(currentRet.priceCents / 100),
+        // condition_score is a placeholder until AI grading confidence is threaded here.
+        condition_score: 0.7,
+        listing_created_at: new Date(nowMs).toISOString(),
+        pickup_deadline: new Date(nowMs + RESCUE_WINDOW_HOURS * 3600_000).toISOString(),
+        grade: currentGrading.grade,
+      });
+
+      const match = await initiateMatching(currentRet.returnId);
+      setMatchInfo({ candidateCount: match.candidateCount, sessionId: match.sessionId });
+
       const updated = approveReturn(currentRet.returnId);
       if (updated) {
         setRet(updated);
-        if (currentRouting?.decision === 'local_resale' && currentGrading?.grade && currentGrading.grade !== 'Salvage') {
-          createLocalRoutingListing({
-            returnId: currentRet.returnId,
-            productName: currentRet.productName,
-            category: currentRet.category,
-            grade: currentGrading.grade as 'A' | 'B' | 'C',
-            priceCents: currentRet.priceCents,
-            nearbyBuyers: currentRouting.nearbyBuyers ?? 4,
-            radiusKm: currentRouting.radiusKm ?? 5,
-            co2SavedKg: currentRouting.co2SavedKg ?? 2.4,
-            distanceSavedKm: currentRouting.warehouseDistanceKm ?? 580,
-            imageUrl: currentRet.photoUrls?.[0],
-          });
-
-          // Persist a structured return record so the backend pricing engine can
-          // price it on the rescue page. Best-effort: the approval already
-          // succeeded locally, so a DB/API hiccup here must not block the seller.
-          const nowMs = Date.now();
-          void upsertReturnRecord({
-            returnId: currentRet.returnId,
-            productName: currentRet.productName,
-            category: currentRet.category.toLowerCase(),
-            // No pincode on returns yet — default to a launch zone for the demo.
-            region_cluster: 'Bengaluru',
-            pincode: '560001',
-            base_price: Math.round(currentRet.priceCents / 100),
-            // condition_score is a placeholder until AI grading is wired in.
-            condition_score: 0.7,
-            listing_created_at: new Date(nowMs).toISOString(),
-            pickup_deadline: new Date(nowMs + RESCUE_WINDOW_HOURS * 3600_000).toISOString(),
-            grade: currentGrading.grade,
-          }).catch(() => {
-            // Swallow — pricing tab falls back to the local estimate if absent.
-          });
-        }
+        createLocalRoutingListing({
+          returnId: currentRet.returnId,
+          productName: currentRet.productName,
+          category: currentRet.category,
+          grade: currentGrading.grade as 'A' | 'B' | 'C',
+          priceCents: currentRet.priceCents,
+          nearbyBuyers: currentRouting.nearbyBuyers ?? 4,
+          radiusKm: currentRouting.radiusKm ?? 5,
+          co2SavedKg: currentRouting.co2SavedKg ?? 2.4,
+          distanceSavedKm: currentRouting.warehouseDistanceKm ?? 580,
+          imageUrl: currentRet.photoUrls?.[0],
+        });
       }
+    } catch (err) {
+      setApproveError(
+        err instanceof ApiRequestError
+          ? err.message
+          : 'Could not start local buyer matching. Please try again.',
+      );
+    } finally {
       setApproving(false);
-    }, 600);
+    }
   }
 
   function handleSendToWarehouse() {
@@ -513,19 +561,34 @@ export function SellerReturnDetail({ returnId }: Props) {
                   <button
                     type="button"
                     disabled={approving}
-                    onClick={handleApprove}
+                    onClick={() => void handleApprove()}
                     className="flex-1 rounded-xl bg-success px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60 sm:flex-none"
                   >
-                    {approving ? 'Creating listing…' : 'Approve for Local Listing'}
+                    {approving ? 'Starting local matching…' : 'Approve for Local Listing'}
                   </button>
                   <button
                     type="button"
+                    disabled={approving}
                     onClick={handleSendToWarehouse}
-                    className="flex-1 rounded-xl border border-border bg-card px-5 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground sm:flex-none"
+                    className="flex-1 rounded-xl border border-border bg-card px-5 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground disabled:opacity-60 sm:flex-none"
                   >
                     Send to Warehouse Instead
                   </button>
                 </div>
+
+                {approveError && (
+                  <div className="mt-4 rounded-lg border border-danger/30 bg-danger/10 p-4">
+                    <p className="text-sm font-semibold text-danger">Approval didn't go through</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{approveError}</p>
+                    <button
+                      type="button"
+                      onClick={() => void handleApprove()}
+                      className="mt-3 rounded-lg border border-danger/40 px-4 py-2 text-xs font-semibold text-danger hover:bg-danger/10"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -543,6 +606,12 @@ export function SellerReturnDetail({ returnId }: Props) {
                 {ret.sellerApprovedAt && (
                   <p className="text-xs text-muted-foreground">
                     Approved {formatDateTime(ret.sellerApprovedAt)}
+                  </p>
+                )}
+                {matchInfo && (
+                  <p className="mt-1 text-sm font-semibold text-success">
+                    Matching started — {matchInfo.candidateCount} local buyer
+                    {matchInfo.candidateCount === 1 ? '' : 's'} notified.
                   </p>
                 )}
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -627,6 +696,52 @@ export function SellerReturnDetail({ returnId }: Props) {
           )}
         </Card>
 
+        {/* ── Intelligent Bridge — glass-box EV breakdown ── */}
+        {routing?.evBreakdown && (
+          <Card>
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Intelligent Bridge — why {routing.decision.replace(/_/g, ' ')}
+            </p>
+            <p className="mb-4 text-sm text-muted-foreground">{routing.reasoning}</p>
+            <div className="space-y-2">
+              {[...routing.evBreakdown.paths]
+                .sort((a, b) => b.evCents - a.evCents)
+                .map((p) => {
+                  const isChosen = p.path === routing.evBreakdown!.chosen;
+                  return (
+                    <div key={p.path} className="space-y-1">
+                      <div
+                        className={`flex items-center justify-between rounded-lg px-3 py-2 ${
+                          isChosen ? 'bg-brand/10 ring-1 ring-brand/40' : 'bg-secondary/50'
+                        } ${p.viable ? '' : 'opacity-60'}`}
+                      >
+                        <span className="text-sm capitalize text-foreground">
+                          {isChosen && '✓ '}
+                          {p.path.replace(/_/g, ' ')}
+                        </span>
+                        <span
+                          className={`font-mono text-sm tabular-nums ${
+                            p.evCents >= 0 ? 'text-foreground' : 'text-danger'
+                          }`}
+                        >
+                          {p.evCents >= 0 ? '+' : '−'}
+                          {formatPrice(Math.abs(p.evCents))}
+                        </span>
+                      </div>
+                      {!p.viable && p.gateReason && (
+                        <p className="px-3 text-xs text-muted-foreground">{p.gateReason}</p>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+            {routing.evBreakdown.hardRule && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Hard rule applied: {routing.evBreakdown.hardRule}
+              </p>
+            )}
+          </Card>
+        )}
 
         {/* ── Economic summary — only visible after seller approves ── */}
         {(isSellerApproved || isDealComplete) && routing && (routing.localMargin !== undefined || routing.warehouseMargin !== undefined) && (

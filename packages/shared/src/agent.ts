@@ -81,6 +81,9 @@ export interface AgentEvent {
   priceToCents?: number;
   floorCents?: number;
   routeRecommendation?: RouteRecommendation;
+  /** Spec 022: the deterministic factors behind a 'diagnosed' event — the
+   *  itemized "why" underneath the one-line diagnosis text. */
+  factors?: AgentFactor[];
 }
 
 /** Request body for POST /api/agent/narrate (LLM phrases the acted line). */

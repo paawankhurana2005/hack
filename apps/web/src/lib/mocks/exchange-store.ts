@@ -88,6 +88,34 @@ const BUYER_POOL: Array<Pick<MatchedBuyer, 'name' | 'avatar' | 'buyerId' | 'city
 
 const MATCH_REASONS: MatchedBuyer['matchReason'][] = ['wishlisted', 'searched', 'purchased_similar'];
 
+// Spec 023: approximate Bengaluru-neighborhood coordinates for the nearby-buyers
+// map — illustrative demo data (mirrors the pattern in apps/api's regionCluster.ts
+// pincode table), keyed by the neighborhood name every `MatchedBuyer.city` here
+// starts with (e.g. "Koramangala, Bengaluru" → "Koramangala").
+const NEIGHBORHOOD_COORDS: Record<string, { lat: number; lng: number }> = {
+  Koramangala: { lat: 12.9352, lng: 77.6146 },
+  Indiranagar: { lat: 12.9719, lng: 77.6412 },
+  'HSR Layout': { lat: 12.9121, lng: 77.6446 },
+  Whitefield: { lat: 12.9698, lng: 77.75 },
+  'JP Nagar': { lat: 12.9077, lng: 77.5851 },
+  Jayanagar: { lat: 12.9308, lng: 77.5838 },
+  'BTM Layout': { lat: 12.9166, lng: 77.6101 },
+  'Electronic City': { lat: 12.8452, lng: 77.6602 },
+  Malleshwaram: { lat: 13.0037, lng: 77.5709 },
+  Marathahalli: { lat: 12.9569, lng: 77.7011 },
+  Banaswadi: { lat: 13.0143, lng: 77.6512 },
+  Rajajinagar: { lat: 12.9915, lng: 77.5522 },
+  Yelahanka: { lat: 13.1007, lng: 77.5963 },
+};
+const BENGALURU_CENTER = { lat: 12.9716, lng: 77.5946 };
+
+/** Approximate lat/lng for a buyer's neighborhood, for the nearby-buyers map. */
+export function coordsForBuyer(buyer: Pick<MatchedBuyer, 'city'>): { lat: number; lng: number } {
+  const neighborhood = buyer.city?.split(',')[0]?.trim();
+  const coords = neighborhood ? NEIGHBORHOOD_COORDS[neighborhood] : undefined;
+  return coords ?? BENGALURU_CENTER;
+}
+
 function generateLocalBuyers(count: number, radiusKm: number): MatchedBuyer[] {
   const n = Math.min(count, BUYER_POOL.length);
   return BUYER_POOL.slice(0, n).map((b, i) => ({

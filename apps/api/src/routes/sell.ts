@@ -7,6 +7,7 @@ import type { GradingService } from '../services/grading/grading-service.js';
 import type { PricingService } from '../services/pricing/pricing-service.js';
 import type { HealthCardService } from '../services/health-card/health-card-service.js';
 import { runSellPipeline } from '../services/pipeline/sell-pipeline.js';
+import { getReqId, log } from '../lib/logger.js';
 
 const MAX_IMAGES = 4;
 // ~2.6MB of base64 ≈ ~2MB binary per image; generous upper bound before we reject.
@@ -137,8 +138,7 @@ export function createSellRouter(
       return res.json(result);
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'unknown error';
-      // eslint-disable-next-line no-console
-      console.error('[reloop/api] grading failed:', detail);
+      log('error', 'grading failed', { reqId: getReqId(req), detail });
       return res
         .status(502)
         .json(apiError('grading_failed', `Grading failed: ${detail.slice(0, 200)}`));
@@ -156,8 +156,7 @@ export function createSellRouter(
       return res.json(result);
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'unknown error';
-      // eslint-disable-next-line no-console
-      console.error('[reloop/api] pricing failed:', detail);
+      log('error', 'pricing failed', { reqId: getReqId(req), detail });
       return res
         .status(502)
         .json(apiError('pricing_failed', `Pricing failed: ${detail.slice(0, 200)}`));

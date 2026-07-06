@@ -420,7 +420,14 @@ export async function tick(
       )} · ${s.ctx.localDemand} demand`,
       at: now,
     });
-    newEvents.push({ day: s.day, phase: 'diagnosed', text: decision.diagnosis, at: now, action: decision.action });
+    newEvents.push({
+      day: s.day,
+      phase: 'diagnosed',
+      text: decision.diagnosis,
+      at: now,
+      action: decision.action,
+      factors: decision.factors,
+    });
     newEvents.push({
       day: s.day,
       phase: 'acted',
@@ -473,6 +480,97 @@ export function setManualPrice(id: string, cents: number): AgentState | null {
       priceFromCents: from,
       priceToCents: clamped,
       floorCents: s.floorCents,
+    },
+  ];
+  write(s);
+  return s;
+}
+
+/**
+ * Spec 023: seller approves a specific discounted price for an already-listed
+ * item (distinct from `setManualPrice`, which is a pure client-side clamp that
+ * pauses the agent). This goes through the real reprice engine as a
+ * `seller_markdown` event — the bandit/model still run for telemetry
+ * continuity, the seller's price becomes the new floor going forward, and the
+ * agent keeps running (the bandit continues adjusting from this new baseline).
+ */
+export async function applyManualMarkdown(
+  id: string,
+  approvedPriceCents: number,
+): Promise<AgentState | null> {
+  const s = read(id);
+  if (!s) return null;
+
+  const approvedPrice = Math.round(approvedPriceCents / 100);
+  const newFloorCents = Math.max(s.floorCents, approvedPriceCents);
+  const anchor = Math.round(s.ctx.comparableCents / 100);
+  const from = s.priceCents;
+  const now = new Date().toISOString();
+
+  const req: PricingDecideRequest = {
+    listingId: s.id,
+    currentPrice: Math.round(s.priceCents / 100),
+    event: { type: 'seller_markdown', payload: { approvedPrice } },
+    state: {
+      category: s.category,
+      gradeKey: s.grade,
+      compMedianPrice: anchor,
+      amazonNewPrice: Math.round(s.retailCents / 100),
+      sellerFloor: Math.round(newFloorCents / 100),
+      routeElsewhereValue: Math.round((newFloorCents / 100) * 0.6),
+      numReprices: s.priceHistory.length - 1,
+      daysOnMarket: s.day,
+    },
+  };
+
+  let finalCents: number;
+  let diagnosis: string;
+  try {
+    const pd = await decidePricing(req);
+    finalCents = Math.round(pd.finalPrice * 100);
+    diagnosis = pd.reason;
+  } catch {
+    // Engine unreachable — fall back to the approved price itself, clamped to
+    // the retail ceiling, so the seller's action still lands.
+    finalCents = Math.min(s.retailCents, approvedPriceCents);
+    diagnosis = 'Set from your approved markdown (pricing engine unavailable, applied directly).';
+  }
+
+  s.priceCents = finalCents;
+  s.floorCents = newFloorCents;
+  s.priceHistory = [...s.priceHistory, { day: s.day, cents: finalCents }];
+
+  if (finalCents !== from) {
+    appendEventIfStored(s.itemId, {
+      type: 'price_adjusted',
+      at: now,
+      verified: true,
+      fromPrice: inr(from),
+      toPrice: inr(finalCents),
+      reason: 'Seller-approved markdown.',
+    });
+  }
+
+  s.events = [
+    ...s.events,
+    {
+      day: s.day,
+      phase: 'diagnosed',
+      text: diagnosis,
+      at: now,
+      action: 'reprice',
+    },
+    {
+      day: s.day,
+      phase: 'acted',
+      text: `Seller approved a markdown from ${formatMoney(inr(from))} to ${formatMoney(
+        inr(finalCents),
+      )} — new floor ${formatMoney(inr(newFloorCents))}.`,
+      at: now,
+      action: 'reprice',
+      priceFromCents: from,
+      priceToCents: finalCents,
+      floorCents: newFloorCents,
     },
   ];
   write(s);

@@ -5,6 +5,14 @@ Everything the deck needs you to screenshot, with the **exact command**, the
 All commands are deterministic — no network, no NVIDIA key needed for the proofs
 (the two live `/api/route` calls just need your local API running on `:4000`).
 
+> **The deck has just 3 "📸 PASTE SCREENSHOT HERE" spots.** In order of priority:
+> - **Slide 8** — the speaker example → §3 (Scenario A)
+> - **Slide 10** — the live re-route → §5 (Scenario D), or capture it in the UI
+> - **Slide 16** — "is it real?" proof → §1 + §2 (`pnpm eval && pnpm test:edge`)
+>
+> Sections §4 and §6 below are optional extras (nice to have on hand for Q&A,
+> not required by any slide).
+
 > **Terminal tips for clean screenshots**
 > - Full-screen the terminal, dark theme, font size ~16pt, ~110 cols wide.
 > - Pipe long JSON through `| python3 -m json.tool` (already baked into the
@@ -34,7 +42,7 @@ curl -s http://localhost:4000/health
 
 ## 1. `pnpm test:edge` — the 51/51 edge-case matrix
 
-**Slides:** 7 (hard ladder), 15 (returnless refund), 20 (validation)
+**Slide:** 16 (the “is it real?” proof)
 
 ```bash
 cd /Users/damankhurana/hack
@@ -49,20 +57,13 @@ ReLoop edge-case matrix — 51/51 passed
   ✓ all edge cases handled
 ```
 
-> 💡 For slide 15 you want the returnless assertions specifically. Run this to
-> show only those lines in the screenshot (they're asserted inside the run —
-> this grep just proves which ones exist):
->
-> ```bash
-> grep -n "returnless\|all-paths-negative\|no trust\|high-value\|fraud signal" \
->   apps/api/src/eval/edge-cases.ts
-> ```
+> 💡 The `51/51 passed` line is the one to crop for slide 16.
 
 ---
 
 ## 2. `pnpm eval` — the deterministic baseline report
 
-**Slides:** 7 (hard-rule 100%), 20 (validation tiles — MAPE, AUC, ECE, argmax)
+**Slide:** 16 (the “is it real?” proof — the metric tiles come from this report)
 
 ```bash
 cd /Users/damankhurana/hack
@@ -87,14 +88,14 @@ Confidence calibration     ECE 0.099 → 0.024
 Drift watchdog             stable PSI 0 → continue · shifted PSI 3.404 → fallback
 ```
 
-> 💡 Screenshot the **whole** report for slide 20's big bottom placeholder.
-> Screenshot just the **Routing** block for slide 7.
+> 💡 Screenshot the **whole** report for slide 16's big placeholder — the four
+> metric tiles on that slide (51/51, 100%, 100%, Live) all trace back to it.
 
 ---
 
 ## 3. Live routing — Scenario A (RESTOCK, full glass-box EV table)
 
-**Slide:** 8 ("Every path priced, every term signed")
+**Slide:** 8 (the returned-speaker example)
 
 ```bash
 curl -s -X POST http://localhost:4000/api/route \
@@ -143,7 +144,7 @@ every path with its signed `terms`. Key rows to have visible in the crop:
 
 ## 4. Live routing — Scenario B (LOW-CONFIDENCE COLLAPSE → liquidate pallet)
 
-**Slide:** 9 ("Confidence gates — graceful degradation")
+**Optional** (Q&A backup — not on a slide in this version)
 
 ```bash
 curl -s -X POST http://localhost:4000/api/route \
@@ -163,7 +164,7 @@ curl -s -X POST http://localhost:4000/api/route \
 
 ## 5. Live checkpoint — Scenario D (LIVE RE-ROUTE restock → local_resale)
 
-**Slide:** 11 ("Two human checkpoints — live re-route"). This is the money shot.
+**Slide:** 10 (the live re-route). This is the money shot — capture the UI too.
 
 ```bash
 # BEFORE — doorstep, sealed grade A
@@ -195,8 +196,8 @@ AFTER   decision: local_resale
 
 ## 6. Liquidation-lot engine — pallet auction + manifest premium + ship-vs-wait
 
-**Slide:** 14 ("Manifested pallets: a real secondary-market auction"). This script
-is committed at `apps/api/src/scripts/lot-trace.ts`.
+**Optional** (Q&A backup for the "graded lot" row on slide 8/11). Committed at
+`apps/api/src/scripts/lot-trace.ts`.
 
 ```bash
 cd /Users/damankhurana/hack
@@ -222,9 +223,8 @@ ship-vs-wait  40/40 → shipNow=true  Pallet full (40/40) — ship now
 
 ## 7. Notifications / cascade logs (optional — needs MongoDB configured)
 
-**Slide:** 17 ("Stateful, restart-safe buyer matching"). The deck already shows
-a rendered mock of these lines; if you have Mongo wired and want a real capture,
-the API prints these on boot and every 30-min cron tick:
+**Optional** (Q&A backup — cascade/notification behaviour). If you have Mongo
+wired, the API prints these on boot and every 30-min cron tick:
 
 ```
 {"level":"info","msg":"matching cascade scheduled","cron":"*/30 * * * *"}
@@ -233,8 +233,8 @@ the API prints these on boot and every 30-min cron tick:
 ```
 
 You can also screenshot your **API terminal** after making the curl calls above —
-each request emits a structured access log line (this is the "structured JSON
-logging" claim on slides 17 & 19):
+each request emits a structured access log line, handy if a judge asks about
+logging/observability:
 
 ```
 {"level":"info","time":"...","msg":"request","reqId":"...","method":"POST","path":"/api/route","status":200,"durationMs":3}
@@ -242,18 +242,18 @@ logging" claim on slides 17 & 19):
 
 ---
 
-## Slide → screenshot cheat sheet
+## Slide → screenshot cheat sheet (this version of the deck)
 
-| Slide | Screenshot | Command |
+Only three slides have a "📸 PASTE SCREENSHOT HERE" box:
+
+| Slide | What goes there | Command |
 |---|---|---|
-| 7  | Routing hard-rule 100% | `pnpm eval` (Routing block) |
-| 8  | Restock glass-box EV table | Scenario A curl (§3) |
-| 9  | Low-confidence gated paths | Scenario B curl (§4) |
-| 11 | Live re-route (terminal + UI) | Scenario D curl (§5) + Hub Bench UI |
-| 14 | Pallet auction + +45% premium | `lot-trace.ts` (§6) |
-| 15 | Returnless assertions | `pnpm test:edge` (§1) |
-| 17 | Cascade / request logs | API terminal (§7) |
-| 20 | Full eval + 51/51 matrix | `pnpm eval` + `pnpm test:edge` |
+| **8**  | The speaker's option-by-option breakdown | Scenario A curl (§3) |
+| **10** | The live re-route (terminal **and/or** the Hub UI) | Scenario D curl (§5) + Hub screen |
+| **16** | Full self-test — the four metric tiles trace to this | `pnpm eval` + `pnpm test:edge` (§1–2) |
+
+Sections **§4** (low-confidence collapse) and **§6** (lot engine) are optional
+Q&A backups — no slide needs them, but they're great live answers.
 
 Everything is reproducible from a clean checkout — that's the point. If a judge
 asks "is this real or hardcoded?", run any of these live.

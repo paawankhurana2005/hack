@@ -15,6 +15,7 @@ const REASON_BY_EVENT: Record<DemandEventType, PricingReasonCode> = {
   save_no_purchase: 'save_no_purchase',
   heartbeat: 'heartbeat_staleness',
   initial_listing: 'initial_listing',
+  seller_markdown: 'seller_markdown',
 };
 
 export function reasonCodeFor(type: DemandEventType): PricingReasonCode {
@@ -52,6 +53,8 @@ export function isSignificant(event: DemandEvent, ctx: SignificanceContext): boo
       return true; // daily staleness backstop (caller gates the cadence)
     case 'initial_listing':
       return true; // first price
+    case 'seller_markdown':
+      return true; // deliberate seller action — always significant
     default:
       return false;
   }

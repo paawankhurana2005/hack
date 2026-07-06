@@ -1,5 +1,6 @@
 import type {
   ReturnGradingResult,
+  ReturnHealthCard,
   ReturnItemState,
   ReturnRoutingDecision,
   ReturnReason,
@@ -17,6 +18,9 @@ export interface SubmittedReturn {
   photoUrls?: string[];
   gradingResult: ReturnGradingResult | null;
   routingDecision: ReturnRoutingDecision | null;
+  /** Spec 022: the Product Health Card minted at grading time (real API or a
+   *  deterministic-summary fallback). Absent on records from before this spec. */
+  healthCard?: ReturnHealthCard | { fallback: true; summary: string };
   submittedAt: string;
   agentArrivesAt: string;
   status:

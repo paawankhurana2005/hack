@@ -9,11 +9,13 @@ import {
   rescueProgress,
   hoursRemaining,
   getLocalRoutingListings,
+  coordsForBuyer,
   type ExchangeItem,
   type MatchedBuyer,
 } from '@/lib/mocks/exchange-store';
 import { getPricing } from '@/lib/api-client';
 import type { PriceBreakdown } from '@reloop/shared';
+import { LeafletMap } from '@/components/map/LeafletMap';
 
 function formatINR(cents: number) {
   return `₹${(cents / 100).toLocaleString('en-IN')}`;
@@ -218,6 +220,22 @@ function BuyersTab({ item, offsetHours }: { item: ExchangeItem; offsetHours: num
         <span className="font-semibold text-foreground">{formatINR(currentPrice)}</span> —{' '}
         before the return was even processed.
       </p>
+
+      {/* Nearby-buyers map */}
+      {sortedBuyers.length > 0 && (
+        <div className="overflow-hidden rounded-2xl ring-1 ring-border">
+          <LeafletMap
+            center={coordsForBuyer(sortedBuyers[0]!)}
+            zoom={12}
+            markers={sortedBuyers.map((b) => ({
+              ...coordsForBuyer(b),
+              label: b.buyerId,
+              popup: `${b.city ?? 'Local area'} · ${b.distanceKm}km away`,
+              tone: b.responded ? 'success' : 'brand',
+            }))}
+          />
+        </div>
+      )}
 
       {/* Buyer rows */}
       <div className="space-y-2">

@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { PRICE_ARMS } from '@reloop/shared';
 import type { RepriceEngine } from '../services/pricing/reprice-engine.js';
+import { getReqId, log } from '../lib/logger.js';
 
 const eventTypeEnum = z.enum([
   'comp_sold',
@@ -17,6 +18,7 @@ const eventTypeEnum = z.enum([
   'save_no_purchase',
   'heartbeat',
   'initial_listing',
+  'seller_markdown',
 ]);
 
 const stateSchema = z
@@ -72,8 +74,11 @@ export function createPricingRouter(engine: RepriceEngine): Router {
       })
       .then((decision) => res.json(decision))
       .catch((err: unknown) => {
-        // eslint-disable-next-line no-console
-        console.error('[reloop/api] pricing decide failed:', err);
+        log('error', 'pricing decide failed', {
+          reqId: getReqId(req),
+          listingId,
+          detail: err instanceof Error ? err.message : String(err),
+        });
         res.status(500).json({ error: 'pricing decision failed' });
       });
   });

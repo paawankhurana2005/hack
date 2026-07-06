@@ -1,9 +1,11 @@
 import type { Request, Response } from 'express';
 import type { ReturnGradingResult, ReturnHealthCard } from '@reloop/shared';
-import { nvidiaChat } from '../lib/nvidia-client.js';
+import { nvidiaChat } from '../services/nvidia/client.js';
+import { config } from '../config.js';
 import { HealthCardError } from '../lib/errors.js';
 import { MOCK_MODE } from '../lib/env.js';
 import { mockHealthCard } from '../lib/mocks.js';
+import { getReqId } from '../lib/logger.js';
 
 const TEXT_MODEL = 'meta/llama-3.1-70b-instruct';
 
@@ -80,7 +82,7 @@ export async function healthCardHandler(req: Request, res: Response): Promise<vo
   }
 
   try {
-    const raw = await nvidiaChat({
+    const raw = await nvidiaChat(config, {
       model: TEXT_MODEL,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -88,6 +90,7 @@ export async function healthCardHandler(req: Request, res: Response): Promise<vo
       ],
       maxTokens: 256,
       temperature: 0.2,
+      traceMeta: { name: 'health-card.summarize', reqId: getReqId(req) },
     });
 
     const result = parseHealthCardResponse(raw);

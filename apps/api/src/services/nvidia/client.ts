@@ -3,6 +3,7 @@
 // in one place.
 
 import type { Config } from '../../config.js';
+import { traceModelCall, type TraceMeta } from '../../lib/langfuse.js';
 
 export interface ChatContentPart {
   type: 'text' | 'image_url';
@@ -21,6 +22,8 @@ export interface ChatRequest {
   maxTokens?: number;
   temperature?: number;
   topP?: number;
+  /** Spec 022: optional Langfuse trace correlation — omit to run untraced. */
+  traceMeta?: TraceMeta;
 }
 
 // Hard ceiling on a single model call so a stuck upstream can never hang the
@@ -28,8 +31,14 @@ export interface ChatRequest {
 const REQUEST_TIMEOUT_MS = 45_000;
 
 /** POST a chat completion and return the assistant's text content. Throws on
- *  transport errors, timeout, or an empty response. */
+ *  transport errors, timeout, or an empty response. Every call is traced via
+ *  Langfuse when configured (see lib/langfuse.ts) — this is the one seam all
+ *  NVIDIA calls in the API go through, so tracing lives here, not per call site. */
 export async function nvidiaChat(cfg: Config, req: ChatRequest): Promise<string> {
+  return traceModelCall(req.traceMeta ?? {}, req.model, req.messages, () => doChat(cfg, req));
+}
+
+async function doChat(cfg: Config, req: ChatRequest): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 

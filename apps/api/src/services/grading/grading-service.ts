@@ -8,6 +8,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { ConditionGrade, DetectedIssue, GradeRequest, GradingResult, PhotoQuality } from '@reloop/shared';
+import { log } from '../../lib/logger.js';
 import {
   ABSTAIN_THRESHOLD,
   calibrateConfidence,
@@ -98,8 +99,9 @@ export class GradingService {
         assessments.push(await this.provider.assessImage({ draft: req.draft, imageBase64 }));
       } catch (err) {
         lastError = err;
-        // eslint-disable-next-line no-console
-        console.error('[reloop/api] one image failed to grade:', err instanceof Error ? err.message : err);
+        log('warn', 'one image failed to grade', {
+          detail: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 

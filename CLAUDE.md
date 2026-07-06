@@ -99,6 +99,10 @@ the GitHub app in Project → Settings → Git). The two are wired by env vars:
 - Render: `NVIDIA_API_KEY` (required — the API exits without it) and `WEB_ORIGIN`
   = the Vercel URL (CORS). If either URL changes, update the other side and
   redeploy web (the API URL is compiled into the web bundle).
+- Render: also set `GRADING_PROVIDER=chat-vlm` — the default (`trained-local`)
+  expects our own trained grader (`ml/grading/serve.py`) running locally on
+  `GRADING_MODEL_URL`; nobody has deployed that Flask server on Render, so
+  leaving the default would pay a timeout-then-fallback on every grade call.
 
 ### Before every push to `main` (so deploys stay green)
 1. `pnpm -r typecheck` — must pass (web, api, shared are all strict, no `any`).

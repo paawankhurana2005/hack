@@ -6,11 +6,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { ObjectId } from 'mongodb';
-import type { ApiError } from '@reloop/shared';
+import type { ApiError, MatchCandidateGeo } from '@reloop/shared';
 import { getDb, isMongoConfigured } from '../lib/mongo.js';
 import { log } from '../lib/logger.js';
-import { getRegionCluster, getPincodeCoordinates, getCityForPincode } from '../lib/regionCluster.js';
-import { BUYERS, MATCH_SESSIONS, type BuyerDoc, type MatchSessionDoc } from '../lib/collections.js';
+import { getRegionCluster, getPincodeCoordinates, getCityForPincode, haversineDistanceKm } from '../lib/regionCluster.js';
+import { BUYERS, MATCH_SESSIONS, RETURNS, type BuyerDoc, type MatchSessionDoc, type ReturnRecordDoc } from '../lib/collections.js';
 import { initiateMatchSession, recordBuyerResponse } from '../services/matchingEngine.js';
 import { logDemandEvent } from '../services/demandEvents.js';
 import { MatchSessionNotFoundError, ReturnIncompleteError, ReturnNotFoundError } from '../lib/errors.js';
@@ -129,6 +129,35 @@ export function createMatchingRouter(): Router {
       if (!session) {
         return res.status(404).json(apiError('match_session_not_found', `No match session for return: ${returnId}`));
       }
+
+      // Spec 023: illustrative geo for the seller's nearby-buyers map — derived
+      // at read-time (not stored). Origin = the return's own pincode centroid;
+      // omits buyer.contact (PII) from the response entirely.
+      const notified = session.candidate_list.filter((c) => c.notified_at !== null);
+      let candidates: MatchCandidateGeo[] = [];
+      if (notified.length > 0) {
+        const returnDoc = await db.collection<ReturnRecordDoc>(RETURNS).findOne({ returnId });
+        const origin = getPincodeCoordinates(returnDoc?.pincode ?? '560001');
+        const buyerDocs = await db
+          .collection<BuyerDoc>(BUYERS)
+          .find({ _id: { $in: notified.map((c) => c.buyer_id) } })
+          .toArray();
+        const buyerById = new Map(buyerDocs.map((b) => [b._id!.toString(), b]));
+        candidates = notified.map((c) => {
+          const buyer = buyerById.get(c.buyer_id.toString());
+          const [lng, lat] = buyer?.location.coordinates ?? [origin.lng, origin.lat];
+          return {
+            buyerId: c.buyer_id.toString(),
+            city: buyer?.city ?? 'Unknown',
+            lat,
+            lng,
+            distanceKm: Math.round(haversineDistanceKm(origin, { lat, lng }) * 10) / 10,
+            matchScore: c.match_score,
+            response: c.response,
+          };
+        });
+      }
+
       return res.json({
         sessionId: session._id.toString(),
         returnId: session.return_id,
@@ -139,6 +168,7 @@ export function createMatchingRouter(): Router {
         matchedBuyerId: session.matched_buyer_id?.toString() ?? null,
         matchedAt: session.matched_at,
         pickupDeadline: session.pickup_deadline,
+        candidates,
       });
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'unknown error';

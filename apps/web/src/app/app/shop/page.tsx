@@ -50,6 +50,19 @@ export default function ShopPage() {
         </span>
       </div>
 
+      <Link
+        href="/app/shop/returned"
+        className="mb-6 flex items-center justify-between rounded-2xl border border-orange/30 bg-orange/5 px-5 py-4 transition-colors hover:bg-orange/10"
+      >
+        <span>
+          <span className="block font-semibold text-foreground">Returned & Verified</span>
+          <span className="block text-sm text-muted-foreground">
+            Hub-checked customer returns, condition and packaging status shown upfront.
+          </span>
+        </span>
+        <span className="font-mono text-xs uppercase tracking-widest text-orange">Browse →</span>
+      </Link>
+
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {entries.map((item) => (
           <ShopCard

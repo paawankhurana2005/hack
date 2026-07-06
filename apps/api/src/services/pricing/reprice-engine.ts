@@ -20,6 +20,7 @@ import type { RewardModel } from './reward-model.js';
 import { RepriceBandit } from './reprice-bandit.js';
 import { reasonCodeFor } from './reprice-events.js';
 import { narrateDecision, type Completer } from './reprice-narrate.js';
+import { log } from '../../lib/logger.js';
 
 const GRADE_ORDINAL: Record<PricingStateVector['gradeKey'], number> = {
   new: 5,
@@ -115,15 +116,24 @@ export class RepriceEngine {
 
     const prior = this.lastByListing.get(req.listingId);
     // If the caller tells us the current price, this is a reprice, not a first listing
-    // (so the per-step cap applies) — unless the event itself is the initial listing.
+    // (so the per-step cap applies) — unless the event itself is the initial listing, or
+    // a seller-approved markdown (spec 023: a deliberate seller decision should land in
+    // one step too, not get clamped by the ±₹100/8% guardrail meant for algorithmic moves).
     const isFirstListing =
       req.event.type === 'initial_listing' ||
+      req.event.type === 'seller_markdown' ||
       (req.currentPrice === undefined && !prior && state.numReprices === 0);
     const currentPrice = req.currentPrice ?? prior?.finalPrice ?? anchor;
 
     const { rewards, curve } = await this.model.predict(state, anchor);
     const choice = this.bandit.decide(bucket, rewards, anchor, floor, ceiling);
-    const rawPrice = anchor * choice.chosenArm;
+    // The bandit/model still run (for telemetry + bandit-update continuity) even when
+    // a seller markdown overrides the chosen price outright.
+    const approvedPrice = req.event.payload['approvedPrice'];
+    const rawPrice =
+      req.event.type === 'seller_markdown' && typeof approvedPrice === 'number'
+        ? approvedPrice
+        : anchor * choice.chosenArm;
     const guard = applyGuardrails({ proposedPrice: rawPrice, currentPrice, state, isFirstListing });
 
     const decision: PricingDecision = {
@@ -158,29 +168,26 @@ export class RepriceEngine {
     // Structured "thinking" log — one JSON line per decision. On AWS this lands in
     // CloudWatch verbatim, so every reprice is auditable: what the model saw, what it
     // predicted per arm, which arm the bandit chose, and which guardrails fired.
-    // eslint-disable-next-line no-console
-    console.log(
-      JSON.stringify({
-        tag: 'pricing.decide',
-        listingId: req.listingId,
-        event: req.event.type,
-        bucket: `${bucket.category}/${bucket.gradeKey}`,
-        anchor: Math.round(anchor),
-        currentPrice: Math.round(currentPrice),
-        chosenArm: choice.chosenArm,
-        predictedRewards: Object.fromEntries(
-          Object.entries(rewards).map(([k, v]) => [k, Math.round(v)]),
-        ),
-        rawPrice: Math.round(rawPrice),
-        finalPrice: guard.finalPrice,
-        floor,
-        ceiling: decision.ceiling,
-        shouldReroute: guard.shouldReroute,
-        guardrails: guard.guardrailsApplied.filter((g) => g.triggered).map((g) => g.rule),
-        modelVersion: this.modelVersion,
-        reason: decision.reason,
-      }),
-    );
+    log('info', 'pricing.decide', {
+      tag: 'pricing.decide',
+      listingId: req.listingId,
+      event: req.event.type,
+      bucket: `${bucket.category}/${bucket.gradeKey}`,
+      anchor: Math.round(anchor),
+      currentPrice: Math.round(currentPrice),
+      chosenArm: choice.chosenArm,
+      predictedRewards: Object.fromEntries(
+        Object.entries(rewards).map(([k, v]) => [k, Math.round(v)]),
+      ),
+      rawPrice: Math.round(rawPrice),
+      finalPrice: guard.finalPrice,
+      floor,
+      ceiling: decision.ceiling,
+      shouldReroute: guard.shouldReroute,
+      guardrails: guard.guardrailsApplied.filter((g) => g.triggered).map((g) => g.rule),
+      modelVersion: this.modelVersion,
+      reason: decision.reason,
+    });
     return decision;
   }
 
@@ -198,34 +205,28 @@ export class RepriceEngine {
 
     // Unified "thinking" trace — same schema the Python agent emits, so a CloudWatch query
     // spans both. One outcome line per terminal event...
-    // eslint-disable-next-line no-console
-    console.log(
-      JSON.stringify({
-        tag: 'pricing.outcome',
-        listingId: outcome.listingId,
-        bucket: prior ? `${prior.bucket.category}/${prior.bucket.gradeKey}` : null,
-        arm: outcome.arm,
-        sold: outcome.sold,
-        rerouted: outcome.rerouted,
-        rerouteDestination: outcome.rerouteDestination ?? null,
-        finalPrice: Math.round(outcome.finalPrice),
-        daysOnMarket: outcome.daysOnMarket,
-        reward: Math.round(reward),
-      }),
-    );
+    log('info', 'pricing.outcome', {
+      tag: 'pricing.outcome',
+      listingId: outcome.listingId,
+      bucket: prior ? `${prior.bucket.category}/${prior.bucket.gradeKey}` : null,
+      arm: outcome.arm,
+      sold: outcome.sold,
+      rerouted: outcome.rerouted,
+      rerouteDestination: outcome.rerouteDestination ?? null,
+      finalPrice: Math.round(outcome.finalPrice),
+      daysOnMarket: outcome.daysOnMarket,
+      reward: Math.round(reward),
+    });
     // ...and a signal when enough fresh rows have accrued to justify a retrain. The API
     // can't retrain XGBoost itself (that's the Python learning loop, ml/pricing/retrain.py);
     // it emits the trigger so an offline job / operator picks it up — honest split.
     if (this.outcomeLog.length % RETRAIN_EVERY === 0) {
-      // eslint-disable-next-line no-console
-      console.log(
-        JSON.stringify({
-          tag: 'pricing.retrain_due',
-          loggedOutcomes: this.outcomeLog.length,
-          retrainEvery: RETRAIN_EVERY,
-          note: 'run ml/pricing retrain_from_logger → offline_policy_evaluation → promote',
-        }),
-      );
+      log('info', 'pricing.retrain_due', {
+        tag: 'pricing.retrain_due',
+        loggedOutcomes: this.outcomeLog.length,
+        retrainEvery: RETRAIN_EVERY,
+        note: 'run ml/pricing retrain_from_logger → offline_policy_evaluation → promote',
+      });
     }
     return { reward, bucketUpdated };
   }

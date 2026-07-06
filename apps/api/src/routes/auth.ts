@@ -12,6 +12,7 @@ import { z } from 'zod';
 import type { ApiError } from '@reloop/shared';
 import { getDb, isMongoConfigured } from '../lib/mongo.js';
 import { COLLECTION, ensureSeeded, toPublic, type SeedAccount } from '../lib/accounts-seed.js';
+import { getReqId, log } from '../lib/logger.js';
 
 const loginSchema = z.object({
   handle: z.string().trim().min(1).max(60),
@@ -26,7 +27,7 @@ export function createAuthRouter(): Router {
   const router = Router();
 
   // List demo accounts for the login chips (never includes passwords).
-  router.get('/accounts', async (_req, res) => {
+  router.get('/accounts', async (req, res) => {
     if (!isMongoConfigured()) {
       return res.status(503).json(apiError('auth_unavailable', 'Auth database not configured'));
     }
@@ -40,8 +41,7 @@ export function createAuthRouter(): Router {
       return res.json(docs);
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'unknown error';
-      // eslint-disable-next-line no-console
-      console.error('[reloop/api] accounts list failed:', detail);
+      log('error', 'accounts list failed', { reqId: getReqId(req), detail });
       return res.status(503).json(apiError('auth_unavailable', 'Could not reach the auth database'));
     }
   });
@@ -75,8 +75,7 @@ export function createAuthRouter(): Router {
       return res.json({ account: toPublic(account), token: `demo_${randomUUID()}` });
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'unknown error';
-      // eslint-disable-next-line no-console
-      console.error('[reloop/api] login failed:', detail);
+      log('error', 'login failed', { reqId: getReqId(req), handle, detail });
       return res.status(503).json(apiError('auth_unavailable', 'Could not reach the auth database'));
     }
   });

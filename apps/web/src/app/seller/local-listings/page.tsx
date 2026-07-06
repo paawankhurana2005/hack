@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   acceptRoute,
+  applyManualMarkdown,
   ensureAgent,
   getAgentState,
   isAgentActive,
@@ -40,6 +41,7 @@ export default function LocalListingsPage() {
   const [agent, setAgent] = useState<AgentState | null>(null);
   const [autoRun, setAutoRun] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [markdownInput, setMarkdownInput] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -52,6 +54,7 @@ export default function LocalListingsPage() {
 
   useEffect(() => {
     setAutoRun(false);
+    setMarkdownInput('');
     if (!selected) {
       setAgent(null);
       return;
@@ -68,6 +71,20 @@ export default function LocalListingsPage() {
     try {
       const next = await tick(selected.id, { narrateWithLlm: !auto });
       if (next) setAgent({ ...next });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleMarkdown() {
+    if (!selected || busy) return;
+    const rupees = Number(markdownInput);
+    if (!Number.isFinite(rupees) || rupees <= 0) return;
+    setBusy(true);
+    try {
+      const next = await applyManualMarkdown(selected.id, Math.round(rupees * 100));
+      if (next) setAgent({ ...next });
+      setMarkdownInput('');
     } finally {
       setBusy(false);
     }
@@ -211,6 +228,31 @@ export default function LocalListingsPage() {
                     {autoRun ? 'Stop auto-run' : 'Auto-run'}
                   </button>
                 </div>
+              </div>
+
+              {/* Seller-approved markdown — a deliberate override, distinct from the
+                  agent's own reprice loop; lands in one step and raises the floor. */}
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Approve a markdown (₹)
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  inputMode="decimal"
+                  value={markdownInput}
+                  onChange={(e) => setMarkdownInput(e.target.value)}
+                  placeholder={`e.g. ${Math.round(agent.floorCents / 100)}`}
+                  className="w-28 rounded-full bg-secondary px-3 py-1 text-sm text-foreground ring-1 ring-border focus:outline-none focus:ring-brand/50"
+                />
+                <button
+                  type="button"
+                  disabled={!active || busy || !markdownInput}
+                  onClick={() => void handleMarkdown()}
+                  className="rounded-full bg-secondary px-4 py-1.5 text-sm font-semibold text-foreground ring-1 ring-border transition-colors hover:text-brand disabled:opacity-40"
+                >
+                  Set price
+                </button>
               </div>
 
               {/* Price history strip */}

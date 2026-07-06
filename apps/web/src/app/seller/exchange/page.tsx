@@ -6,9 +6,11 @@ import {
   computeCurrentPrice,
   rescueProgress,
   hoursRemaining,
+  coordsForBuyer,
   type ExchangeItem,
   type MatchedBuyer,
 } from '@/lib/mocks/exchange-store';
+import { LeafletMap } from '@/components/map/LeafletMap';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatINR(cents: number) {
@@ -238,19 +240,6 @@ function BuyerMatchPanel({
             <p className="text-xl font-bold text-foreground">{item.radiusKm} km</p>
             <p className="mb-0.5 text-xs text-muted-foreground">configurable</p>
           </div>
-          {/* Concentric rings visualisation */}
-          <div className="mt-3 flex items-center gap-2">
-            {[5, 10, 15].map((r) => (
-              <div key={r} className="flex items-center gap-1">
-                <span
-                  className={`inline-block h-2 w-2 rounded-full ${
-                    r <= item.radiusKm ? 'bg-brand' : 'bg-secondary'
-                  }`}
-                />
-                <span className="text-[10px] text-muted-foreground">{r}km</span>
-              </div>
-            ))}
-          </div>
         </div>
         <div className="px-5 py-4">
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -273,6 +262,22 @@ function BuyerMatchPanel({
           enters the return logistics chain.
         </p>
       </div>
+
+      {/* Nearby-buyers map */}
+      {sortedBuyers.length > 0 && (
+        <div className="mx-5 mt-4 overflow-hidden rounded-2xl ring-1 ring-border">
+          <LeafletMap
+            center={coordsForBuyer(sortedBuyers[0]!)}
+            zoom={12}
+            markers={sortedBuyers.map((b) => ({
+              ...coordsForBuyer(b),
+              label: b.buyerId,
+              popup: `${b.city ?? 'Local area'} · ${b.distanceKm}km away`,
+              tone: b.responded ? 'success' : 'brand',
+            }))}
+          />
+        </div>
+      )}
 
       {/* Buyer list */}
       <div className="px-5 pb-5 pt-4">

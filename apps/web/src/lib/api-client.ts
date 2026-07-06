@@ -5,6 +5,7 @@ import type {
   AgentNarrateRequest,
   AgentNarrateResponse,
   ApiError,
+  CheckpointEvidence,
   DemandEventType,
   GradeRequest,
   GradingResult,
@@ -15,7 +16,14 @@ import type {
   PricingResult,
   PricingStateVector,
   ProductHealthCard,
+  ReturnGradeResponse,
+  ReturnGradingResult,
+  ReturnHealthCard,
+  ReturnItemState,
+  ReturnReason,
   ReturnRecordInput,
+  ReturnRouteResponse,
+  ReturnStateTransition,
   RufusRequest,
   RufusResponse,
 } from '@reloop/shared';
@@ -171,6 +179,98 @@ export function upsertReturnRecord(req: ReturnRecordInput): Promise<{ ok: boolea
  *  (/api/return-pricing — /api/pricing is the spec-014 reprice engine.) */
 export function getPricing(returnId: string): Promise<PriceBreakdown> {
   return getJson<PriceBreakdown>(`/api/return-pricing/${encodeURIComponent(returnId)}`);
+}
+
+// --- Return pipeline (spec 016/022) — doorstep grading, the Intelligent
+// Bridge, checkpoints, and buyer matching. Distinct from the Sell-flow
+// functions above (gradeItem/priceItem/createHealthCard hit /api/sell/*).
+
+/** Doorstep AI grading for a return. Strips the `data:image/...;base64,`
+ *  prefix from each photo — the API expects raw base64, not a data URL. */
+export function gradeReturnItem(req: {
+  photos: string[];
+  reason: ReturnReason;
+  sku?: string;
+}): Promise<ReturnGradeResponse> {
+  const stripped = req.photos.map((p) => {
+    const idx = p.indexOf(',');
+    return idx === -1 ? p : p.slice(idx + 1);
+  });
+  return postJson<{ photos: string[]; reason: ReturnReason; sku?: string }, ReturnGradeResponse>(
+    '/api/grade',
+    { ...req, photos: stripped },
+  );
+}
+
+/** The Intelligent Bridge — deterministic EV routing engine + narrated
+ *  reasoning (LLM-narrated for most decisions, deterministic template for
+ *  liquidate/returnless_refund/return_to_seller). */
+export function routeReturnItem(req: {
+  gradingResult: ReturnGradingResult | null;
+  reason: ReturnReason;
+  sku: string;
+  sellerType: '1P' | '3P';
+}): Promise<ReturnRouteResponse> {
+  return postJson<typeof req, ReturnRouteResponse>('/api/route', req);
+}
+
+/** Spec 016: re-run the routing engine with checkpoint evidence (driver scan,
+ *  hub bench) against the production-shaped endpoint — the same engine the
+ *  demo previously ran directly against the shared package client-side. */
+export function checkpointReturnItem(req: {
+  gradingResult: ReturnGradingResult;
+  reason: ReturnReason;
+  sku: string;
+  sellerType: '1P' | '3P';
+  evidence: CheckpointEvidence;
+  from: ReturnItemState;
+}): Promise<{ decision: ReturnRouteResponse; transition: ReturnStateTransition }> {
+  return postJson<typeof req, { decision: ReturnRouteResponse; transition: ReturnStateTransition }>(
+    '/api/return/checkpoint',
+    req,
+  );
+}
+
+/** Return-flow Product Health Card (distinct from createHealthCard, which
+ *  hits the Sell-flow's /api/sell/health-card). */
+export function createReturnHealthCard(req: {
+  gradingResult: ReturnGradingResult;
+}): Promise<ReturnHealthCard | { fallback: true; summary: string }> {
+  return postJson<typeof req, ReturnHealthCard | { fallback: true; summary: string }>(
+    '/api/health-card',
+    req,
+  );
+}
+
+/** Seller accepted local routing — opens a match session, ranks nearby
+ *  buyers, notifies the top candidate. Idempotent server-side: safe to retry. */
+export function initiateMatching(returnId: string): Promise<{
+  sessionId: string;
+  returnId: string;
+  status: string;
+  candidateCount: number;
+}> {
+  return postJson<Record<string, never>, {
+    sessionId: string;
+    returnId: string;
+    status: string;
+    candidateCount: number;
+  }>(`/api/matching/initiate/${encodeURIComponent(returnId)}`, {});
+}
+
+/** Poll the current state of a return's match session (seller dashboard). */
+export function getMatchingStatus(returnId: string): Promise<{
+  sessionId: string;
+  returnId: string;
+  status: string;
+  offeredPrice: number;
+  candidateCount: number;
+  currentCandidateIndex: number;
+  matchedBuyerId: string | null;
+  matchedAt: string | null;
+  pickupDeadline: string;
+}> {
+  return getJson(`/api/matching/status/${encodeURIComponent(returnId)}`);
 }
 
 export function createHealthCard(req: HealthCardRequest): Promise<ProductHealthCard> {
