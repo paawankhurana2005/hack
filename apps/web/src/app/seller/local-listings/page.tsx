@@ -16,6 +16,7 @@ import {
   tick,
   type AgentState,
 } from '@/lib/agent-store';
+import { acquireManualLock, releaseManualLock } from '@/lib/agent-lock';
 import { getReturnListings } from '@/lib/return-market';
 import { matchBuyers } from '@/lib/demand-graph';
 import { recordTransition } from '@/lib/mocks/return-store';
@@ -103,6 +104,15 @@ export default function LocalListingsPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRun, agent]);
+
+  // Spec 024, phase 5: hold this listing's manual-control lock for as long as
+  // this page is actively driving its clock (auto-run), so a background
+  // scheduled Sales Agent run can't also tick it and double-advance the day.
+  useEffect(() => {
+    if (!selected) return;
+    if (autoRun) acquireManualLock(selected.id);
+    return () => releaseManualLock(selected.id);
+  }, [autoRun, selected]);
 
   function handleAcceptRoute() {
     if (!selected) return;

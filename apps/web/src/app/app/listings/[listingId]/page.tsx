@@ -16,6 +16,7 @@ import { formatMoney } from '@/lib/money';
 import { findSeedListing } from '@/mock/seed-listings';
 import type { CasualListing } from '@/mock/casual-listings';
 import { getListings } from '@/lib/listings-store';
+import { acquireManualLock, releaseManualLock } from '@/lib/agent-lock';
 import { isSold } from '@/lib/marketplace-store';
 import { getSale, type SellerSale } from '@/lib/sale-store';
 import {
@@ -105,6 +106,15 @@ export default function ListingDetailPage() {
     const t = setTimeout(() => void advance(true), TICK_MS);
     return () => clearTimeout(t);
   }, [autoRun, agent, thinking, advance]);
+
+  // Spec 024, phase 5: hold this listing's manual-control lock for as long as
+  // this page is actively driving its clock, so a background scheduled Sales
+  // Agent run can't also tick it and double-advance the simulated day.
+  useEffect(() => {
+    if (!id) return;
+    if (autoRun) acquireManualLock(id);
+    return () => releaseManualLock(id);
+  }, [autoRun, id]);
 
   if (listing === undefined) return <PageShell eyebrow="Second life" title="Listing" />;
   if (listing === null || !agent) {

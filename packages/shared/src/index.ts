@@ -33,3 +33,4 @@ export * from './rufus-rag.js';
 export * from './review.js';
 export * from './monitor.js';
 export * from './pii.js';
+export * from './notifications.js'; // in-app notifications (spec 024)

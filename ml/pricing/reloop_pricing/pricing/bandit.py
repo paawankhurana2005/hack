@@ -81,14 +81,19 @@ class ContextualBandit:
 
 
 class BucketedBandit:
-    """Pooled Thompson-sampling posteriors, one bucket per (category × grade).
+    """Pooled Thompson-sampling posteriors, one bucket per (category × grade),
+    plus region_cluster as a third dimension when resolved (spec 024, phase 8 —
+    geo as a bandit posterior, not just a flat feature, per spec 014's own open
+    question).
 
     Mirrors the TS RepriceBandit (apps/api/src/services/pricing/reprice-bandit.ts), which
-    pools observations by ``category|gradeKey``: every outcome in a bucket teaches every
-    listing in that bucket, so a brand-new listing inherits the exploration its cohort has
-    already paid for. The reward predictor is shared across buckets and hot-swappable —
-    when a retrain is promoted the agent calls ``set_predictor`` so all buckets score with
-    the new model while keeping their accumulated exploration counts.
+    pools observations by ``category|gradeKey[|regionCluster]``: every outcome in a bucket
+    teaches every listing in that bucket, so a brand-new listing inherits the exploration
+    its cohort has already paid for. Omitting region_cluster (not available/resolved) falls
+    back to the coarser (category, grade) pool rather than fragmenting cold-start data — the
+    same fallback shape the TS side uses. The reward predictor is shared across buckets and
+    hot-swappable — when a retrain is promoted the agent calls ``set_predictor`` so all
+    buckets score with the new model while keeping their accumulated exploration counts.
     """
 
     def __init__(self, predictor: RewardPredictor, arms: Optional[List[float]] = None, rng=None):
@@ -98,8 +103,8 @@ class BucketedBandit:
         self._buckets: Dict[str, ContextualBandit] = {}
 
     @staticmethod
-    def bucket_key(category: str, grade_key: str) -> str:
-        return f"{category}|{grade_key}"
+    def bucket_key(category: str, grade_key: str, region_cluster: Optional[str] = None) -> str:
+        return f"{category}|{grade_key}|{region_cluster}" if region_cluster else f"{category}|{grade_key}"
 
     def _bandit(self, key: str) -> ContextualBandit:
         if key not in self._buckets:

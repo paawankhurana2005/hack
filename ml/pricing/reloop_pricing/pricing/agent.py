@@ -80,7 +80,13 @@ class PricingAgent:
         # normalise case so the same cohort from differently-cased data sources pools into
         # one posterior (e.g. "Electronics" and "electronics" are one bucket).
         category = str(state.get("category") or state.get("category_l1", "unknown")).lower()
-        return BucketedBandit.bucket_key(category, _grade_key(state))
+        # region_cluster as a third pooling dimension when the caller's state carries one
+        # (spec 024, phase 8) — mirrors the TS RepriceBandit's regionCluster bucket field.
+        # The marketplace simulator doesn't yet assign listings a synthetic region (an
+        # honest, documented gap — see simulate_marketplace.py), so this is ready for real
+        # region-tagged state without pretending the simulator already produces it.
+        region_cluster = state.get("region_cluster")
+        return BucketedBandit.bucket_key(category, _grade_key(state), region_cluster)
 
     # ── SENSE ─────────────────────────────────────────────────────────────
     def sense(self, state: Dict, event_type: str, payload: Dict, days_since_last_reprice: int) -> bool:

@@ -10,6 +10,10 @@ import type {
   GradeRequest,
   GradingResult,
   HealthCardRequest,
+  Notification,
+  NotificationKind,
+  NotificationPreferences,
+  NotificationSeverity,
   PriceBreakdown,
   PriceRequest,
   PricingDecision,
@@ -120,6 +124,65 @@ async function getJson<TRes>(path: string): Promise<TRes> {
   return data as TRes;
 }
 
+async function patchJson<TRes>(path: string): Promise<TRes> {
+  let res: Response;
+  const t = withTimeout();
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { method: 'PATCH', signal: t.signal });
+  } catch {
+    throw new ApiRequestError(
+      'Could not reach the ReLoop service. Is the API running?',
+      'network_error',
+      0,
+    );
+  } finally {
+    t.done();
+  }
+
+  const data: unknown = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    if (isApiError(data)) {
+      throw new ApiRequestError(data.error.message, data.error.code, res.status);
+    }
+    throw new ApiRequestError('Request failed.', 'unknown_error', res.status);
+  }
+
+  return data as TRes;
+}
+
+async function putJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
+  let res: Response;
+  const t = withTimeout();
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: t.signal,
+    });
+  } catch {
+    throw new ApiRequestError(
+      'Could not reach the ReLoop service. Is the API running?',
+      'network_error',
+      0,
+    );
+  } finally {
+    t.done();
+  }
+
+  const data: unknown = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    if (isApiError(data)) {
+      throw new ApiRequestError(data.error.message, data.error.code, res.status);
+    }
+    throw new ApiRequestError('Request failed.', 'unknown_error', res.status);
+  }
+
+  return data as TRes;
+}
+
 /** List the demo accounts (no passwords) for the login screen. */
 export function listAccounts(): Promise<Account[]> {
   return getJson<Account[]>('/api/auth/accounts');
@@ -148,6 +211,10 @@ export type PricingDecideRequest = {
   listingId: string;
   /** The listing's real current price (₹) so step-caps are correct per call. */
   currentPrice?: number;
+  /** Lets the engine resolve real geo/local features (spec 024) for a
+   *  return-sourced listing instead of its flat placeholder defaults. */
+  pincode?: string;
+  returnId?: string;
   event: { type: DemandEventType; payload?: Record<string, unknown> };
   state: Pick<
     PricingStateVector,
@@ -280,4 +347,58 @@ export function createHealthCard(req: HealthCardRequest): Promise<ProductHealthC
     grading: { ...req.grading, photoUrls: [] },
   };
   return postJson<HealthCardRequest, ProductHealthCard>('/api/sell/health-card', lean);
+}
+
+// --- In-app notifications (spec 024) — the seller dashboard's bell/inbox. ---
+
+export function createNotification(req: {
+  sellerId: string;
+  kind: NotificationKind;
+  severity: NotificationSeverity;
+  title: string;
+  body: string;
+  returnId?: string;
+  listingId?: string;
+}): Promise<Notification> {
+  return postJson<typeof req, Notification>('/api/notifications', req);
+}
+
+export function listNotifications(
+  sellerId: string,
+  opts: { unreadOnly?: boolean; limit?: number } = {},
+): Promise<{ notifications: Notification[] }> {
+  const params = new URLSearchParams();
+  if (opts.unreadOnly) params.set('unreadOnly', 'true');
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return getJson(`/api/notifications/${encodeURIComponent(sellerId)}${qs ? `?${qs}` : ''}`);
+}
+
+export function markNotificationRead(id: string): Promise<{ ok: boolean }> {
+  return patchJson(`/api/notifications/${encodeURIComponent(id)}/read`);
+}
+
+export function markAllNotificationsRead(sellerId: string): Promise<{ ok: boolean }> {
+  return patchJson(`/api/notifications/${encodeURIComponent(sellerId)}/read-all`);
+}
+
+export function getNotificationPreferences(sellerId: string): Promise<NotificationPreferences> {
+  return getJson(`/api/notifications/${encodeURIComponent(sellerId)}/preferences`);
+}
+
+export function setNotificationPreferences(
+  sellerId: string,
+  prefs: Pick<NotificationPreferences, 'mutedKinds' | 'quietHoursStart' | 'quietHoursEnd'>,
+): Promise<NotificationPreferences> {
+  return putJson(`/api/notifications/${encodeURIComponent(sellerId)}/preferences`, prefs);
+}
+
+// --- Per-listing engagement capture (spec 024, phase 3) ---------------------
+// Real signal for the reprice engine's demand-signal feature group. Callers
+// should NOT await this for correctness — it's a fire-and-forget side effect,
+// same convention as the notification helpers above.
+export type ListingEventType = 'view' | 'save' | 'message' | 'cart_abandon';
+
+export function logListingEvent(listingId: string, eventType: ListingEventType): Promise<{ ok: boolean }> {
+  return postJson(`/api/listings/${encodeURIComponent(listingId)}/events`, { eventType });
 }

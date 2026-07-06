@@ -11,6 +11,7 @@ import {
 import { createLocalRoutingListing, RESCUE_WINDOW_HOURS } from '@/lib/mocks/exchange-store';
 import { upsertReturnRecord, initiateMatching, ApiRequestError } from '@/lib/api-client';
 import { earnSeller } from '@/lib/credits-store';
+import { currentAccountId } from '@/lib/storage';
 import { Card } from '@/components/ui/card';
 
 interface Props {
@@ -317,6 +318,7 @@ export function SellerReturnDetail({ returnId }: Props) {
         listing_created_at: new Date(nowMs).toISOString(),
         pickup_deadline: new Date(nowMs + RESCUE_WINDOW_HOURS * 3600_000).toISOString(),
         grade: currentGrading.grade,
+        sellerId: currentAccountId(),
       });
 
       const match = await initiateMatching(currentRet.returnId);

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { RufusContext } from '@reloop/shared';
+import { logListingEvent } from '@/lib/api-client';
 
 interface Msg {
   role: 'user' | 'rufus';
@@ -101,7 +102,7 @@ function suggestionsFor(ctx: RufusContext): string[] {
   ];
 }
 
-export function RufusChat({ context }: { context: RufusContext }) {
+export function RufusChat({ context, listingId }: { context: RufusContext; listingId?: string }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -118,6 +119,9 @@ export function RufusChat({ context }: { context: RufusContext }) {
     setInput('');
     setMessages((m) => [...m, { role: 'user', text: q }]);
     setLoading(true);
+    // Real engagement signal (spec 024, phase 3) — a genuine buyer question is
+    // a stronger intent signal than a page view.
+    if (listingId) void logListingEvent(listingId, 'message').catch(() => {});
     // Hardcoded: answer locally from the Health Card after a fixed ~2s delay.
     const text = answerLocally(q, context);
     await new Promise((r) => setTimeout(r, RUFUS_DELAY_MS));

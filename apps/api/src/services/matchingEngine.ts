@@ -14,6 +14,7 @@ import { log } from '../lib/logger.js';
 import { getPincodeCoordinates, getCityForPincode, haversineDistanceKm, type LatLng } from '../lib/regionCluster.js';
 import { calculatePrice, PRICING_CONFIG } from './pricingEngine.js';
 import { logDemandEvent } from './demandEvents.js';
+import { createNotification, createNotificationForReturn } from './notifications/notification-service.js';
 import {
   BUYERS,
   MATCH_SESSIONS,
@@ -174,14 +175,20 @@ export function toCandidateList(candidates: RankedCandidate[]): MatchCandidate[]
 }
 
 /** Stub notification — no SMS/email/push provider exists yet. Logs everything a
- * real provider would need so the integration point is obvious. Never throws. */
+ * real provider would need so the integration point is obvious. Never throws.
+ * Spec 024, phase 6: when this buyer IS a real platform account
+ * (`user_id` set — the ONLY case with anywhere to actually show it), it also
+ * gets a real in-app notification via the same inbox/bell sellers use. Buyers
+ * with no platform account (the common case — most seeded buyers are
+ * synthetic) still only get the log line; there's nowhere to show them one. */
 function sendNotification(
   buyer: BuyerDoc,
   product: { category: string; grade: string },
   price: number,
 ): void {
   // TODO: wire to a real SMS/email/push provider (Twilio/SES/FCM). For now this
-  // is the entire "notification system" — a structured log line a human can read.
+  // is the entire "notification system" for buyers with no platform account —
+  // a structured log line a human can read.
   const acceptLink = `https://reloop-woad.vercel.app/buyer/match/${randomUUID()}`;
   log('info', 'buyer notified', {
     buyerName: buyer.name,
@@ -192,6 +199,16 @@ function sendNotification(
     price,
     acceptLink,
   });
+
+  if (buyer.user_id) {
+    void createNotification({
+      seller_id: buyer.user_id,
+      kind: 'cascade_update',
+      severity: 'info',
+      title: 'A nearby return is available',
+      body: `A ${product.grade}-grade ${product.category} return near you is available at ₹${price} — first come, first served.`,
+    }).catch(() => {});
+  }
 }
 
 /** Called when a seller accepts local routing. Idempotent: replaying on an
@@ -348,6 +365,12 @@ export async function recordBuyerResponse(
 
     const returnRecord = await db.collection<ReturnRecordDoc>(RETURNS).findOne({ returnId: session.return_id });
     logDemandEvent('match_completed', session.category, returnRecord?.pincode ?? '');
+    await createNotificationForReturn(session.return_id, {
+      kind: 'cascade_update',
+      severity: 'success',
+      title: 'Matched with a local buyer!',
+      body: `A nearby buyer accepted your ${session.category} return at ₹${session.offered_price}.`,
+    });
     return;
   }
 

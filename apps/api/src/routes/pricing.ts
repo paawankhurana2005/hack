@@ -35,6 +35,10 @@ const stateSchema = z
 const decideSchema = z.object({
   listingId: z.string().min(1),
   currentPrice: z.number().positive().optional(),
+  // Request metadata (spec 024) letting the engine resolve real geo/local
+  // features instead of the flat placeholder defaults — not part of `state`.
+  pincode: z.string().trim().min(1).optional(),
+  returnId: z.string().trim().min(1).optional(),
   event: z.object({
     type: eventTypeEnum,
     payload: z.record(z.unknown()).default({}),
@@ -64,11 +68,13 @@ export function createPricingRouter(engine: RepriceEngine): Router {
       res.status(400).json({ error: parsed.error.flatten() });
       return;
     }
-    const { listingId, currentPrice, event, state } = parsed.data;
+    const { listingId, currentPrice, pincode, returnId, event, state } = parsed.data;
     void engine
       .decide({
         listingId,
         ...(currentPrice !== undefined ? { currentPrice } : {}),
+        ...(pincode !== undefined ? { pincode } : {}),
+        ...(returnId !== undefined ? { returnId } : {}),
         event: { type: event.type, listingId, timestamp: new Date().toISOString(), payload: event.payload },
         state,
       })

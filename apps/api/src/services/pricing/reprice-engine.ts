@@ -20,6 +20,10 @@ import type { RewardModel } from './reward-model.js';
 import { RepriceBandit } from './reprice-bandit.js';
 import { reasonCodeFor } from './reprice-events.js';
 import { narrateDecision, type Completer } from './reprice-narrate.js';
+import { resolveGeoPricingFeatures } from './geo-features.js';
+import { getSeasonalityIndex } from '../../lib/seasonality.js';
+import { getListingEngagement } from '../listingEvents.js';
+import { logPricingTransaction } from './production-log.js';
 import { log } from '../../lib/logger.js';
 
 const GRADE_ORDINAL: Record<PricingStateVector['gradeKey'], number> = {
@@ -40,6 +44,12 @@ export interface RepriceRequest {
   /** The listing's real current price (₹). Lets step-caps work per call instead of
    *  relying on the engine's in-memory last decision. Falls back to that, then anchor. */
   currentPrice?: number;
+  /** Request metadata (not part of the feature vector itself) letting the engine
+   *  resolve REAL geo/local features (spec 024) instead of the flat placeholder
+   *  defaults in fillState() below. Either is optional and either may miss — the
+   *  placeholders remain the safety net when neither resolves anything. */
+  pincode?: string;
+  returnId?: string;
   state: Partial<PricingStateVector> &
     Pick<PricingStateVector, 'category' | 'gradeKey' | 'compMedianPrice' | 'amazonNewPrice' | 'sellerFloor' | 'routeElsewhereValue'>;
 }
@@ -85,7 +95,10 @@ function fillState(s: RepriceRequest['state']): PricingStateVector {
     dayOfWeekCos: s.dayOfWeekCos ?? 1,
     hourOfDaySin: s.hourOfDaySin ?? 0,
     hourOfDayCos: s.hourOfDayCos ?? 1,
-    seasonalityIndex: s.seasonalityIndex ?? 0.5,
+    // Real calendar-driven signal (spec 024, phase 2) — no Mongo dependency,
+    // unlike the geo/local group above, so it's always computed, never a flat
+    // placeholder.
+    seasonalityIndex: s.seasonalityIndex ?? getSeasonalityIndex(s.category),
   };
 }
 
@@ -94,6 +107,10 @@ interface LastDecision {
   finalPrice: number;
   decisionId: string;
   arm: PriceArm;
+  /** The full feature vector this decision used — kept so logOutcome() can
+   *  persist a real (state, arm, reward) row for offline retraining (spec
+   *  024, phase 7), not just the bucket. */
+  state: PricingStateVector;
 }
 
 export class RepriceEngine {
@@ -108,8 +125,19 @@ export class RepriceEngine {
   ) {}
 
   async decide(req: RepriceRequest): Promise<PricingDecision> {
-    const state = fillState(req.state);
-    const bucket = { category: state.category, gradeKey: state.gradeKey };
+    const [geo, engagement] = await Promise.all([
+      resolveGeoPricingFeatures({
+        pincode: req.pincode,
+        returnId: req.returnId,
+        category: req.state.category,
+      }),
+      getListingEngagement(req.listingId),
+    ]);
+    const { regionCluster, ...geoFeatures } = geo;
+    const state = fillState({ ...req.state, ...geoFeatures, ...engagement });
+    // Region cluster pools bandit posteriors as a third dimension when resolved
+    // (spec 024, phase 8); it's request metadata, not a PricingStateVector feature.
+    const bucket = { category: state.category, gradeKey: state.gradeKey, regionCluster };
     const anchor = state.compMedianPrice;
     const floor = Math.max(state.sellerFloor, state.routeElsewhereValue);
     const ceiling = state.amazonNewPrice * 0.95;
@@ -153,6 +181,7 @@ export class RepriceEngine {
       modelVersion: this.modelVersion,
       timestamp: new Date().toISOString(),
       guardrailsApplied: guard.guardrailsApplied,
+      geoDemandIndex: state.geoDemandIndex,
     };
     decision.reason = guard.shouldReroute
       ? `Below floor ₹${floor} — handing off to the Intelligent Bridge to reroute.`
@@ -163,6 +192,7 @@ export class RepriceEngine {
       finalPrice: guard.finalPrice,
       decisionId: randomUUID(),
       arm: choice.chosenArm,
+      state,
     });
 
     // Structured "thinking" log — one JSON line per decision. On AWS this lands in
@@ -202,6 +232,24 @@ export class RepriceEngine {
       bucketUpdated = true;
     }
     this.outcomeLog.push({ ...outcome, reward });
+
+    // Real (state, arm, reward) row → Mongo (spec 024, phase 7) — the durable
+    // bridge into ml/pricing's offline retraining (see
+    // scripts/exportPricingTransactions.ts). Only possible when we actually
+    // have the state this outcome's decision used.
+    if (prior) {
+      logPricingTransaction({
+        listing_id: outcome.listingId,
+        state: prior.state,
+        arm: outcome.arm,
+        reward,
+        sold: outcome.sold,
+        rerouted: outcome.rerouted,
+        reroute_destination: outcome.rerouteDestination,
+        final_price: outcome.finalPrice,
+        days_on_market: outcome.daysOnMarket,
+      });
+    }
 
     // Unified "thinking" trace — same schema the Python agent emits, so a CloudWatch query
     // spans both. One outcome line per terminal event...

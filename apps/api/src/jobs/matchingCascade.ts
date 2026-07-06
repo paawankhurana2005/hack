@@ -10,6 +10,7 @@ import { getDb, isMongoConfigured } from '../lib/mongo.js';
 import { log } from '../lib/logger.js';
 import { MATCH_SESSIONS, RETURNS, type MatchSessionDoc, type ReturnRecordDoc } from '../lib/collections.js';
 import { findCandidates, notifyBuyer, toCandidateList, NOTIFY_TIMEOUT_MS } from '../services/matchingEngine.js';
+import { createNotificationForReturn } from '../services/notifications/notification-service.js';
 
 const CRON_EXPRESSION = '*/30 * * * *'; // every 30 minutes
 // Don't re-run findCandidates for the same "searching" session more than once
@@ -53,8 +54,20 @@ async function handleTimeouts(db: Db): Promise<number> {
     const nextIndex = idx + 1;
     if (nextIndex < session.candidate_list.length) {
       await notifyBuyer(session._id.toString(), nextIndex);
+      await createNotificationForReturn(session.return_id, {
+        kind: 'cascade_update',
+        severity: 'info',
+        title: "Buyer didn't respond",
+        body: `No response in time for your ${session.category} return — trying the next nearby buyer.`,
+      });
     } else {
       await sessions.updateOne({ _id: session._id }, { $set: { status: 'searching', updated_at: now } });
+      await createNotificationForReturn(session.return_id, {
+        kind: 'cascade_update',
+        severity: 'info',
+        title: 'Out of nearby buyers for now',
+        body: `Every matched buyer timed out for your ${session.category} return — back to searching for new candidates.`,
+      });
     }
     advanced += 1;
   }
@@ -91,6 +104,12 @@ async function retrySearches(db: Db): Promise<{ retried: number; found: number }
           },
         );
         await notifyBuyer(session._id.toString(), 0);
+        await createNotificationForReturn(session.return_id, {
+          kind: 'cascade_update',
+          severity: 'info',
+          title: 'Found new nearby buyers',
+          body: `${ranked.length} new local buyer${ranked.length === 1 ? '' : 's'} found for your ${session.category} return.`,
+        });
         found += 1;
       } else {
         await sessions.updateOne({ _id: session._id }, { $set: { updated_at: now } });
@@ -124,6 +143,12 @@ async function handleExpiry(db: Db): Promise<number> {
     log('warn', 'match session expired — falling back to warehouse', {
       returnId: session.return_id,
       sessionId: session._id.toString(),
+    });
+    await createNotificationForReturn(session.return_id, {
+      kind: 'cascade_update',
+      severity: 'warning',
+      title: 'Local pickup window expired',
+      body: `No local buyer matched in time for your ${session.category} return — routed to the warehouse instead.`,
     });
   }
   return expiring.length;

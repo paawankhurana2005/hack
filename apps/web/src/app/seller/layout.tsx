@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole } from '@/lib/role-context';
+import { NotificationBell } from '@/components/seller/notification-bell';
 
 const nav = [
   { href: '/seller', label: 'Overview' },
   { href: '/seller/returns', label: 'Returns' },
   { href: '/seller/hub', label: 'Hub Bench' },
+  { href: '/seller/sales-agent', label: 'Sales Agent' },
   { href: '/seller/local-listings', label: 'Local Listings' },
   { href: '/seller/listings', label: 'Listings' },
   { href: '/seller/rescue', label: 'Rescue' },
@@ -31,13 +33,16 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
           <span className="font-semibold tracking-tight text-foreground">ReLoop</span>
         </Link>
 
-        <div className="mb-5 rounded-xl bg-card p-3 ring-1 ring-border">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
-            Seller dashboard
-          </p>
-          <p className="mt-1 truncate text-sm font-semibold text-foreground">
-            {account?.name ?? 'Seller'}
-          </p>
+        <div className="mb-5 flex items-center justify-between rounded-xl bg-card p-3 ring-1 ring-border">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
+              Seller dashboard
+            </p>
+            <p className="mt-1 truncate text-sm font-semibold text-foreground">
+              {account?.name ?? 'Seller'}
+            </p>
+          </div>
+          <NotificationBell sellerId={account?.id ?? ''} />
         </div>
 
         <nav className="flex flex-col gap-1">

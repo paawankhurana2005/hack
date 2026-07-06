@@ -142,6 +142,11 @@ export type PricingDecision = {
   modelVersion: string; // for audit
   timestamp: string;
   guardrailsApplied: GuardrailResult[];
+  /** The geo/local demand feature actually used for this decision (spec 024) —
+   *  real when resolved from a return's pincode, the flat 0.5 placeholder
+   *  otherwise. Surfaced for glass-box reasoning: it's what the Sales Agent's
+   *  `relist` lever compares against the value recorded at escalation time. */
+  geoDemandIndex: number;
 };
 
 /** The outcome logged after a sale or reroute — the training signal for Stage 2. */
@@ -170,4 +175,9 @@ export type BanditState = {
 export type ContextBucket = {
   category: string;
   gradeKey: string;
+  /** Optional third pooling dimension (spec 024, phase 8) — resolved from a
+   *  return's pincode when available. Omitted (not empty-string) when there's
+   *  nothing to resolve, so buckets fall back to pooling at the coarser
+   *  (category, gradeKey) level rather than fragmenting cold-start data. */
+  regionCluster?: string;
 };

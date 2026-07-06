@@ -14,6 +14,7 @@
     "seed:demand": "tsx src/scripts/seedDemandEvents.ts",
     "aggregate:demand": "tsx src/scripts/runDemandAggregation.ts",
     "seed:buyers": "tsx src/scripts/seedBuyers.ts",
+    "export:pricing-transactions": "tsx src/scripts/exportPricingTransactions.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

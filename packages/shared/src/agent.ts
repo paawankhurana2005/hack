@@ -13,7 +13,12 @@ export type AgentAction =
   | 'reprice'
   | 'widen_radius'
   | 'improve_listing'
-  | 'escalate_route';
+  | 'escalate_route'
+  // Sales Agent only (spec 024) — un-escalates a donate/recycle return-sourced
+  // listing whose local geo-demand has since improved past what it was at
+  // escalation time. Meaningless against the old flat geo placeholder; only a
+  // real payoff once geo-demand is wired to actual data (spec 024, phase A).
+  | 'relist';
 
 export type AgentPhase = 'perceived' | 'diagnosed' | 'decided' | 'acted';
 
@@ -103,6 +108,17 @@ export interface AgentNarrateRequest {
 
 export interface AgentNarrateResponse {
   text: string;
+}
+
+/** Result of one portfolio-level Sales Agent run (spec 024) — a batch driver
+ *  over the same per-listing engine above, not a new decision brain. Reuses
+ *  AgentEvent verbatim; adds nothing to the decision layer itself. */
+export interface SalesAgentDigest {
+  ranAt: string; // ISO
+  listingsReviewed: number;
+  actionsByType: Partial<Record<AgentAction, number>>;
+  events: AgentEvent[];
+  narrative: string;
 }
 
 // --- Tunables (the glass-box rules) -----------------------------------------

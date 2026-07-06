@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole } from '@/lib/role-context';
+import { NotificationBell } from '@/components/seller/notification-bell';
 
 const tabs = [
   { href: '/app/store', label: 'Store' },
@@ -54,6 +55,10 @@ export function AppNav() {
               </span>
             </span>
           )}
+          {/* Spec 024, phase 6: the same real notification inbox sellers get —
+              this account is a real platform user, and buyer-matching events
+              (a local buyer being notified/matched) now target it too. */}
+          <NotificationBell sellerId={account?.id ?? ''} />
           <button
             type="button"
             onClick={logout}

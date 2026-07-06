@@ -30,6 +30,9 @@ import { createStateRouter } from './routes/state.js';
 import { createReturnPricingRouter } from './routes/return-pricing.js';
 import { createReturnsRouter } from './routes/returns.js';
 import { createMatchingRouter } from './routes/matching.js';
+import { createNotificationsRouter } from './routes/notifications.js';
+import { createListingEventsRouter } from './routes/listing-events.js';
+import { configureNotificationNarration } from './services/notifications/notification-service.js';
 import { isMongoConfigured, getDb } from './lib/mongo.js';
 import { ensurePricingIndexes } from './lib/collections.js';
 import { scheduleDemandAggregation } from './jobs/computeDemandIndex.js';
@@ -125,6 +128,9 @@ const repriceEngine = new RepriceEngine(
   pricingModelUrl ? 'xgboost-http' : 'heuristic-v1',
   narrator,
 );
+// Spec 024, phase 4: the same LLM completer (no-op when unset) rephrases
+// notification bodies — narration only, never changes which events fire.
+configureNotificationNarration(narrator);
 
 app.use('/api/sell', createSellRouter(gradingService, pricingService, healthCardService));
 app.use('/api/pricing', createPricingRouter(repriceEngine));
@@ -137,6 +143,8 @@ app.use('/api/state', createStateRouter());
 app.use('/api/return-pricing', createReturnPricingRouter());
 app.use('/api/returns', createReturnsRouter());
 app.use('/api/matching', createMatchingRouter());
+app.use('/api/notifications', createNotificationsRouter());
+app.use('/api/listings', createListingEventsRouter());
 
 const gradeHandler = createGradeHandler(gradingService);
 app.post('/api/grade', (req, res) => { void gradeHandler(req, res); });

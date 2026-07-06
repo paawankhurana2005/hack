@@ -52,8 +52,10 @@ function round2(n: number): number {
 }
 
 /** Demand factor — a point lookup against the precomputed index. Falls back to a
- * static category prior when the cell is missing or its rollup is stale. */
-async function getDemandFactor(region_cluster: string, category: string): Promise<number> {
+ * static category prior when the cell is missing or its rollup is stale. Exported
+ * so the reprice engine's geo-feature resolver (spec 024) can reuse this exact
+ * freshness/fallback logic instead of duplicating it. */
+export async function getDemandFactor(region_cluster: string, category: string): Promise<number> {
   const db = await getDb();
   const row = await db
     .collection<DemandIndexDoc>(DEMAND_INDEX)

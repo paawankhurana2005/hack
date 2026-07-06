@@ -27,12 +27,21 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
+from datetime import date, timedelta
+
 from ..data.pipeline import assemble_catalogue
 from .agent import GRADE_KEY_BY_ORDINAL, PricingAgent
 from .bandit import ARMS
+from .geo import compute_geo_demand_index
 from .memory import AgentMemory
 from .retrain import LearningLoop
+from .seasonality import get_seasonality_index
 from .warmstart import WarmStartPricingModel
+
+# Synthetic calendar anchor — the simulator's `day` counter is relative
+# (day 1..N), not a real date, so seasonality needs a fixed reference point to
+# map simulated days onto real months (spec 024, phase 2).
+SIM_CALENDAR_ANCHOR = date(2026, 1, 1)
 
 MODEL_DIR = "runs/warmstart/v1"
 NEUTRAL_ARM = 0.92
@@ -143,9 +152,16 @@ def _make_listing(row: Dict, idx: int, day: int, world: MarketWorld, rng: np.ran
         "num_reprices": 0,
         "is_first_listing": 1,
         "view_velocity_24h": float(rng.uniform(3, 12)),
-        "geo_demand_index": float(rng.uniform(0.3, 0.8)),
+        # Real signal (spec 024), not an unrelated random draw: a noisy read of this
+        # cohort's true hidden demand bias — the same bias try_sell() actually clears
+        # against — via the same normalize/clamp formula computeDemandIndex.ts uses.
+        "geo_demand_index": compute_geo_demand_index(
+            MarketWorld.CATEGORY_BIAS.get(category.lower(), 1.0), rng=rng
+        ),
         "nearby_buyer_count": int(rng.integers(2, 12)),
-        "seasonality_index": float(rng.uniform(0.3, 0.7)),
+        # Real calendar-driven signal (spec 024, phase 2), not an unrelated
+        # random draw — mapped onto a real month via the synthetic anchor date.
+        "seasonality_index": get_seasonality_index(category, SIM_CALENDAR_ANCHOR + timedelta(days=day)),
     }
     return Listing(
         id=state["listing_id"],

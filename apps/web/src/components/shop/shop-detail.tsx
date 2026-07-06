@@ -191,6 +191,7 @@ export function ShopDetail({ item }: { item: ShopEntry }) {
 
       {/* Rufus — Health-Card-aware shopping assistant for this item */}
       <RufusChat
+        listingId={item.id}
         context={{
           title: card.title,
           category: item.category,

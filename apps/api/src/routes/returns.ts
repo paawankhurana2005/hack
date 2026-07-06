@@ -23,6 +23,10 @@ const returnSchema = z.object({
   listing_created_at: z.string().datetime(),
   grade: z.enum(['A', 'B', 'C', 'Salvage']).nullable().optional(),
   sku: z.string().max(60).optional(),
+  // Owning seller (spec 024) — lets cascade/agent events notify the right
+  // seller. Wire name matches the identifier style of returnId/productName;
+  // stored as the doc's snake_case seller_id below.
+  sellerId: z.string().trim().min(1).max(120).optional(),
 });
 
 function apiError(code: string, message: string): ApiError {
@@ -42,11 +46,12 @@ export function createReturnsRouter(): Router {
       return res.status(503).json(apiError('returns_unavailable', 'Returns database not configured'));
     }
 
-    const { pickup_deadline, listing_created_at, ...rest } = parsed.data;
+    const { pickup_deadline, listing_created_at, sellerId, ...rest } = parsed.data;
     const doc: ReturnRecordDoc = {
       ...rest,
       pickup_deadline: new Date(pickup_deadline),
       listing_created_at: new Date(listing_created_at),
+      ...(sellerId !== undefined ? { seller_id: sellerId } : {}),
     };
 
     try {

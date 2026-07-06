@@ -5,6 +5,7 @@
 // all agree on field names and never drift.
 
 import type { Db, ObjectId } from 'mongodb';
+import type { PricingStateVector } from '@reloop/shared';
 import type { RegionCluster } from './regionCluster.js';
 
 // ── Collection names ─────────────────────────────────────────────────────────
@@ -13,6 +14,10 @@ export const DEMAND_INDEX = 'demand_index';
 export const RETURNS = 'returns';
 export const BUYERS = 'buyers';
 export const MATCH_SESSIONS = 'match_sessions';
+export const NOTIFICATIONS = 'notifications';
+export const NOTIFICATION_PREFS = 'notification_prefs';
+export const LISTING_EVENTS = 'listing_events';
+export const PRICING_TRANSACTIONS = 'pricing_transactions';
 
 // ── demand_events: raw, append-only buyer-activity log (write-heavy) ──────────
 export type DemandEventType = 'search' | 'view' | 'interest' | 'match_completed';
@@ -33,6 +38,21 @@ export const EVENT_WEIGHTS: Record<DemandEventType, number> = {
   view: 1,
   search: 0.5,
 };
+
+// ── listing_events: raw, append-only per-listing engagement log (spec 024,
+// phase 3) — mirrors demand_events' shape, but keyed by listing_id (the
+// client-side agent-store id) instead of region_cluster/pincode, since
+// listings themselves have no other server-side record. `save`/`cart_abandon`
+// have no real UI signal yet (no wishlist/cart feature exists) — only
+// `view`/`message` are actually fired today; the type still names them so the
+// gap isn't silently rediscovered later. ─────────────────────────────────────
+export type ListingEventType = 'view' | 'save' | 'message' | 'cart_abandon';
+
+export interface ListingEventDoc {
+  listing_id: string;
+  event_type: ListingEventType;
+  timestamp: Date;
+}
 
 // ── demand_index: precomputed lookup, small & read-heavy ─────────────────────
 export interface DemandIndexDoc {
@@ -61,6 +81,8 @@ export interface ReturnRecordDoc {
   sku?: string;
   match_session_id?: ObjectId; // set once the local buyer matching engine opens a session
   local_routing_accepted?: boolean; // seller accepted local routing for this return
+  seller_id?: string; // owning seller account id (spec 024) — lets cascade/agent
+  // events notify the right seller; matches users.id (string-keyed), not ObjectId.
 }
 
 // ── buyers: registered local buyers eligible for rescue-pipeline matching ────
@@ -137,6 +159,51 @@ export interface MatchSessionDoc {
   updated_at: Date;
 }
 
+// ── notifications: the seller-visible in-app inbox (spec 024) ────────────────
+// Fed by the matching cascade job, the Sales Agent, and the Listing Agent.
+// In-app only — no real SMS/email/push provider, same deferral spec 020 made
+// twice already for buyer-side notifications.
+export interface NotificationDoc {
+  _id?: ObjectId;
+  seller_id: string; // matches ReturnRecordDoc.seller_id / users.id
+  kind: 'cascade_update' | 'sales_agent' | 'listing_agent';
+  severity: 'info' | 'warning' | 'success';
+  title: string;
+  body: string;
+  return_id?: string;
+  listing_id?: string;
+  read: boolean;
+  created_at: Date;
+}
+
+// ── notification_prefs: one doc per seller (spec 024, phase 4) ───────────────
+export interface NotificationPrefsDoc {
+  seller_id: string; // unique
+  muted_kinds: Array<'cascade_update' | 'sales_agent' | 'listing_agent'>;
+  quiet_hours_start?: number;
+  quiet_hours_end?: number;
+}
+
+// ── pricing_transactions: real (state, arm, reward) rows (spec 024, phase 7) ─
+// Every real reprice decision + its eventual outcome, durably persisted so a
+// later offline export can bridge them into ml/pricing's retrain loop — today
+// that loop only ever trains on synthetic data + its OWN simulated
+// transactions (ml/pricing/reloop_pricing/pricing/simulate_marketplace.py),
+// never real apps/api production decisions. This is the missing durable link;
+// see scripts/exportPricingTransactions.ts for the actual bridge.
+export interface PricingTransactionDoc {
+  listing_id: string;
+  state: PricingStateVector; // the full feature vector this decision used
+  arm: number;
+  reward: number;
+  sold: boolean;
+  rerouted: boolean;
+  reroute_destination?: string;
+  final_price: number;
+  days_on_market: number;
+  created_at: Date;
+}
+
 // We only ever need a 7-day rolling window for aggregation; expire raw events
 // after 14 days so the write-heavy log can't grow without bound.
 const EVENT_TTL_SECONDS = 14 * 24 * 60 * 60;
@@ -161,6 +228,11 @@ export function ensurePricingIndexes(db: Db): Promise<void> {
       // One row per zone × category — keeps this collection tiny and unique.
       await index.createIndex({ region_cluster: 1, category: 1 }, { unique: true });
 
+      const listingEvents = db.collection<ListingEventDoc>(LISTING_EVENTS);
+      // Same TTL/window convention as demand_events — only a rolling window matters.
+      await listingEvents.createIndex({ timestamp: 1 }, { expireAfterSeconds: EVENT_TTL_SECONDS });
+      await listingEvents.createIndex({ listing_id: 1, timestamp: -1 });
+
       const returns = db.collection<ReturnRecordDoc>(RETURNS);
       await returns.createIndex({ returnId: 1 }, { unique: true });
 
@@ -177,6 +249,16 @@ export function ensurePricingIndexes(db: Db): Promise<void> {
       await matchSessions.createIndex({ return_id: 1 }, { unique: true });
       await matchSessions.createIndex({ status: 1 });
       await matchSessions.createIndex({ pickup_deadline: 1 });
+
+      const notifications = db.collection<NotificationDoc>(NOTIFICATIONS);
+      await notifications.createIndex({ seller_id: 1, created_at: -1 });
+      await notifications.createIndex({ seller_id: 1, read: 1 });
+
+      const notificationPrefs = db.collection<NotificationPrefsDoc>(NOTIFICATION_PREFS);
+      await notificationPrefs.createIndex({ seller_id: 1 }, { unique: true });
+
+      const pricingTransactions = db.collection<PricingTransactionDoc>(PRICING_TRANSACTIONS);
+      await pricingTransactions.createIndex({ created_at: 1 });
     })().catch((err: unknown) => {
       indexPromise = null;
       throw err;

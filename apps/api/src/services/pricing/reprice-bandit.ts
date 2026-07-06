@@ -1,9 +1,11 @@
 // Thompson-sampling contextual bandit (TS mirror of ml/pricing/.../bandit.py) — the
 // "EXPLORE" half. Looks at the reward model's per-arm predictions and adds calibrated
 // noise so we occasionally try a non-optimal arm and gather data. Not RL, not a net.
-// Posteriors are POOLED per (category × grade) bucket: every outcome teaches the whole
-// bucket and warm-starts the next listing. In production this state lives in DynamoDB;
-// here it's in-memory for the demo.
+// Posteriors are POOLED per (category × grade) bucket, plus region_cluster as a third
+// dimension when resolved (spec 024, phase 8 — geo as a posterior, not just a flat
+// feature, per spec 014's own open question): every outcome teaches the whole bucket
+// and warm-starts the next listing. In production this state lives in DynamoDB; here
+// it's in-memory for the demo.
 
 import type { BanditState, ContextBucket, PriceArm } from '@reloop/shared';
 import { PRICE_ARMS, NEUTRAL_ARM } from '@reloop/shared';
@@ -11,7 +13,9 @@ import { PRICE_ARMS, NEUTRAL_ARM } from '@reloop/shared';
 const EXPLORE_FRACTION = 0.6; // initial noise as a fraction of the per-decision spread
 
 function bucketKey(b: ContextBucket): string {
-  return `${b.category}|${b.gradeKey}`;
+  // No region_cluster (e.g. no pincode resolved) → fall back to the coarser
+  // (category, gradeKey) pool rather than fragmenting cold-start data.
+  return b.regionCluster ? `${b.category}|${b.gradeKey}|${b.regionCluster}` : `${b.category}|${b.gradeKey}`;
 }
 
 function zeroObs(): Record<PriceArm, number> {

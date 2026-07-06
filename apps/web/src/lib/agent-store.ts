@@ -53,6 +53,12 @@ export interface AgentState {
   ctx: MarketContext;
   /** Last day the agent actually ran a pricing decision (for the heartbeat cadence). */
   lastRepriceDay?: number;
+  /** Recorded when escalate_route fires (spec 024) — lets the Sales Agent's
+   *  `relist` lever compare today's real geo-demand against what it was when
+   *  this listing was given up on. Undefined when the local fallback engine
+   *  (no real geo data) made the escalation call. */
+  escalatedAtDay?: number;
+  escalatedGeoDemandIndex?: number;
 }
 
 const inr = (cents: number) => ({ amountCents: cents, currency: 'INR' as const });
@@ -231,12 +237,17 @@ function simulateDayEvent(s: AgentState, viewsToday: number): DemandEvent {
 async function decideViaEngine(
   s: AgentState,
   event: DemandEvent,
-): Promise<{ decision: AgentDecision; acted: string } | null> {
+): Promise<{ decision: AgentDecision; acted: string; geoDemandIndex: number } | null> {
   const anchor = Math.round(s.ctx.comparableCents / 100);
   const floor = Math.round(s.floorCents / 100);
+  // Return-sourced listings (birthReturnListing() in seller/hub/page.tsx) are IDed
+  // `item_ret_${returnId}` — recoverable without a new field, and it's the only
+  // case where a real server-side pincode exists to resolve geo-demand from.
+  const returnId = s.itemId.startsWith('item_ret_') ? s.itemId.replace('item_ret_', '') : undefined;
   const req: PricingDecideRequest = {
     listingId: s.id,
     currentPrice: Math.round(s.priceCents / 100),
+    ...(returnId ? { returnId } : {}),
     event: { type: event.type, payload: event.payload },
     state: {
       category: s.category,
@@ -277,6 +288,7 @@ async function decideViaEngine(
     return {
       decision: { action: 'escalate_route', routeRecommendation: 'recycle', diagnosis: pd.reason, factors, confidence: 0.9 },
       acted,
+      geoDemandIndex: pd.geoDemandIndex,
     };
   }
 
@@ -293,12 +305,16 @@ async function decideViaEngine(
     )}${capped} — the reward model picked ${pd.chosenArm}× the ${formatMoney(
       inr(anchorCents),
     )} local median, still clear of the ${formatMoney(inr(s.floorCents))} floor.`;
-    return { decision: { action: 'reprice', newPriceCents: finalCents, diagnosis, factors, confidence: 0.85 }, acted };
+    return {
+      decision: { action: 'reprice', newPriceCents: finalCents, diagnosis, factors, confidence: 0.85 },
+      acted,
+      geoDemandIndex: pd.geoDemandIndex,
+    };
   }
   const acted = `Holding at ${formatMoney(
     inr(s.priceCents),
   )} — that's already where the reward model wants it for this market.`;
-  return { decision: { action: 'hold', diagnosis, factors, confidence: 0.7 }, acted };
+  return { decision: { action: 'hold', diagnosis, factors, confidence: 0.7 }, acted, geoDemandIndex: pd.geoDemandIndex };
 }
 
 // --- The tick: one simulated day --------------------------------------------
@@ -406,6 +422,8 @@ export async function tick(
     s.hasImproved = true;
   } else if (decision.action === 'escalate_route') {
     s.routeRecommendation = decision.routeRecommendation;
+    s.escalatedAtDay = s.day;
+    s.escalatedGeoDemandIndex = viaEngine?.geoDemandIndex;
   }
 
   const newEvents: AgentEvent[] = [];
@@ -633,6 +651,68 @@ export function markAgentSold(id: string, salePriceCents?: number): AgentState |
   ];
   write(s);
   return s;
+}
+
+// --- Sales Agent (spec 024): portfolio-level, on-demand ---------------------
+// The Sales Agent never touches the bandit/reprice-engine directly — it drives
+// the SAME per-listing primitives above (decideViaEngine, tick) that a seller
+// manually clicking through one listing already triggers. Its one genuinely
+// new capability, `relist`, is a direct payoff of real geo-demand (phase A):
+// it re-checks a previously-escalated listing's geo-demand via the same
+// engine call and un-escalates it if local demand has genuinely improved.
+
+/** How much geoDemandIndex must improve over its value at escalation time
+ *  before the Sales Agent proposes un-escalating a donate/recycle listing. */
+export const RELIST_DEMAND_MARGIN = 1.15;
+
+/** Re-check real geo-demand for a previously-escalated listing. Returns null
+ *  when the listing has no recorded escalation baseline (e.g. the local
+ *  fallback engine made the original call, with no real geo data) or the
+ *  pricing engine is unreachable. */
+export async function checkRelistCandidate(id: string): Promise<{ geoDemandIndex: number } | null> {
+  const s = read(id);
+  if (!s || !s.routeRecommendation || s.escalatedGeoDemandIndex === undefined) return null;
+  const event: DemandEvent = {
+    type: 'heartbeat',
+    listingId: s.id,
+    timestamp: new Date().toISOString(),
+    payload: {},
+  };
+  const viaEngine = await decideViaEngine(s, event);
+  if (!viaEngine) return null;
+  return { geoDemandIndex: viaEngine.geoDemandIndex };
+}
+
+/** Un-escalate a listing whose local geo-demand has genuinely improved since
+ *  it was given up on. Resumes the agent from where it left off. */
+export function relistFromRoute(id: string): AgentState | null {
+  const s = read(id);
+  if (!s || !s.routeRecommendation) return null;
+  const route = s.routeRecommendation;
+  const geoDemandIndex = s.escalatedGeoDemandIndex;
+  s.routeRecommendation = undefined;
+  s.escalatedAtDay = undefined;
+  s.escalatedGeoDemandIndex = undefined;
+  s.events = [
+    ...s.events,
+    {
+      day: s.day,
+      phase: 'acted',
+      text: `Relisted — local demand has picked up since the ${route} recommendation${
+        geoDemandIndex !== undefined ? ` (geo-demand now ${geoDemandIndex.toFixed(2)})` : ''
+      }, so resale is worth trying again.`,
+      at: new Date().toISOString(),
+      action: 'relist',
+    },
+  ];
+  write(s);
+  return s;
+}
+
+/** Should the Sales Agent even look at this listing? Escalated listings are
+ *  reviewed for relist; everything else follows the normal active check. */
+export function isRelistCandidate(s: AgentState): boolean {
+  return !!s.routeRecommendation && s.escalatedGeoDemandIndex !== undefined;
 }
 
 export function resetAgent(listing: CasualListing): AgentState {

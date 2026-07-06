@@ -29,4 +29,7 @@ export interface ReturnRecordInput {
   listing_created_at: string; // ISO
   grade?: 'A' | 'B' | 'C' | 'Salvage' | null;
   sku?: string;
+  /** Owning seller account id (spec 024) — lets matching-cascade and agent
+   *  events notify the right seller via the in-app notification inbox. */
+  sellerId?: string;
 }

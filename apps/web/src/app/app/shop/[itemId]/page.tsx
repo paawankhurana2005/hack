@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { PageShell } from '@/components/layout/page-shell';
 import { Card } from '@/components/ui/card';
 import { findShopEntry, type ShopEntry } from '@/lib/market';
+import { logListingEvent } from '@/lib/api-client';
 import { ShopDetail } from '@/components/shop/shop-detail';
 
 export default function ShopItemPage() {
@@ -15,6 +16,13 @@ export default function ShopItemPage() {
 
   useEffect(() => {
     setItem(findShopEntry(id) ?? null);
+  }, [id]);
+
+  // Real per-listing engagement signal (spec 024, phase 3) — feeds the reprice
+  // engine's viewVelocity24h/viewVelocityTrend instead of a client simulation.
+  useEffect(() => {
+    if (!id) return;
+    void logListingEvent(id, 'view').catch(() => {});
   }, [id]);
 
   if (item === undefined) return <PageShell eyebrow="Shop" title="Item" />;
