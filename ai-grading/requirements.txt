@@ -1,0 +1,17 @@
+# Core ML (for the downstream CLIP regression trainer; dataset build only needs
+# the imaging stack, but these are pinned-loose so the module is self-contained).
+torch
+torchvision
+transformers
+
+# Imaging / numerics
+Pillow
+numpy
+pandas
+scipy
+opencv-python
+
+# Networking + UX
+requests
+tqdm
+matplotlib

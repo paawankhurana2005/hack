@@ -1,0 +1,12 @@
+# Large downloaded sources and generated training images — never commit these.
+data/raw/
+data/processed/
+data/dataset.csv
+data/verification_grid.png
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
