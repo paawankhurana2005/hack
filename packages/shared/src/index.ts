@@ -34,3 +34,4 @@ export * from './review.js';
 export * from './monitor.js';
 export * from './pii.js';
 export * from './notifications.js'; // in-app notifications (spec 024)
+export * from './return-job.js'; // async S3->SQS->Lambda return-grading pipeline (spec 025)

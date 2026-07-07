@@ -6,10 +6,13 @@ import type {
   ReturnHealthCard,
   ReturnRoutingDecision,
   ReturnReason,
+  ReturnManifest,
+  ReturnJobResult,
 } from '@reloop/shared';
 import { mockGradeItem, mockRouteItem } from '@/lib/mocks/return-flow';
 import { gradeReturnItem, routeReturnItem, createReturnHealthCard } from '@/lib/api-client';
 import { saveReturn, generateReturnId } from '@/lib/mocks/return-store';
+import { initReturn, submitReturnPhotos, pollReturnStatus } from '@/lib/return-pipeline-api';
 import { Card } from '@/components/ui/card';
 import { LeafletMap } from '@/components/map/LeafletMap';
 import {
@@ -35,8 +38,13 @@ interface Props {
   onDone: (agentWindow: string) => void;
 }
 
-type Phase = 'grading' | 'routing' | 'health_card' | 'saving' | 'ready';
+type Phase = 'grading' | 'routing' | 'health_card' | 'processing' | 'saving' | 'ready';
 type HealthCardResult = ReturnHealthCard | { fallback: true; summary: string };
+
+// Spec 025: how long to poll the async return-worker Lambda before giving up
+// and falling back to the synchronous mock path.
+const ASYNC_POLL_TIMEOUT_MS = 120_000;
+const ASYNC_POLL_INTERVAL_MS = 2_000;
 
 function computeAgentWindow() {
   const now = new Date();
@@ -57,6 +65,16 @@ const PHASE_STEPS: { key: Phase; label: string; Icon: Icon }[] = [
 ];
 
 const PHASE_ORDER: Phase[] = ['grading', 'routing', 'health_card', 'saving', 'ready'];
+
+// Spec 025: the async pipeline (S3 -> SQS -> Lambda) grades, routes, and mints
+// the Health Card in one server-side job — the client only sees PENDING vs.
+// DONE, not each stage, so it gets a single combined step instead of three.
+const ASYNC_PHASE_STEPS: { key: Phase; label: string; Icon: Icon }[] = [
+  { key: 'processing', label: 'Grading, routing, and building your Health Card', Icon: ScanIcon },
+  { key: 'saving', label: 'Confirming your return', Icon: ClipboardCheckIcon },
+];
+
+const ASYNC_PHASE_ORDER: Phase[] = ['processing', 'saving', 'ready'];
 
 const GRADE_COLORS: Record<string, string> = {
   A: 'bg-success/20 text-success border-success/30',
@@ -102,71 +120,142 @@ export function BuyerStep2Pickup({
   orderId, productName, priceCents, category, sku, reason, photos, onDone,
 }: Props) {
   const [phase, setPhase] = useState<Phase>('grading');
+  const [asyncMode, setAsyncMode] = useState(false);
   const [agentWindow] = useState(computeAgentWindow);
   const [grading, setGrading] = useState<ReturnGradingResult | null>(null);
   const [routing, setRouting] = useState<ReturnRoutingDecision | null>(null);
   const [healthCard, setHealthCard] = useState<HealthCardResult | null>(null);
 
   useEffect(() => {
+    // Spec 025: resolves a job's raw (possibly-fallback) results into the same
+    // fully-typed shapes the synchronous path guarantees, using the same mock
+    // fallback the sync path uses when the server reports `fallback: true`.
+    async function resolveJobResult(jobResult: ReturnJobResult) {
+      let gr: ReturnGradingResult | null =
+        'fallback' in jobResult.gradingResult ? null : jobResult.gradingResult;
+      if (!gr) gr = await mockGradeItem(reason, photos, 'high_confidence');
+
+      let rd: ReturnRoutingDecision | null =
+        'fallback' in jobResult.routingDecision ? null : jobResult.routingDecision;
+      if (!rd) rd = await mockRouteItem(gr, reason, sku, 'local_resale');
+
+      return { grading: gr, routing: rd, card: jobResult.healthCard };
+    }
+
     void (async () => {
-      // --- Stage 1: doorstep grading (real /api/grade, mock fallback) ------
+      const returnId = generateReturnId();
       let gradingResult: ReturnGradingResult | null = null;
+      let routingDecision: ReturnRoutingDecision | null = null;
+      let card: HealthCardResult | null = null;
+      let resolvedAsync = false;
+
+      // --- Spec 025: try the async S3 -> SQS -> Lambda pipeline first -------
+      // initReturn/pollReturnStatus degrade gracefully (return null) when the
+      // API's AWS credentials aren't configured, so this always attempts and
+      // falls through to the synchronous path below on any failure.
       if (photos.length > 0) {
+        setAsyncMode(true);
+        setPhase('processing');
         try {
-          const res = await gradeReturnItem({ photos, reason, sku });
-          gradingResult = 'fallback' in res ? await mockGradeItem(reason, photos, 'high_confidence') : res;
+          const init = await initReturn(returnId, photos.length);
+          if (init) {
+            const manifest: ReturnManifest = {
+              returnId,
+              orderId,
+              sku,
+              reason,
+              sellerType: '1P',
+              photoCount: photos.length,
+              createdAt: new Date().toISOString(),
+            };
+            const uploaded = await submitReturnPhotos(init, photos, manifest);
+            if (uploaded) {
+              const deadline = Date.now() + ASYNC_POLL_TIMEOUT_MS;
+              while (Date.now() < deadline) {
+                await new Promise((r) => setTimeout(r, ASYNC_POLL_INTERVAL_MS));
+                const status = await pollReturnStatus(returnId);
+                if (status?.status === 'DONE' && status.result) {
+                  const resolved = await resolveJobResult(status.result);
+                  gradingResult = resolved.grading;
+                  routingDecision = resolved.routing;
+                  card = resolved.card;
+                  resolvedAsync = true;
+                  break;
+                }
+                if (status?.status === 'FAILED') break;
+              }
+            }
+          }
+        } catch {
+          // fall through to the synchronous path below
+        }
+      }
+
+      if (resolvedAsync) {
+        setGrading(gradingResult);
+        setRouting(routingDecision);
+        setHealthCard(card);
+      } else {
+        setAsyncMode(false);
+
+        // --- Stage 1: doorstep grading (real /api/grade, mock fallback) ----
+        if (photos.length > 0) {
+          setPhase('grading');
+          try {
+            const res = await gradeReturnItem({ photos, reason, sku });
+            gradingResult = 'fallback' in res ? await mockGradeItem(reason, photos, 'high_confidence') : res;
+          } catch {
+            try {
+              gradingResult = await mockGradeItem(reason, photos, 'high_confidence');
+            } catch {
+              gradingResult = null;
+            }
+          }
+          setGrading(gradingResult);
+        } else {
+          setPhase('grading');
+          // no photos — simulate a quick pause
+          await new Promise((r) => setTimeout(r, 1200));
+        }
+        setPhase('routing');
+
+        // --- Stage 3: the Intelligent Bridge (real /api/route, mock fallback)
+        try {
+          // Demo catalog is 1P-only — no sellerType is threaded through MockOrder yet.
+          const res = await routeReturnItem({ gradingResult, reason, sku, sellerType: '1P' });
+          routingDecision =
+            'fallback' in res ? await mockRouteItem(gradingResult, reason, sku, 'local_resale') : res;
         } catch {
           try {
-            gradingResult = await mockGradeItem(reason, photos, 'high_confidence');
+            routingDecision = await mockRouteItem(gradingResult, reason, sku, 'local_resale');
           } catch {
-            gradingResult = null;
+            routingDecision = null;
           }
         }
-        setGrading(gradingResult);
-      } else {
-        // no photos — simulate a quick pause
-        await new Promise((r) => setTimeout(r, 1200));
-      }
-      setPhase('routing');
+        setRouting(routingDecision);
+        setPhase('health_card');
 
-      // --- Stage 3: the Intelligent Bridge (real /api/route, mock fallback) -
-      let routingDecision: ReturnRoutingDecision | null = null;
-      try {
-        // Demo catalog is 1P-only — no sellerType is threaded through MockOrder yet.
-        const res = await routeReturnItem({ gradingResult, reason, sku, sellerType: '1P' });
-        routingDecision =
-          'fallback' in res ? await mockRouteItem(gradingResult, reason, sku, 'local_resale') : res;
-      } catch {
-        try {
-          routingDecision = await mockRouteItem(gradingResult, reason, sku, 'local_resale');
-        } catch {
-          routingDecision = null;
+        // --- The Product Health Card — minted at the return click (spec 016)
+        if (gradingResult && photos.length > 0) {
+          try {
+            card = await createReturnHealthCard({ gradingResult });
+          } catch {
+            // Enrichment only — never blocks return submission.
+          }
+        } else {
+          await new Promise((r) => setTimeout(r, 400));
         }
+        setHealthCard(card);
       }
-      setRouting(routingDecision);
-      setPhase('health_card');
 
-      // --- The Product Health Card — minted at the return click (spec 016) --
-      let card: HealthCardResult | null = null;
-      if (gradingResult && photos.length > 0) {
-        try {
-          card = await createReturnHealthCard({ gradingResult });
-        } catch {
-          // Enrichment only — never blocks return submission.
-        }
-      } else {
-        await new Promise((r) => setTimeout(r, 400));
-      }
-      setHealthCard(card);
       setPhase('saving');
-
       await new Promise((r) => setTimeout(r, 800));
 
       const isGradeALocalResale =
         gradingResult?.grade === 'A' && routingDecision?.decision === 'local_resale';
 
       saveReturn({
-        returnId: generateReturnId(),
+        returnId,
         orderId,
         productName,
         category,
@@ -194,7 +283,9 @@ export function BuyerStep2Pickup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const currentIdx = PHASE_ORDER.indexOf(phase);
+  const activeSteps = asyncMode ? ASYNC_PHASE_STEPS : PHASE_STEPS;
+  const activeOrder = asyncMode ? ASYNC_PHASE_ORDER : PHASE_ORDER;
+  const currentIdx = activeOrder.indexOf(phase);
 
   const evPaths = useMemo(() => {
     if (!routing?.evBreakdown) return null;
@@ -208,10 +299,12 @@ export function BuyerStep2Pickup({
           Processing your return
         </p>
         <p className="mb-6 mt-1 text-sm text-muted-foreground">
-          This takes a few seconds — no need to refresh.
+          {asyncMode
+            ? 'This can take up to a couple of minutes — no need to refresh.'
+            : 'This takes a few seconds — no need to refresh.'}
         </p>
         <div className="space-y-4">
-          {PHASE_STEPS.map((step, i) => {
+          {activeSteps.map((step, i) => {
             const isDone = currentIdx > i;
             const isActive = currentIdx === i;
             const StepIcon = step.Icon;

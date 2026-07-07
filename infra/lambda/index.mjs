@@ -1,6 +1,8 @@
 // ReLoop data service — a single AWS Lambda behind a Function URL.
-// Serves the Product Health Card provenance ledger from DynamoDB (append-only)
-// and issues presigned S3 upload URLs for grading photos. The web app calls this
+// Serves the Product Health Card provenance ledger from DynamoDB (append-only),
+// issues presigned S3 upload URLs for grading photos, and (spec 025) kicks off
+// + reports on the async return-grading pipeline (S3 -> SQS -> return-worker
+// Lambda, see return-worker.mjs and infra/provision.sh). The web app calls this
 // directly (public Function URL); localStorage stays the bulletproof fallback.
 //
 // Runtime: Node.js 20 (AWS SDK v3 is preinstalled — no bundled deps).
@@ -11,6 +13,7 @@ import {
   PutCommand,
   QueryCommand,
   UpdateCommand,
+  GetCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -18,6 +21,8 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 const REGION = process.env.AWS_REGION || 'ap-south-1';
 const TABLE = process.env.TABLE_NAME || 'reloop-provenance';
 const BUCKET = process.env.BUCKET_NAME || 'reloop-media-paawan';
+const JOBS_TABLE = process.env.JOBS_TABLE_NAME || 'reloop-return-jobs';
+const JOB_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }));
 const s3 = new S3Client({ region: REGION });
@@ -107,6 +112,67 @@ export async function handler(event) {
       const uploadUrl = await getSignedUrl(s3, cmd, { expiresIn: 300 });
       const publicUrl = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
       return json(200, { uploadUrl, publicUrl });
+    }
+
+    // --- Spec 025: init an async return-grading job ------------------------
+    // Mints a PENDING job row (idempotent — a client retry for the same
+    // returnId doesn't reset an in-flight job) and returns presigned PUT URLs
+    // for each photo plus the manifest.json whose arrival triggers the
+    // pipeline (S3 event -> SQS -> return-worker Lambda).
+    if (method === 'POST' && path === '/return-init') {
+      const body = JSON.parse(event.body || '{}');
+      const { returnId, photoCount, contentType } = body;
+      if (!returnId || !Number.isInteger(photoCount) || photoCount < 0) {
+        return json(400, { error: 'returnId + integer photoCount required' });
+      }
+      const now = new Date().toISOString();
+      const ttl = Math.floor(Date.now() / 1000) + JOB_TTL_SECONDS;
+      try {
+        await ddb.send(
+          new PutCommand({
+            TableName: JOBS_TABLE,
+            Item: { pk: returnId, status: 'PENDING', createdAt: now, updatedAt: now, ttl },
+            ConditionExpression: 'attribute_not_exists(pk)',
+          }),
+        );
+      } catch (err) {
+        if (err.name !== 'ConditionalCheckFailedException') throw err;
+        // Job already exists (client retry) — fall through and just re-issue URLs.
+      }
+
+      const ct = contentType || 'image/jpeg';
+      const uploadUrls = [];
+      const publicPhotoUrls = [];
+      for (let i = 0; i < photoCount; i += 1) {
+        const key = `returns/${returnId}/photo-${i}.jpg`;
+        const cmd = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: ct });
+        uploadUrls.push(await getSignedUrl(s3, cmd, { expiresIn: 300 }));
+        publicPhotoUrls.push(`https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`);
+      }
+      const manifestCmd = new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: `returns/${returnId}/manifest.json`,
+        ContentType: 'application/json',
+      });
+      const manifestUploadUrl = await getSignedUrl(s3, manifestCmd, { expiresIn: 300 });
+
+      return json(200, { uploadUrls, manifestUploadUrl, publicPhotoUrls });
+    }
+
+    // --- Spec 025: poll an async return-grading job's status ---------------
+    if (method === 'GET' && path === '/return-status') {
+      const returnId = event?.queryStringParameters?.returnId;
+      if (!returnId) return json(400, { error: 'returnId required' });
+      const out = await ddb.send(new GetCommand({ TableName: JOBS_TABLE, Key: { pk: returnId } }));
+      if (!out.Item) return json(404, { error: 'not found' });
+      const { status, updatedAt, result, error } = out.Item;
+      return json(200, {
+        returnId,
+        status,
+        updatedAt,
+        result: result ? JSON.parse(result) : undefined,
+        error,
+      });
     }
 
     return json(404, { error: `no route for ${method} ${path}` });

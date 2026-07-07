@@ -23,6 +23,20 @@ services:
       # https://reloop.vercel.app  — set after the Vercel deploy is live.
       - key: WEB_ORIGIN
         sync: false
+      # MongoDB Atlas — create a free M0 cluster at mongodb.com and paste the
+      # connection string here. Optional: unset means auth + pricing/demand/
+      # matching/notifications routes run in degraded (503) mode.
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        sync: false
+      # Spec 025: shared secret the async return-worker Lambda sends as
+      # x-reloop-internal-secret. Generate with `openssl rand -hex 32`. Must
+      # match the value the Lambda is deployed with (infra/provision.sh reads
+      # it from your shell's INTERNAL_API_SECRET env var). Optional: unset
+      # disables the check entirely.
+      - key: INTERNAL_API_SECRET
+        sync: false
       # Optional model/url overrides (sensible defaults live in config.ts):
       # - key: NVIDIA_BASE_URL
       #   value: https://integrate.api.nvidia.com/v1

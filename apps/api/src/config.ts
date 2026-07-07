@@ -26,6 +26,24 @@ const schema = z.object({
   LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),
   LANGFUSE_SECRET_KEY: z.string().min(1).optional(),
   LANGFUSE_BASE_URL: z.string().url().default('https://cloud.langfuse.com'),
+  // Spec 025: gates /api/grade, /api/route, /api/return/checkpoint, and
+  // /api/health-card behind a shared secret once the async return-worker
+  // Lambda becomes their only real caller. Optional: when unset, the gate is
+  // skipped entirely so local dev never breaks.
+  INTERNAL_API_SECRET: z.string().min(1).optional(),
+  // Spec 025 fallback: the account's Lambda Function URL public-invoke path
+  // is blocked by an AWS account-level restriction (concurrency quota stuck
+  // at 10, quota-increase request disabled — pending an AWS Support case).
+  // Until that's lifted, /api/return-init and /api/return-status run these
+  // same AWS SDK calls directly from apps/api (authenticated, not subject to
+  // the same restriction) instead of going through the Lambda Function URL.
+  // Optional: when unset, those two routes return 503 and the web falls back
+  // to the synchronous grading path.
+  AWS_REGION: z.string().min(1).default('ap-south-1'),
+  AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  AWS_S3_BUCKET: z.string().min(1).default('reloop-media-paawan'),
+  AWS_RETURN_JOBS_TABLE: z.string().min(1).default('reloop-return-jobs'),
 });
 
 const parsed = schema.safeParse(process.env);

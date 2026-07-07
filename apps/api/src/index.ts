@@ -32,6 +32,7 @@ import { createReturnsRouter } from './routes/returns.js';
 import { createMatchingRouter } from './routes/matching.js';
 import { createNotificationsRouter } from './routes/notifications.js';
 import { createListingEventsRouter } from './routes/listing-events.js';
+import { createReturnPipelineRouter } from './routes/return-pipeline.js';
 import { configureNotificationNarration } from './services/notifications/notification-service.js';
 import { isMongoConfigured, getDb } from './lib/mongo.js';
 import { ensurePricingIndexes } from './lib/collections.js';
@@ -40,6 +41,7 @@ import { scheduleMatchingCascade } from './jobs/matchingCascade.js';
 import { createGradeHandler } from './routes/grade.js';
 import { checkpointHandler, routeHandler } from './routes/route.js';
 import { healthCardHandler } from './routes/health-card.js';
+import { requireInternalSecret } from './lib/internal-auth.js';
 
 const app = express();
 
@@ -145,12 +147,18 @@ app.use('/api/returns', createReturnsRouter());
 app.use('/api/matching', createMatchingRouter());
 app.use('/api/notifications', createNotificationsRouter());
 app.use('/api/listings', createListingEventsRouter());
+// Spec 025 fallback: authenticated AWS SDK calls, standing in for the
+// currently account-restricted public Lambda Function URL (see config.ts).
+app.use('/api', createReturnPipelineRouter());
 
+// Spec 025: these four routes are the return-worker Lambda's only real
+// caller once the async pipeline ships (BuyerStep2Pickup.tsx stops calling
+// them directly) — gated behind INTERNAL_API_SECRET when it's configured.
 const gradeHandler = createGradeHandler(gradingService);
-app.post('/api/grade', (req, res) => { void gradeHandler(req, res); });
-app.post('/api/route', (req, res) => { void routeHandler(req, res); });
-app.post('/api/return/checkpoint', (req, res) => { void checkpointHandler(req, res); });
-app.post('/api/health-card', (req, res) => { void healthCardHandler(req, res); });
+app.post('/api/grade', requireInternalSecret, (req, res) => { void gradeHandler(req, res); });
+app.post('/api/route', requireInternalSecret, (req, res) => { void routeHandler(req, res); });
+app.post('/api/return/checkpoint', requireInternalSecret, (req, res) => { void checkpointHandler(req, res); });
+app.post('/api/health-card', requireInternalSecret, (req, res) => { void healthCardHandler(req, res); });
 
 app.listen(config.PORT, () => {
   log('info', 'api listening', { port: config.PORT, mockMode: MOCK_MODE });
