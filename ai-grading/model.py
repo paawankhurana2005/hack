@@ -108,21 +108,24 @@ class GraderModel(nn.Module):
 
 
 def save_checkpoint(model: GraderModel, path, **extra) -> None:
-    """Persist the fine-tuned vision weights + head. Only the vision tower and the
-    visual projection are saved (the text tower is unused for grading)."""
-    torch.save(
-        {
-            "head_state_dict": model.head.state_dict(),
-            "vision_model_state_dict": model.clip.vision_model.state_dict(),
-            "visual_projection_state_dict": model.clip.visual_projection.state_dict(),
-            "backbone": model.backbone_name,
-            "unfreeze_last_n": model.unfreeze_last_n,
-            "feature_dim": FEATURE_DIM,
-            "score_ranges": config.GRADE_SCORE_RANGES,
-            **extra,
-        },
-        path,
-    )
+    """Persist the head (always) + the fine-tuned vision weights (only when the CLIP
+    tail was actually unfrozen). A FROZEN model reuses stock pretrained CLIP, so saving
+    its vision tower is redundant AND huge (~340MB) — head-only keeps the checkpoint
+    tiny (<1MB) and committable, so anyone who clones gets a working grader (CLIP
+    auto-downloads, head loads from git). load_grader() reconstructs pretrained CLIP
+    when the vision weights are absent."""
+    payload = {
+        "head_state_dict": model.head.state_dict(),
+        "backbone": model.backbone_name,
+        "unfreeze_last_n": model.unfreeze_last_n,
+        "feature_dim": FEATURE_DIM,
+        "score_ranges": config.GRADE_SCORE_RANGES,
+        **extra,
+    }
+    if model.unfreeze_last_n and model.unfreeze_last_n > 0:
+        payload["vision_model_state_dict"] = model.clip.vision_model.state_dict()
+        payload["visual_projection_state_dict"] = model.clip.visual_projection.state_dict()
+    torch.save(payload, path)
 
 
 @lru_cache(maxsize=1)

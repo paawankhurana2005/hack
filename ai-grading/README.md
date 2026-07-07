@@ -91,35 +91,63 @@ data/
 
 Images are 224×224 (CLIP ViT input size).
 
-## How it connects to the grading pipeline
+## Use it in the app (wiring) — the fast path
 
-The ReLoop API already has a grading contract and a swappable provider seam:
+The trained head ships in git (`data/model_best.pt`, <1 MB — the frozen CLIP backbone
+is downloaded from Hugging Face on first run), so grading works right after a clone.
+`apps/api` already routes `/api/grade` through a `trained-local` provider that POSTs each
+photo to `GRADING_MODEL_URL/assess`; `serve.py` speaks exactly that protocol, so **no app
+code changes are needed** — just run the server and point the API at it:
 
-- `packages/shared/src/return.ts` → `ReturnGradingResult` (`grade`, `confidence`,
-  `defects`, …) — the contract this model ultimately fills.
-- `apps/api/src/routes/grade.ts` → today calls a hosted VLM; the longer-term plan
-  is a purpose-trained CLIP regressor.
+```bash
+# 1) start the grader (this folder)
+cd ai-grading
+pip install -r requirements.txt          # first time
+python serve.py                          # -> http://127.0.0.1:8000
 
-This module produces the **training data** for that regressor. The intended next
-steps (out of scope here) are:
+# 2) run apps/api with these env vars (defaults already point at :8000)
+GRADING_PROVIDER=trained-local
+GRADING_MODEL_URL=http://127.0.0.1:8000
+GRADER_LENIENCY=0     # this model is calibrated — don't let the app bump grades
+GRADER_FLOOR=poor     # allow the full range (the app's default 'fair' clips Salvage)
+```
 
-1. Train a CLIP image encoder + small regression head on `dataset.csv` to predict
-   `score`.
-2. Threshold `score` into A/B/C/Salvage using the same ranges in `config.py`,
-   producing a `ReturnGradingResult`.
-3. Serve it behind the existing `/api/grade` provider seam.
+**Graceful fallback:** if the grader is down or the model is missing, `apps/api`'s
+`FallbackVlmProvider` automatically falls back to the hosted VLM (or mock mode), so the
+app always runs. To force the hosted VLM instead, set `GRADING_PROVIDER=chat-vlm`.
 
-The score→grade thresholds and the `defects` vocabulary are deliberately shared
-with `config.py` so training, inference, and the app stay in lockstep.
+### Endpoints (`serve.py`)
+| Route | Body | Returns |
+|---|---|---|
+| `GET /health` | — | `{status, ready}` |
+| `POST /assess` | `{ imageBase64 }` | ConditionGrade JSON (**the app protocol** — one photo → `new\|like-new\|good\|fair\|poor`, mapped to A/B/C/Salvage by `conditionGradeToReturnGrade`) |
+| `POST /grade` | `{ category, images: {angle: b64} }` | richer multi-angle: one score (worst-angle bounded), per-angle breakdown, and a `missing_required` review flag |
+
+Try it standalone:
+```bash
+python inference.py footwear sole:../shoesDemo/sole.jpg top:../shoesDemo/top.jpg
+```
+
+**Retrain** (optional — the shipped head already works): `python build_dataset.py &&
+python train.py`. The frozen-model checkpoint stays tiny (head-only); a fine-tuned one
+(`config.FINETUNE_UNFREEZE_LAST_N > 0`) also stores the vision weights and gets large.
+
+The score→grade thresholds and `defects` vocabulary are shared via `config.py`, so
+training, inference, and the app stay in lockstep.
 
 ## Module layout
 
 ```
 ai-grading/
-├── config.py              # every tunable parameter
-├── build_dataset.py       # one-command end-to-end builder
+├── config.py              # every tunable parameter (categories, capture spec, bias)
+├── build_dataset.py       # one-command end-to-end dataset builder
 ├── verify_dataset.py      # histogram + sample-grid sanity check
-├── downloaders/           # abo / mvtec / coco (idempotent, fault-tolerant)
+├── model.py               # GraderModel (CLIP + head), calibrate, save/load checkpoint
+├── train.py               # train the condition head (+ optional CLIP fine-tune)
+├── evaluate.py            # bucket accuracy, confusion, in-band MAE
+├── inference.py           # grade_image / grade_images (multi-angle) + capture spec
+├── serve.py               # HTTP server for the app (/assess, /grade)
+├── downloaders/           # abo (category-aware) / mvtec / coco (fault-tolerant)
 └── degradation/
     ├── overlays.py        # individual defect operations
     └── composer.py        # combines ops → labelled sample

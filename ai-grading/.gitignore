@@ -1,8 +1,10 @@
-# Large downloaded sources and generated training images — never commit these.
-data/raw/
-data/processed/
-data/dataset.csv
-data/verification_grid.png
+# Generated / downloaded artifacts (all regenerable) — but keep the tiny trained head
+# so the grader works right after a clone (the frozen CLIP backbone downloads from HF).
+data/
+!data/model_best.pt
+
+# Local server / run logs
+*.log
 
 # Python
 __pycache__/
