@@ -65,7 +65,7 @@ function Flows() {
           <div className="absolute inset-0 p-6">
             <div className="mb-4 flex items-center justify-between">
               <div className="font-mono text-[10px] uppercase text-foreground/40">
-                Camera Viewport · 88.2% Active
+                Camera Viewport · Active
               </div>
               <div className="h-2 w-2 animate-pulse rounded-full bg-orange" />
             </div>
@@ -95,7 +95,7 @@ function Flows() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium">Estimated Payout</span>
-                <span className="font-mono text-xs font-bold">$482.00</span>
+                <span className="font-mono text-xs font-bold">Calculated live</span>
               </div>
             </div>
           </div>
@@ -143,9 +143,9 @@ function Flows() {
           <div className="col-span-2 rounded-2xl border border-white/10 bg-white/5 p-6">
             <div className="flex items-end justify-between">
               <div>
-                <div className="font-mono text-2xl font-bold">$14.2k</div>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-orange">
-                  Saved Logistical Loss · last 24h
+                <div className="text-sm font-bold uppercase tracking-tight">Logistical loss avoided</div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-orange">
+                  Graded &amp; routed before it moves
                 </div>
               </div>
               <div className="flex h-12 w-28 items-end gap-1">
@@ -170,14 +170,13 @@ type Row = {
   source: string;
   route: string;
   routeTone: 'orange' | 'navy' | 'muted';
-  recovery: string;
 };
 
 const ROWS: Row[] = [
-  { id: 'AMZ-9021-KLX', item: 'Kindle Paperwhite', grade: 'A', source: 'Doorstep Return', route: 'Direct Resale', routeTone: 'orange', recovery: '$124.50' },
-  { id: 'AMZ-8842-TRV', item: 'Anker PowerCore', grade: 'B+', source: 'Marketplace · Sell', route: 'Buyer Matched · 9.2km', routeTone: 'orange', recovery: '$48.20' },
-  { id: 'AMZ-7712-QPC', item: 'Bose QC45 Headphones', grade: 'B', source: 'Doorstep Return', route: 'Refurbish Hub · SEA-4', routeTone: 'navy', recovery: '$189.00' },
-  { id: 'AMZ-6610-DKR', item: 'Levoit Air Purifier', grade: 'C', source: 'Excess Inventory', route: 'Local Donation', routeTone: 'muted', recovery: '$0.00' },
+  { id: 'AMZ-9021-KLX', item: 'Kindle Paperwhite', grade: 'A', source: 'Doorstep Return', route: 'Direct Resale', routeTone: 'orange' },
+  { id: 'AMZ-8842-TRV', item: 'Anker PowerCore', grade: 'B+', source: 'Marketplace · Sell', route: 'Buyer Matched · Nearby', routeTone: 'orange' },
+  { id: 'AMZ-7712-QPC', item: 'Bose QC45 Headphones', grade: 'B', source: 'Doorstep Return', route: 'Refurbish Hub · BLR-4', routeTone: 'navy' },
+  { id: 'AMZ-6610-DKR', item: 'Levoit Air Purifier', grade: 'C', source: 'Excess Inventory', route: 'Local Donation', routeTone: 'muted' },
 ];
 
 function Dashboard() {
@@ -187,23 +186,18 @@ function Dashboard() {
         <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
           <div>
             <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-orange">
-              Live · Seattle Cluster
+              Live · Bengaluru Cluster
             </span>
             <h2 className="mt-2 text-4xl font-bold tracking-tighter">Live Routing Engine</h2>
             <p className="mt-2 text-foreground/60">
-              Current return operations across the Pacific Northwest logistics network.
+              Current return operations across your local logistics network.
             </p>
-          </div>
-          <div className="flex gap-6">
-            <Stat label="Active Couriers" value="1,204" />
-            <Stat label="Success Rate" value="99.8%" />
-            <Stat label="Recovery 7d" value="$2.4M" accent />
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           <div className="space-y-4">
-            <Step n="01" title="Visual Grading" body="AI verifies authenticity and wear in 4.2s." />
+            <Step n="01" title="Visual Grading" body="AI verifies authenticity and wear in seconds." />
             <Step n="02" title="Dynamic Pricing" body="Real-time matching with local secondary-market prices." />
             <Step n="03" title="Hyper-local Routing" body="Item moves directly to a new buyer or the nearest refurb hub." accent />
           </div>
@@ -219,7 +213,7 @@ function Dashboard() {
                 className="h-full w-full object-cover"
               />
               <div className="absolute left-4 top-4 rounded border border-hairline bg-white/90 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-foreground/60 backdrop-blur-sm">
-                Network Topology · PNW
+                Network Topology · India
               </div>
             </div>
           </div>
@@ -235,7 +229,6 @@ function Dashboard() {
                   <th className="px-6 py-3 font-bold">Grade</th>
                   <th className="px-6 py-3 font-bold">Source</th>
                   <th className="px-6 py-3 font-bold">Routing Outcome</th>
-                  <th className="px-6 py-3 text-right font-bold">Recovery</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface">
@@ -263,7 +256,6 @@ function Dashboard() {
                         {r.route}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-mono font-semibold">{r.recovery}</td>
                   </tr>
                 ))}
               </tbody>
@@ -272,15 +264,6 @@ function Dashboard() {
         </div>
       </div>
     </section>
-  );
-}
-
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="text-right">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">{label}</div>
-      <div className={`font-mono text-lg font-bold ${accent ? 'text-orange' : ''}`}>{value}</div>
-    </div>
   );
 }
 

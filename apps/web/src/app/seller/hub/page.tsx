@@ -466,12 +466,6 @@ export default function HubBenchPage() {
                 </div>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">{lot.remainingNote}</p>
-                  <Link
-                    href="/seller/bulk-exchange"
-                    className="text-xs font-semibold text-brand hover:underline"
-                  >
-                    View in Bulk Exchange →
-                  </Link>
                 </div>
               </div>
             );

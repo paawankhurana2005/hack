@@ -8,7 +8,6 @@ import { NotificationBell } from '@/components/seller/notification-bell';
 const tabs = [
   { href: '/app/store', label: 'Store' },
   { href: '/app/shop', label: 'Local Shop' },
-  { href: '/app/mesh', label: 'Mesh' },
   { href: '/app/items', label: 'My Items' },
   { href: '/app/listings', label: 'My Listings' },
   { href: '/app/rewards', label: 'Rewards' },
