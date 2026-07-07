@@ -11,6 +11,7 @@ import type {
 } from '@reloop/shared';
 import { mockGradeItem, mockRouteItem } from '@/lib/mocks/return-flow';
 import { gradeReturnItem, routeReturnItem, createReturnHealthCard } from '@/lib/api-client';
+import type { CapturedAngle } from './BuyerStep1';
 import { saveReturn, generateReturnId } from '@/lib/mocks/return-store';
 import { initReturn, submitReturnPhotos, pollReturnStatus } from '@/lib/return-pipeline-api';
 import { Card } from '@/components/ui/card';
@@ -34,7 +35,7 @@ interface Props {
   category: string;
   sku: string;
   reason: ReturnReason;
-  photos: string[];
+  images: CapturedAngle[];
   onDone: (agentWindow: string) => void;
 }
 
@@ -117,8 +118,10 @@ function inr(paise: number) {
 }
 
 export function BuyerStep2Pickup({
-  orderId, productName, priceCents, category, sku, reason, photos, onDone,
+  orderId, productName, priceCents, category, sku, reason, images, onDone,
 }: Props) {
+  // Flat data-URLs for persistence / mock grading; the angle tags go to the API.
+  const photos = images.map((im) => im.dataUrl);
   const [phase, setPhase] = useState<Phase>('grading');
   const [asyncMode, setAsyncMode] = useState(false);
   const [agentWindow] = useState(computeAgentWindow);
@@ -202,7 +205,12 @@ export function BuyerStep2Pickup({
         if (photos.length > 0) {
           setPhase('grading');
           try {
-            const res = await gradeReturnItem({ photos, reason, sku });
+            const res = await gradeReturnItem({
+              images: images.map((im) => ({ angle: im.angle, imageBase64: im.dataUrl })),
+              reason,
+              sku,
+              category,
+            });
             gradingResult = 'fallback' in res ? await mockGradeItem(reason, photos, 'high_confidence') : res;
           } catch {
             try {
@@ -416,6 +424,17 @@ export function BuyerStep2Pickup({
             </div>
 
             <ConfidenceBar label="AI Confidence" value={grading.confidence} />
+
+            {grading.missingAngles && grading.missingAngles.length > 0 && (
+              <div className="rounded-lg border-l-4 border-warning bg-warning/10 p-3">
+                <p className="text-sm text-warning">
+                  Graded from the angles you provided — the{' '}
+                  <span className="font-semibold">{grading.missingAngles.join(', ')}</span>{' '}
+                  {grading.missingAngles.length === 1 ? 'view was' : 'views were'} missing, so the
+                  item will be verified in person at pickup before any resale.
+                </p>
+              </div>
+            )}
 
             {grading.confidence < 0.6 && (
               <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">

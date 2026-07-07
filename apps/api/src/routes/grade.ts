@@ -1,6 +1,12 @@
 import type { Request, Response } from 'express';
 import type { ReturnGradingResult, ReturnReason } from '@reloop/shared';
-import { conditionGradeToReturnGrade, tagDefects } from '@reloop/shared';
+import {
+  conditionGradeToReturnGrade,
+  tagDefects,
+  toGradingCategory,
+  missingRequiredAngles,
+  angleLabels,
+} from '@reloop/shared';
 import type { GradingService } from '../services/grading/grading-service.js';
 import { skuToCategory } from '../lib/routing-engine.js';
 import { MOCK_MODE } from '../lib/env.js';
@@ -11,6 +17,28 @@ import { log } from '../lib/logger.js';
 // a malicious or runaway client can't push huge payloads through this route.
 const MAX_PHOTOS = 6;
 const MAX_B64_LEN = 2_600_000; // ~2MB binary per image
+
+/** Normalize the request body into angle-tagged images. Accepts the spec-025
+ *  `images: [{ angle, imageBase64 }]` shape, and still tolerates the legacy flat
+ *  `photos: string[]` (angle-less) so older callers don't break. */
+function readImages(body: unknown): { angle: string | null; imageBase64: string }[] | null {
+  const b = (body ?? {}) as { images?: unknown; photos?: unknown };
+  if (Array.isArray(b.images)) {
+    const out: { angle: string | null; imageBase64: string }[] = [];
+    for (const raw of b.images) {
+      if (!raw || typeof raw !== 'object') return null;
+      const { angle, imageBase64 } = raw as { angle?: unknown; imageBase64?: unknown };
+      if (typeof imageBase64 !== 'string') return null;
+      out.push({ angle: typeof angle === 'string' && angle ? angle : null, imageBase64 });
+    }
+    return out;
+  }
+  if (Array.isArray(b.photos)) {
+    if (!b.photos.every((p) => typeof p === 'string')) return null;
+    return (b.photos as string[]).map((imageBase64) => ({ angle: null, imageBase64 }));
+  }
+  return null;
+}
 
 const VALID_REASONS = new Set<string>([
   'didnt_fit', 'changed_mind', 'duplicate_gift', 'defective',
@@ -28,21 +56,22 @@ const VALID_REASONS = new Set<string>([
  */
 export function createGradeHandler(gradingService: GradingService) {
   return async function gradeHandler(req: Request, res: Response): Promise<void> {
-    const { photos, reason, sku } = req.body as {
-      photos: unknown;
+    const { reason, sku, category } = req.body as {
       reason: unknown;
       sku: unknown;
+      category: unknown;
     };
 
-    if (!Array.isArray(photos)) {
-      res.status(400).json({ error: '`photos` must be an array' });
+    const images = readImages(req.body);
+    if (images === null) {
+      res.status(400).json({ error: '`images` must be [{ angle, imageBase64 }] (or legacy `photos: string[]`)' });
       return;
     }
-    if (photos.length > MAX_PHOTOS) {
+    if (images.length > MAX_PHOTOS) {
       res.status(400).json({ error: `at most ${MAX_PHOTOS} photos` });
       return;
     }
-    if (!photos.every((p) => typeof p === 'string' && p.length <= MAX_B64_LEN)) {
+    if (!images.every((im) => im.imageBase64.length <= MAX_B64_LEN)) {
       res.status(400).json({ error: 'each photo must be a base64 string within the size limit' });
       return;
     }
@@ -53,8 +82,17 @@ export function createGradeHandler(gradingService: GradingService) {
 
     const typedReason = reason as ReturnReason;
 
+    // Same capture spec the web used to render the angle slots — trust the
+    // client-resolved category, else fall back to the SKU-derived one so both
+    // sides compute the SAME required angles (no drift).
+    const gradingCategory =
+      typeof category === 'string' && category
+        ? toGradingCategory(category)
+        : toGradingCategory(skuToCategory(typeof sku === 'string' ? sku : ''));
+    const providedAngles = images.map((im) => im.angle).filter((a): a is string => a !== null);
+
     // No photos or mock mode — skip the grading provider entirely.
-    if (photos.length === 0 || MOCK_MODE) {
+    if (images.length === 0 || MOCK_MODE) {
       res.json(mockGradeResult(typedReason));
       return;
     }
@@ -65,8 +103,19 @@ export function createGradeHandler(gradingService: GradingService) {
           title: 'Return item',
           category: skuToCategory(typeof sku === 'string' ? sku : ''),
         },
-        imagesBase64: photos as string[],
+        imagesBase64: images.map((im) => im.imageBase64),
       });
+
+      // Angle-aware review gate (the trained model's missing_required signal,
+      // enforced app-side so it survives the VLM fallback). Only meaningful when
+      // photos were angle-tagged; a legacy flat upload has no required-angle set.
+      const missing = providedAngles.length > 0 ? missingRequiredAngles(gradingCategory, providedAngles) : [];
+      const missingLabels = angleLabels(gradingCategory, missing);
+      const captureGuidance = [
+        ...(result.captureGuidance ?? []),
+        ...missingLabels.map((l) => `Add a ${l} photo — it's a required angle for this item.`),
+      ];
+      const needsReview = Boolean(result.needsReview) || missing.length > 0;
 
       const defectTags = tagDefects(result.detectedIssues);
       const gradeResult: ReturnGradingResult = {
@@ -78,6 +127,9 @@ export function createGradeHandler(gradingService: GradingService) {
         functionallyVerifiable: result.grade !== 'poor' && !defectTags.includes('dead_battery'),
         rawReason: typedReason,
         packagingSealed: !defectTags.includes('worn_packaging'),
+        needsReview,
+        ...(missingLabels.length ? { missingAngles: missingLabels } : {}),
+        ...(captureGuidance.length ? { captureGuidance } : {}),
       };
       res.json(gradeResult);
     } catch (err) {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { ReturnReason } from '@reloop/shared';
 import { StepIndicator } from '@/components/ui/step-indicator';
 import { mockOrders } from '@/lib/mocks/return-flow';
-import { BuyerStep1 } from './BuyerStep1';
+import { BuyerStep1, type CapturedAngle } from './BuyerStep1';
 import { BuyerStep2Pickup } from './BuyerStep2Pickup';
 import { BuyerStep3Done } from './BuyerStep3Done';
 
@@ -17,7 +17,7 @@ interface Props {
 interface BuyerState {
   step: 1 | 2 | 3;
   reason: ReturnReason | null;
-  photos: string[];
+  images: CapturedAngle[];
   agentWindow: string;
 }
 
@@ -28,12 +28,12 @@ export function ReturnFlowClient({ orderId }: Props) {
   const [state, setState] = useState<BuyerState>({
     step: 1,
     reason: null,
-    photos: [],
+    images: [],
     agentWindow: '',
   });
 
-  function handleStep1Submit(reason: ReturnReason, photos: string[]) {
-    setState((prev) => ({ ...prev, step: 2, reason, photos }));
+  function handleStep1Submit(reason: ReturnReason, images: CapturedAngle[]) {
+    setState((prev) => ({ ...prev, step: 2, reason, images }));
   }
 
   function handleStep2Done(agentWindow: string) {
@@ -56,7 +56,7 @@ export function ReturnFlowClient({ orderId }: Props) {
             category={order.category}
             sku={order.sku}
             reason={state.reason}
-            photos={state.photos}
+            images={state.images}
             onDone={handleStep2Done}
           />
         )}
