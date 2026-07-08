@@ -10,6 +10,7 @@ import type {
   GradeRequest,
   GradingResult,
   HealthCardRequest,
+  MatchStatusResponse,
   Notification,
   NotificationKind,
   NotificationPreferences,
@@ -17,6 +18,7 @@ import type {
   PriceBreakdown,
   PriceRequest,
   PricingDecision,
+  PricingModelInfo,
   PricingResult,
   PricingStateVector,
   ProductHealthCard,
@@ -228,6 +230,12 @@ export function decidePricing(req: PricingDecideRequest): Promise<PricingDecisio
   return postJson<PricingDecideRequest, PricingDecision>('/api/pricing/decide', req);
 }
 
+/** The real trained XGBoost model's offline eval (SHAP-style feature
+ *  importances, MAE/MAPE) — for the technical trace view, not live per-call. */
+export function getPricingModelInfo(): Promise<PricingModelInfo> {
+  return getJson('/api/pricing/model-info');
+}
+
 export function narrateAgent(req: AgentNarrateRequest): Promise<AgentNarrateResponse> {
   return postJson<AgentNarrateRequest, AgentNarrateResponse>('/api/agent/narrate', req);
 }
@@ -329,17 +337,7 @@ export function initiateMatching(returnId: string): Promise<{
 }
 
 /** Poll the current state of a return's match session (seller dashboard). */
-export function getMatchingStatus(returnId: string): Promise<{
-  sessionId: string;
-  returnId: string;
-  status: string;
-  offeredPrice: number;
-  candidateCount: number;
-  currentCandidateIndex: number;
-  matchedBuyerId: string | null;
-  matchedAt: string | null;
-  pickupDeadline: string;
-}> {
+export function getMatchingStatus(returnId: string): Promise<MatchStatusResponse> {
   return getJson(`/api/matching/status/${encodeURIComponent(returnId)}`);
 }
 

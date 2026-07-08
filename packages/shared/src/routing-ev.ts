@@ -467,6 +467,19 @@ export function evByPath(p: RoutingEvProfile): PathEv[] {
   // Spec 016.1: liquidate — a graded, Health-Card-manifested pallet staged at the
   // hub. Grade-INsensitive (the buyer's bid curve absorbs grade risk, not the mix
   // factor); the manifest premium is the market's price for grading at source.
+  //
+  // Deliberately NOT using liquidation-lot.ts's full bid-curve engine
+  // (bestBuyer/lotValueCents) here: at this decision point the item hasn't
+  // joined a pallet yet, so which buyer-type (refurbisher/wholesaler/ngo/
+  // fashion_reseller) ultimately wins the bid for the eventual assembled lot
+  // isn't knowable per single item — that's a property of the pallet's whole
+  // composition, resolved later. This per-item estimate instead uses the
+  // category-average recovery fraction (`LIQUIDATION_RECOVERY_FRAC`) plus
+  // `manifestPremium()`, the one piece of the lot engine that IS a real,
+  // item-specific signal (this item's own Health-Card coverage/confidence).
+  // The full bid-curve engine runs for real once buyers actually bid on the
+  // real assembled pallet — see `apps/web/src/lib/mocks/bulk-exchange-store.ts`
+  // (bestBuyer/lotValueCents/shipNowOrWait).
   const liqFrac = LIQUIDATION_RECOVERY_FRAC[p.category ?? 'other'];
   const liqPremium = manifestPremium(p.manifestCoverage ?? 0, p.confidence ?? 1);
   const liqBase = Math.round(p.clearingPriceCents * liqFrac);

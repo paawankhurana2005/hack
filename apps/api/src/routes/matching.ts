@@ -154,6 +154,16 @@ export function createMatchingRouter(): Router {
             distanceKm: Math.round(haversineDistanceKm(origin, { lat, lng }) * 10) / 10,
             matchScore: c.match_score,
             response: c.response,
+            // Real data the engine already computed/persisted (findCandidates'
+            // ranking + the cascade's own timestamps) — surfaced for the
+            // notification-cascade trace timeline, not the default map.
+            name: buyer?.name ?? 'Unknown buyer',
+            notifiedAt: c.notified_at,
+            responseAt: c.response_at,
+            proximityScore: c.proximity_score,
+            intentScore: c.intent_score,
+            priceFitScore: c.price_fit_score,
+            recencyScore: c.recency_score,
           };
         });
       }

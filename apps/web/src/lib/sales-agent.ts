@@ -13,7 +13,7 @@
 // listing the seller is watching. `runSalesAgentIfDue()` is the opt-in
 // scheduled entry point; `runSalesAgent()` (unchanged) stays the on-demand one.
 
-import type { AgentAction, AgentEvent, SalesAgentDigest } from '@reloop/shared';
+import type { AgentAction, AgentEvent, NotificationKind, SalesAgentDigest } from '@reloop/shared';
 import type { CasualListing } from '@/mock/casual-listings';
 import { getListings } from '@/lib/listings-store';
 import { seedListings } from '@/mock/seed-listings';
@@ -37,11 +37,21 @@ function sellerListings(sellerId: string): CasualListing[] {
 }
 
 /** Fire-and-forget — a notification failure must never break the Sales Agent
- *  run, matching the "never blocks the caller" ethos elsewhere in the app. */
-function notify(sellerId: string, state: AgentState, event: AgentEvent): void {
+ *  run, matching the "never blocks the caller" ethos elsewhere in the app.
+ *  Exported so the single-item agent console (spec 026 UI redesign) can fire
+ *  the same notification for a tick it drives directly (via agent-store.ts's
+ *  tick()), which — unlike this file's own runSalesAgent() sweep — never
+ *  notified on its own. `kind` defaults to 'sales_agent' (the portfolio
+ *  sweep's own behavior, unchanged); per-item callers pass 'listing_agent'. */
+export function notifyAgentEvent(
+  sellerId: string,
+  state: AgentState,
+  event: AgentEvent,
+  kind: NotificationKind = 'sales_agent',
+): void {
   void createNotification({
     sellerId,
-    kind: 'sales_agent',
+    kind,
     severity: event.action === 'escalate_route' ? 'warning' : 'info',
     title: `${state.title}: ${event.action ?? 'update'}`,
     body: event.text,
@@ -71,7 +81,7 @@ export async function runSalesAgent(
   function record(action: AgentAction, event: AgentEvent, state: AgentState): void {
     actionsByType[action] = (actionsByType[action] ?? 0) + 1;
     events.push({ ...event, listingId: state.id, listingTitle: state.title });
-    if (action !== 'hold') notify(sellerId, state, event);
+    if (action !== 'hold') notifyAgentEvent(sellerId, state, event, 'sales_agent');
   }
 
   for (const listing of listings) {

@@ -5,8 +5,10 @@
 // failure/timeout the deterministic body stands untouched. Narration never
 // changes title, severity, or which events fire — only prose.
 
+import type { TraceMeta } from '../../lib/langfuse.js';
+
 export interface Completer {
-  complete: (prompt: string) => Promise<string>;
+  complete: (prompt: string, meta?: TraceMeta) => Promise<string>;
 }
 
 export interface NotificationNarrateInput {
@@ -15,7 +17,11 @@ export interface NotificationNarrateInput {
 }
 
 /** Try the LLM; fall back to the caller's own deterministic body. Never throws. */
-export async function narrateNotification(input: NotificationNarrateInput, llm?: Completer): Promise<string> {
+export async function narrateNotification(
+  input: NotificationNarrateInput,
+  llm?: Completer,
+  meta?: TraceMeta,
+): Promise<string> {
   if (!llm) return input.body;
   try {
     const prompt = [
@@ -25,7 +31,7 @@ export async function narrateNotification(input: NotificationNarrateInput, llm?:
       `Body: ${input.body}`,
       'One sentence only:',
     ].join('\n');
-    const out = (await llm.complete(prompt)).trim().split('\n')[0];
+    const out = (await llm.complete(prompt, meta)).trim().split('\n')[0];
     return out && out.length > 0 ? out : input.body;
   } catch {
     return input.body;

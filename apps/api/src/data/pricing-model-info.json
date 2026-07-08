@@ -1,0 +1,21 @@
+{
+  "modelVersion": "v1.0.0",
+  "valMae": 19.71689796447754,
+  "valMape": 18.931365966796875,
+  "trainRows": 16000,
+  "valRows": 4000,
+  "featureDim": 41,
+  "dataSource": "Mercari Price Suggestion + eBay Electronics (reward simulated from sale prices via a demand curve — real production accuracy requires ReLoop transaction logs)",
+  "topFeatures": [
+    ["original_price_log", 1087.828857421875],
+    ["price_arm_multiplier", 326.057861328125],
+    ["comp_median_price_log", 215.5213165283203],
+    ["candidate_margin_log", 64.2235107421875],
+    ["candidate_price_log", 17.601016998291016],
+    ["comp_min_price_log", 9.542860984802246],
+    ["category_l2_encoded", 3.3146262168884277],
+    ["brand_encoded", 2.4039974212646484],
+    ["grade_ordinal", 2.0710291862487793],
+    ["grade_is_new", 0.3297109603881836]
+  ]
+}

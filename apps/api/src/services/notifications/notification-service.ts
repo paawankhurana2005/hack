@@ -51,7 +51,11 @@ export async function createNotification(input: CreateNotificationInput): Promis
     if (input.severity === 'info' && inQuietHours(prefs, new Date())) return null;
   }
 
-  const body = await narrateNotification({ title: input.title, body: input.body }, llmCompleter);
+  const body = await narrateNotification(
+    { title: input.title, body: input.body },
+    llmCompleter,
+    { name: 'notification.narrate', listingId: input.listing_id, returnId: input.return_id },
+  );
   const doc: NotificationDoc = { ...input, body, read: false, created_at: new Date() };
   const { insertedId } = await db.collection<NotificationDoc>(NOTIFICATIONS).insertOne(doc);
   return { ...doc, _id: insertedId };

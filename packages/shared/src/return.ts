@@ -235,6 +235,7 @@ export type ReturnItemState =
   | 'initiated'
   | 'evidence_captured'
   | 'routed' // provisional, carries a TTL
+  | 'seller_route_choice' // spec 026: seller picked a different viable path than the AI's recommendation, pre-move — still free
   // custody checkpoints (cheap redirects)
   | 'pickup_verified' // driver scan at the doorstep
   | 'at_local_hub' // delivery station bench queue
@@ -297,6 +298,16 @@ export interface MatchCandidateGeo {
   distanceKm: number;
   matchScore: number;
   response: 'pending' | 'accepted' | 'declined' | 'timeout';
+  /** Real data already computed/persisted by matchingEngine.ts, surfaced for
+   *  the notification-cascade trace timeline (agent showcase) — not shown in
+   *  the default seller nearby-buyers map, which only needs the fields above. */
+  name: string;
+  notifiedAt: Date | string | null;
+  responseAt: Date | string | null;
+  proximityScore: number;
+  intentScore: number;
+  priceFitScore: number;
+  recencyScore: number;
 }
 
 export interface MatchStatusResponse {

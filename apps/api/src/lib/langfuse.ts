@@ -33,31 +33,55 @@ export interface TraceMeta {
   reqId?: string;
 }
 
+/** Token counts from the model provider's response, when it reports them —
+ *  lets Langfuse compute cost automatically instead of a trace with no usage. */
+export interface TokenUsage {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+}
+
+export interface ModelCallResult {
+  output: string;
+  usage?: TokenUsage;
+}
+
 /**
  * Wrap a single model call in a Langfuse trace + generation. No-ops (just
  * calls `fn()`) when Langfuse isn't configured, so this is safe to call
  * unconditionally from every model call site.
+ *
+ * `sessionId` groups every trace for one listing/return together (falls back
+ * to `returnId` when there's no listing yet, e.g. a doorstep grading call) so
+ * a seller's whole "story" for one item is one Session in the Langfuse UI.
+ * `tags` gets one entry — the call site's feature area, derived from the
+ * `name`'s prefix (`agent.narrate` → `agent`) — for free per-feature filtering
+ * with no extra parameter for every call site to pass.
  */
 export async function traceModelCall(
   meta: TraceMeta,
   model: string,
   input: unknown,
-  fn: () => Promise<string>,
+  fn: () => Promise<ModelCallResult>,
 ): Promise<string> {
-  if (!isLangfuseConfigured()) return fn();
+  if (!isLangfuseConfigured()) return (await fn()).output;
 
   const name = meta.name ?? 'nvidia-chat';
+  const sessionId = meta.listingId ?? meta.returnId;
+  const feature = name.split('.')[0] ?? name;
   const lf = getClient();
   const trace = lf.trace({
     name,
+    sessionId,
+    tags: [feature],
     metadata: { returnId: meta.returnId, listingId: meta.listingId, reqId: meta.reqId },
   });
   const generation = trace.generation({ name, model, input });
 
   try {
-    const output = await fn();
-    generation.end({ output });
-    return output;
+    const result = await fn();
+    generation.end({ output: result.output, usage: result.usage });
+    return result.output;
   } catch (err) {
     generation.end({
       output: null,

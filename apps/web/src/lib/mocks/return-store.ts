@@ -87,8 +87,9 @@ export const SEEDED_RETURNS: SubmittedReturn[] = [
       nearbyBuyers: 8,
       radiusKm: 4,
       warehouseDistanceKm: 580,
-      warehouseMargin: -32000,
-      localMargin: 54000,
+      // Rupees, matching the live engine's convention (apps/api/src/lib/routing-engine.ts).
+      warehouseMargin: -320,
+      localMargin: 540,
     },
   },
   {
@@ -101,7 +102,10 @@ export const SEEDED_RETURNS: SubmittedReturn[] = [
     photoCount: 2,
     submittedAt: new Date(Date.now() - 26 * 3600000).toISOString(),
     agentArrivesAt: new Date(Date.now() - 23 * 3600000).toISOString(),
-    status: 'processed',
+    // Spec 026: still awaiting a seller dispatch decision (not local_resale,
+    // so it was never routed through 'pending_seller_approval' — but the
+    // seller's route picker needs a non-local_resale example to show on).
+    status: 'awaiting_pickup',
     gradingResult: {
       grade: 'B',
       confidence: 0.84,
@@ -120,8 +124,59 @@ export const SEEDED_RETURNS: SubmittedReturn[] = [
       sellerType: '1P',
       fallbackChain: ['donate', 'recycle'],
       warehouseDistanceKm: 580,
-      warehouseMargin: -44000,
-      localMargin: 140000,
+      // Rupees, matching the live engine's convention.
+      warehouseMargin: -440,
+      localMargin: 1400,
+      evBreakdown: {
+        chosen: 'refurbish',
+        paths: [
+          {
+            path: 'refurbish',
+            evCents: 140000,
+            viable: true,
+            terms: [
+              { label: 'Refurbished resale value uplift', valueCents: 180000 },
+              { label: 'Repair cost', valueCents: -40000 },
+            ],
+          },
+          {
+            path: 'local_resale',
+            evCents: 90000,
+            viable: true,
+            terms: [
+              { label: 'Local buyer clearing price', valueCents: 110000 },
+              { label: 'Local handling', valueCents: -20000 },
+            ],
+          },
+          {
+            path: 'donate',
+            evCents: 15000,
+            viable: true,
+            terms: [
+              { label: 'Donation value (flat)', valueCents: 20000 },
+              { label: 'Handling', valueCents: -5000 },
+            ],
+          },
+          {
+            path: 'recycle',
+            evCents: 8000,
+            viable: true,
+            terms: [
+              { label: 'Recycling value (flat)', valueCents: 12000 },
+              { label: 'Handling', valueCents: -4000 },
+            ],
+          },
+          {
+            path: 'warehouse',
+            evCents: -44000,
+            viable: true,
+            terms: [
+              { label: 'FC liquidation/restock mix', valueCents: 20000 },
+              { label: 'Freight + dwell decay', valueCents: -64000 },
+            ],
+          },
+        ],
+      },
     },
   },
   {
@@ -159,6 +214,31 @@ export const SEEDED_RETURNS: SubmittedReturn[] = [
 
 const SEEDED_IDS = new Set(SEEDED_RETURNS.map((r) => r.returnId));
 
+/**
+ * Merge a seeded demo return with its localStorage interaction state. Only
+ * the fields an in-page action actually mutates (approve, mark-complete,
+ * agent listing/lot linking, lifecycle transitions) come from localStorage —
+ * everything else (grading, routing, pricing, product info) always comes
+ * fresh from the current SEEDED_RETURNS source. Previously this took the
+ * ENTIRE saved record once any interaction had happened, so a source fix to
+ * a seed's numbers (or anything else) stayed permanently masked by whatever
+ * was saved before the fix — exactly the bug that shipped the wrong
+ * localMargin/warehouseMargin figures.
+ */
+function applySeedOverride(seed: SubmittedReturn, saved: SubmittedReturn): SubmittedReturn {
+  return {
+    ...seed,
+    status: saved.status,
+    sellerApprovedAt: saved.sellerApprovedAt ?? seed.sellerApprovedAt,
+    dealCompletedAt: saved.dealCompletedAt ?? seed.dealCompletedAt,
+    ecoCreditsAwarded: saved.ecoCreditsAwarded ?? seed.ecoCreditsAwarded,
+    listingId: saved.listingId ?? seed.listingId,
+    lotId: saved.lotId ?? seed.lotId,
+    lifecycleState: saved.lifecycleState ?? seed.lifecycleState,
+    transitions: saved.transitions ?? seed.transitions,
+  };
+}
+
 export function getSubmittedReturns(): SubmittedReturn[] {
   if (typeof window === 'undefined') return SEEDED_RETURNS;
   try {
@@ -166,9 +246,13 @@ export function getSubmittedReturns(): SubmittedReturn[] {
     const saved: SubmittedReturn[] = raw ? (JSON.parse(raw) as SubmittedReturn[]) : [];
     // User-submitted returns
     const userReturns = saved.filter((r) => !SEEDED_IDS.has(r.returnId));
-    // Seeded returns: allow localStorage overrides (e.g. seller approved, deal completed)
+    // Seeded returns: only interaction state overrides from localStorage —
+    // seed content itself always tracks the current source.
     const savedById = new Map(saved.map((r) => [r.returnId, r]));
-    const seededWithOverrides = SEEDED_RETURNS.map((r) => savedById.get(r.returnId) ?? r);
+    const seededWithOverrides = SEEDED_RETURNS.map((r) => {
+      const override = savedById.get(r.returnId);
+      return override ? applySeedOverride(r, override) : r;
+    });
     return [...userReturns, ...seededWithOverrides];
   } catch {
     return SEEDED_RETURNS;
@@ -213,6 +297,39 @@ export function recordTransition(
     transitions: [...(target.transitions ?? []), transition],
     ...(transition.decision ? { routingDecision: transition.decision } : {}),
   };
+  saveReturn(updated);
+  return updated;
+}
+
+/**
+ * Spec 026: the seller picks a different VIABLE route than the AI's
+ * recommendation, straight from the EV breakdown already shown on the
+ * returns queue — a real operational dispatch, not just a note. Reuses
+ * `recordTransition()`'s mechanism (a self-loop into the new
+ * `seller_route_choice` state, since nothing has physically moved yet).
+ * `local_resale` and `warehouse` already have their own richer handlers
+ * (`handleApprove()`/`handleSendToWarehouse()` in `SellerReturnDetail.tsx`)
+ * — this covers the remaining routes (refurbish/donate/recycle/liquidate/
+ * restock/return_to_seller/returnless_refund), marking the return
+ * `processed` once dispatched, matching the status the pre-seeded demo
+ * returns for those routes already use.
+ */
+export function applySellerRouteChoice(
+  returnId: string,
+  newDecision: ReturnRoutingDecision,
+  note: string,
+): SubmittedReturn | null {
+  const target = getReturnById(returnId);
+  if (!target) return null;
+  const transitioned = recordTransition(returnId, {
+    from: target.lifecycleState ?? 'routed',
+    to: 'seller_route_choice',
+    at: new Date().toISOString(),
+    evidence: { source: 'hub_bench', notes: note },
+    decision: newDecision,
+  });
+  if (!transitioned) return null;
+  const updated: SubmittedReturn = { ...transitioned, status: 'processed' };
   saveReturn(updated);
   return updated;
 }

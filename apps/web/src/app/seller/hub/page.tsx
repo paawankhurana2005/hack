@@ -28,8 +28,22 @@ import {
 } from '@/lib/mocks/return-store';
 import { getBatches, stageReturnIntoLot, type BulkBatch } from '@/lib/mocks/bulk-exchange-store';
 import { birthAgentFromReturn, categoryOf, LIST_FRAC, round50 } from '@/lib/return-agent-bridge';
+import { Card } from '@/components/ui/card';
 
 const GRADES: Grade[] = ['A', 'B', 'C', 'Salvage'];
+
+// Lower rank = better condition — used to tell "bench upgraded" from
+// "bench downgraded" apart when the verified grade differs from the AI's.
+const GRADE_RANK: Record<Grade, number> = { A: 0, B: 1, C: 2, Salvage: 3 };
+
+// Same convention as SellerReturnDetail.tsx's GRADE_STYLE — color-coded so a
+// grade reads at a glance instead of as plain gray text.
+const GRADE_STYLE: Record<string, string> = {
+  A: 'bg-success/20 text-success ring-success/30',
+  B: 'bg-warning/20 text-warning ring-warning/30',
+  C: 'bg-brand/20 text-brand ring-brand/30',
+  Salvage: 'bg-danger/20 text-danger ring-danger/30',
+};
 
 const STATE_LABEL: Partial<Record<ReturnItemState, string>> = {
   initiated: 'Initiated',
@@ -76,6 +90,51 @@ const PATH_LABEL: Record<ReturnRoutingDecision['decision'], string> = {
 
 const CHECKPOINT_FLOW: ReturnItemState[] = ['routed', 'pickup_verified', 'at_local_hub', 'hub_verified'];
 
+/** A real connected-circle stepper instead of a row of plain text pills —
+ *  checkmark for done, filled+pulsing for current, outlined for pending. */
+function LifecycleStepper({ state }: { state: ReturnItemState }) {
+  const idx = CHECKPOINT_FLOW.indexOf(state);
+  const terminal = idx === -1; // dispatched past the checkpoint flow entirely
+  const steps = terminal ? [...CHECKPOINT_FLOW, state] : CHECKPOINT_FLOW;
+
+  return (
+    <div className="flex items-start">
+      {steps.map((s, i) => {
+        const isFinalTerminalStep = terminal && i === steps.length - 1;
+        const done = isFinalTerminalStep || (!terminal && idx > i);
+        const current = !terminal && idx === i;
+        return (
+          <div key={s} className={`flex items-center ${i === steps.length - 1 ? '' : 'flex-1'}`}>
+            <div className="flex flex-col items-center gap-1.5">
+              <div
+                className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-2 transition-colors ${
+                  done
+                    ? 'bg-success text-white ring-success'
+                    : current
+                      ? 'animate-pulse bg-brand text-brand-foreground ring-brand'
+                      : 'bg-secondary text-muted-foreground ring-border'
+                }`}
+              >
+                {done ? '✓' : i + 1}
+              </div>
+              <span
+                className={`whitespace-nowrap font-mono text-[9px] uppercase tracking-widest ${
+                  current ? 'text-brand' : done ? 'text-success' : 'text-muted-foreground'
+                }`}
+              >
+                {STATE_LABEL[s] ?? s}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={`mx-1.5 mb-4 h-0.5 flex-1 rounded-full ${done ? 'bg-success' : 'bg-border'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function inr(paise: number) {
   return `₹${Math.round(Math.abs(paise) / 100).toLocaleString('en-IN')}`;
 }
@@ -120,6 +179,10 @@ export default function HubBenchPage() {
   // item — seeds the listing's price/floor at birth instead of the engine's
   // grade-based default. Empty = use the engine's suggested price.
   const [approvedPriceInput, setApprovedPriceInput] = useState('');
+  // Spec 026: reopening an already-dispatched item shows the exact same
+  // Checkpoint-2 UI again (benchResult is already computed regardless of
+  // lifecycle state) instead of leaving the terminal recap card read-only.
+  const [reopened, setReopened] = useState(false);
 
   useEffect(() => {
     const all = getSubmittedReturns().filter((r) => r.routingDecision !== null);
@@ -139,6 +202,7 @@ export default function HubBenchPage() {
     setSealIntact(selected.gradingResult?.packagingSealed ?? false);
     setFunctionalPass(selected.gradingResult?.functionallyVerifiable ?? true);
     setApprovedPriceInput('');
+    setReopened(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
@@ -197,6 +261,21 @@ export default function HubBenchPage() {
     });
   }
 
+  // Spec 026: reopen an already-dispatched item — seed the bench form from
+  // the LAST recorded verification (not the original AI grade) so the seller
+  // starts from where things actually stand, then let them recalculate.
+  function handleReopen() {
+    if (!selected) return;
+    const lastDecisionTransition = [...(selected.transitions ?? [])].reverse().find((t) => t.decision);
+    const lastEvidence = lastDecisionTransition?.evidence;
+    const lastGrade = lastEvidence?.observedGrade ?? selected.gradingResult?.grade;
+    setBenchGrade(lastGrade && lastGrade !== null ? lastGrade : 'B');
+    setSealIntact(lastEvidence?.packagingSealed ?? selected.gradingResult?.packagingSealed ?? false);
+    setFunctionalPass(lastEvidence?.functionalCheckPassed ?? selected.gradingResult?.functionallyVerifiable ?? true);
+    setApprovedPriceInput('');
+    setReopened(true);
+  }
+
   async function handleConfirmDispatch() {
     if (!selected?.routingDecision || !benchResult) return;
     setDispatching(true);
@@ -223,9 +302,16 @@ export default function HubBenchPage() {
       nearbyBuyers: benchResult.nearbyBuyers,
       radiusKm: benchResult.radiusKm,
     };
+    // Spec 026: a reopened re-decision uses 'seller_route_choice' — the same
+    // lifecycle state the returns-page seller override reuses — instead of
+    // 'hub_verified' again, so the transition log honestly distinguishes "the
+    // original bench verification" from "the seller reconsidered later."
+    // Either way, `from` is the item's REAL current state, not a hardcoded
+    // assumption that this is always the first pass through Checkpoint 2.
+    const verificationState: ReturnItemState = reopened ? 'seller_route_choice' : 'hub_verified';
     recordTransition(selected.returnId, {
-      from: 'at_local_hub',
-      to: 'hub_verified',
+      from: state,
+      to: verificationState,
       at: new Date().toISOString(),
       evidence: {
         source: 'hub_bench',
@@ -237,13 +323,15 @@ export default function HubBenchPage() {
       decision,
     });
     recordTransition(selected.returnId, {
-      from: 'hub_verified',
+      from: verificationState,
       to: EXEC_STATE[benchResult.decision],
       at: new Date().toISOString(),
     });
     // Spec 016 Stage 7: local resale doesn't end at "dispatched" — an autonomous
     // agent takes over the listing (reprice via spec-014, escalate via the Bridge).
-    if (benchResult.decision === 'local_resale') {
+    // Spec 026: skip if a real listing already exists (a reopened re-decision
+    // that confirms/re-picks local_resale shouldn't spawn a second one).
+    if (benchResult.decision === 'local_resale' && !selected.listingId) {
       const approvedRupees = Number(approvedPriceInput);
       const sellerApprovedPriceCents =
         Number.isFinite(approvedRupees) && approvedRupees > 0
@@ -253,8 +341,8 @@ export default function HubBenchPage() {
     }
     // Spec 016.1: liquidate-bound items join the open hub pallet for their
     // category — the lot engine re-prices the pallet and re-runs ship-vs-wait
-    // on every unit added.
-    if (benchResult.decision === 'liquidate') {
+    // on every unit added. Spec 026: same duplicate guard as above.
+    if (benchResult.decision === 'liquidate' && !selected.lotId) {
       const lot = stageReturnIntoLot(
         { returnId: selected.returnId, category: selected.category, priceCents: selected.priceCents },
         benchGrade,
@@ -262,6 +350,7 @@ export default function HubBenchPage() {
       linkLot(selected.returnId, lot.id);
     }
     setDispatching(false);
+    setReopened(false);
     refresh();
   }
 
@@ -286,7 +375,7 @@ export default function HubBenchPage() {
           {stagingLots.map((lot) => {
             const fill = Math.min(1, lot.units / PALLET_CAPACITY);
             return (
-              <div key={lot.id} className="rounded-2xl bg-card p-4 ring-1 ring-border">
+              <Card key={lot.id}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
@@ -318,7 +407,7 @@ export default function HubBenchPage() {
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">{lot.remainingNote}</p>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
@@ -349,8 +438,12 @@ export default function HubBenchPage() {
                     {STATE_LABEL[st] ?? st}
                   </span>
                   {r.gradingResult?.grade && (
-                    <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                      AI: {r.gradingResult.grade} · {Math.round((r.gradingResult.confidence ?? 0) * 100)}%
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold ring-1 ${
+                        GRADE_STYLE[r.gradingResult.grade] ?? 'bg-secondary text-muted-foreground ring-border'
+                      }`}
+                    >
+                      AI {r.gradingResult.grade} · {Math.round((r.gradingResult.confidence ?? 0) * 100)}%
                     </span>
                   )}
                 </div>
@@ -358,9 +451,11 @@ export default function HubBenchPage() {
             );
           })}
           {returns.length === 0 && (
-            <p className="rounded-xl bg-card p-4 text-sm text-muted-foreground ring-1 ring-border">
-              No routed returns in the queue yet — submit a return from the user app first.
-            </p>
+            <Card>
+              <p className="text-sm text-muted-foreground">
+                No routed returns in the queue yet — submit a return from the user app first.
+              </p>
+            </Card>
           )}
         </div>
 
@@ -368,45 +463,17 @@ export default function HubBenchPage() {
         {selected && selected.routingDecision && (
           <div className="min-w-0 flex-1 space-y-4">
             {/* Lifecycle strip */}
-            <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-card p-4 ring-1 ring-border">
-              {CHECKPOINT_FLOW.map((s, i) => {
-                const reached =
-                  CHECKPOINT_FLOW.indexOf(state) >= i || !CHECKPOINT_FLOW.includes(state);
-                const current = s === state;
-                return (
-                  <div key={s} className="flex items-center gap-1">
-                    {i > 0 && <span className="text-muted-foreground">→</span>}
-                    <span
-                      className={`rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest ${
-                        current
-                          ? 'bg-brand/20 text-brand'
-                          : reached
-                            ? 'bg-success/15 text-success'
-                            : 'bg-secondary text-muted-foreground'
-                      }`}
-                    >
-                      {STATE_LABEL[s]}
-                    </span>
-                  </div>
-                );
-              })}
-              {!CHECKPOINT_FLOW.includes(state) && (
-                <div className="flex items-center gap-1">
-                  <span className="text-muted-foreground">→</span>
-                  <span className="rounded-full bg-success/20 px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-success">
-                    {STATE_LABEL[state] ?? state}
-                  </span>
-                </div>
-              )}
+            <Card>
+              <LifecycleStepper state={state} />
               {selected.routingDecision.ttlHours !== undefined && CHECKPOINT_FLOW.includes(state) && (
-                <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                <p className="mt-3 border-t border-border/60 pt-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   Decision TTL {selected.routingDecision.ttlHours}h
-                </span>
+                </p>
               )}
-            </div>
+            </Card>
 
             {/* Current decision */}
-            <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+            <Card>
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 Current route · decided {CHECKPOINT_FLOW.includes(state) ? 'at the doorstep' : 'at this bench'}
               </p>
@@ -414,11 +481,11 @@ export default function HubBenchPage() {
                 {PATH_LABEL[selected.routingDecision.decision]}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">{selected.routingDecision.reasoning}</p>
-            </div>
+            </Card>
 
             {/* Stage action */}
             {state === 'routed' && (
-              <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+              <Card>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
                   Checkpoint 1 · Driver scan (~30s at the doorstep)
                 </p>
@@ -437,11 +504,11 @@ export default function HubBenchPage() {
                 >
                   Record driver scan
                 </button>
-              </div>
+              </Card>
             )}
 
             {state === 'pickup_verified' && (
-              <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+              <Card>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
                   In the pickup van — items flow through the delivery station anyway
                 </p>
@@ -452,14 +519,30 @@ export default function HubBenchPage() {
                 >
                   Check in at hub bench
                 </button>
-              </div>
+              </Card>
             )}
 
-            {state === 'at_local_hub' && benchResult && (
-              <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
-                  Checkpoint 2 · Bench verification (last cheap redirect)
-                </p>
+            {(state === 'at_local_hub' || reopened) && benchResult && (
+              <Card>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
+                    Checkpoint 2 · Bench verification (last cheap redirect)
+                  </p>
+                  {reopened && (
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-warning/15 px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-warning">
+                        Reopened — recalculating
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReopened(false)}
+                        className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-4">
                   <div>
@@ -501,6 +584,61 @@ export default function HubBenchPage() {
                   </label>
                 </div>
 
+                {/* AI vs bench comparison — the moment a wrong doorstep grade
+                    gets caught, made impossible to miss. */}
+                {(() => {
+                  const aiGrade = selected.gradingResult?.grade ?? null;
+                  const aiConfidencePct = Math.round((selected.gradingResult?.confidence ?? 0) * 100);
+                  if (aiGrade === null || aiGrade === benchGrade) {
+                    return (
+                      <div className="mt-4 flex items-center gap-2 rounded-xl bg-success/10 p-3 ring-1 ring-success/30">
+                        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-success text-xs text-white">
+                          ✓
+                        </span>
+                        <p className="text-sm text-foreground">
+                          {aiGrade === null ? (
+                            <>
+                              No doorstep AI grade to compare (ungraded at pickup) — bench verified{' '}
+                              <span className="font-semibold">Grade {benchGrade}</span>.
+                            </>
+                          ) : (
+                            <>
+                              Bench confirms the AI's doorstep grade —{' '}
+                              <span className="font-semibold">Grade {benchGrade}</span>.
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    );
+                  }
+                  const upgraded = GRADE_RANK[benchGrade] < GRADE_RANK[aiGrade];
+                  return (
+                    <div
+                      className={`mt-4 flex flex-wrap items-center gap-3 rounded-xl p-4 ring-1 ${
+                        upgraded ? 'bg-success/10 ring-success/30' : 'bg-warning/10 ring-warning/40'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-lg px-3 py-1.5 text-sm font-bold ring-1 ${GRADE_STYLE[aiGrade]}`}>
+                          Grade {aiGrade}
+                        </span>
+                        <span className="text-xs text-muted-foreground">AI estimated ({aiConfidencePct}%)</span>
+                      </div>
+                      <span className="text-lg text-muted-foreground">→</span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-lg px-3 py-1.5 text-sm font-bold ring-1 ${GRADE_STYLE[benchGrade]}`}
+                        >
+                          Grade {benchGrade}
+                        </span>
+                        <span className={`text-xs font-semibold ${upgraded ? 'text-success' : 'text-warning'}`}>
+                          Bench {upgraded ? 'upgraded' : 'downgraded'} it
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {benchResult.decision === 'local_resale' && (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -523,21 +661,29 @@ export default function HubBenchPage() {
                   </div>
                 )}
 
-                {/* Live re-evaluation preview */}
+                {/* Live re-evaluation preview — the single most important
+                    sentence on this page, so it reads like one. */}
                 <div
-                  className={`mt-4 rounded-xl p-3 ring-1 ${
-                    rerouted ? 'bg-warning/10 ring-warning/40' : 'bg-success/10 ring-success/30'
+                  className={`mt-4 rounded-xl p-4 ring-2 ${
+                    rerouted ? 'bg-warning/10 ring-warning/50' : 'bg-success/10 ring-success/40'
                   }`}
                 >
                   <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                     Engine re-run with bench evidence
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-foreground">
+                  <p
+                    className={`mt-1 flex items-center gap-2 text-lg font-bold ${
+                      rerouted ? 'text-warning' : 'text-success'
+                    }`}
+                  >
+                    <span>{rerouted ? '⚡' : '✓'}</span>
                     {rerouted
                       ? `Re-routes: ${PATH_LABEL[selected.routingDecision.decision]} → ${PATH_LABEL[benchResult.decision]}`
                       : `Confirms: ${PATH_LABEL[benchResult.decision]}`}
-                    {benchResult.hardRule ? ` (hard rule: ${benchResult.hardRule})` : ''}
                   </p>
+                  {benchResult.hardRule && (
+                    <p className="mt-1 text-xs text-muted-foreground">Hard rule: {benchResult.hardRule}</p>
+                  )}
                 </div>
 
                 <table className="mt-3 w-full text-left text-sm">
@@ -571,32 +717,83 @@ export default function HubBenchPage() {
                 >
                   {dispatching ? 'Dispatching…' : 'Confirm & dispatch'}
                 </button>
-              </div>
+              </Card>
             )}
 
-            {!CHECKPOINT_FLOW.includes(state) && (
-              <div className="rounded-2xl bg-success/10 p-4 ring-1 ring-success/30">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-success">
-                  Dispatched · {STATE_LABEL[state] ?? state}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  This item committed to its route after two human checkpoints. Every hub verdict is
-                  also a labelled training pair for the doorstep grader — the flywheel.
-                </p>
-                {selected.listingId && (
-                  <Link
-                    href="/seller/local-listings"
-                    className="mt-3 inline-block rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground transition-opacity hover:opacity-90"
-                  >
-                    Manage in Local Listings →
-                  </Link>
-                )}
-              </div>
-            )}
+            {!CHECKPOINT_FLOW.includes(state) && !reopened && (() => {
+              // The most recent transition that carries a re-run decision —
+              // this is the real recap of what actually happened, not just
+              // which lifecycle bucket the item landed in.
+              const lastDecisionTransition = [...(selected.transitions ?? [])].reverse().find((t) => t.decision);
+              const finalDecision = lastDecisionTransition?.decision ?? selected.routingDecision!;
+              const finalGrade = lastDecisionTransition?.evidence?.observedGrade ?? selected.gradingResult?.grade ?? null;
+              const aiGrade = selected.gradingResult?.grade ?? null;
+              const wasOverridden = finalGrade !== null && aiGrade !== null && finalGrade !== aiGrade;
+              return (
+                <div className="rounded-2xl bg-success/10 p-5 ring-1 ring-success/30">
+                  <div className="flex items-center gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-success text-white">
+                      ✓
+                    </span>
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-success">
+                        Dispatched · {STATE_LABEL[state] ?? state}
+                      </p>
+                      <p className="text-lg font-bold text-foreground">{PATH_LABEL[finalDecision.decision]}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-success/20 pt-3">
+                    {finalGrade && (
+                      <span className={`rounded-lg px-3 py-1 text-sm font-bold ring-1 ${GRADE_STYLE[finalGrade]}`}>
+                        Grade {finalGrade}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {wasOverridden
+                        ? `Bench overrode the AI's Grade ${aiGrade} estimate`
+                        : aiGrade === null
+                          ? 'No doorstep AI grade to compare (ungraded at pickup)'
+                          : "Confirmed the AI's doorstep grade"}
+                    </span>
+                  </div>
+
+                  <p className="mt-3 text-sm text-muted-foreground">{finalDecision.reasoning}</p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                    {finalDecision.co2SavedKg !== undefined && <span>{finalDecision.co2SavedKg}kg CO₂ saved</span>}
+                    {finalDecision.localMargin !== undefined && (
+                      <span>
+                        Net {finalDecision.localMargin >= 0 ? '+' : '−'}
+                        {inr(Math.abs(finalDecision.localMargin) * 100)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {selected.listingId && (
+                      <Link
+                        href="/seller/local-listings"
+                        className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground transition-opacity hover:opacity-90"
+                      >
+                        Manage in Local Listings →
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleReopen}
+                      className="rounded-full border border-success/40 px-4 py-2 text-sm font-semibold text-success hover:bg-success/10"
+                    >
+                      Reopen & recalculate
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Transition log */}
             {(selected.transitions?.length ?? 0) > 0 && (
-              <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+              <Card>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   Transition log
                 </p>
@@ -613,7 +810,7 @@ export default function HubBenchPage() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Card>
             )}
           </div>
         )}

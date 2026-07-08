@@ -182,6 +182,8 @@ export class RepriceEngine {
       timestamp: new Date().toISOString(),
       guardrailsApplied: guard.guardrailsApplied,
       geoDemandIndex: state.geoDemandIndex,
+      stateUsed: state,
+      sampledScores: choice.sampledScores,
     };
     if (guard.shouldReroute) {
       decision.reason = `Below floor ₹${floor} — handing off to the Intelligent Bridge to reroute.`;

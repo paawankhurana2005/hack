@@ -6,6 +6,8 @@ import {
   getReturnById,
   approveReturn,
   completeDeal,
+  applySellerRouteChoice,
+  saveReturn,
   type SubmittedReturn,
 } from '@/lib/mocks/return-store';
 import { createLocalRoutingListing, RESCUE_WINDOW_HOURS } from '@/lib/mocks/exchange-store';
@@ -14,7 +16,9 @@ import { earnSeller } from '@/lib/credits-store';
 import { currentAccountId } from '@/lib/storage';
 import { birthAgentFromReturn } from '@/lib/return-agent-bridge';
 import { Card } from '@/components/ui/card';
-import type { Grade } from '@reloop/shared';
+import { ReturnHealthCardDeep } from '@/components/return/health-card';
+import { CascadeTimeline } from '@/components/matching/cascade-timeline';
+import type { Grade, ReturnRoutingDecision } from '@reloop/shared';
 
 interface Props {
   returnId: string;
@@ -27,6 +31,21 @@ const GRADE_STYLE: Record<string, string> = {
   Salvage: 'bg-danger/20 text-danger border-danger/30',
 };
 
+// Spec 026: the seller's own menu of routes — every viable path from the
+// same EV breakdown already shown in the Intelligent Bridge card, not just
+// "local resale vs warehouse". The seller inspecting a return decides what
+// happens to it; the AI's pick is a recommendation, not the only option.
+const ROUTE_LABEL: Record<ReturnRoutingDecision['decision'], string> = {
+  restock: 'Direct Restock',
+  local_resale: 'Local Buyer Match',
+  refurbish: 'Local Refurbishment',
+  liquidate: 'Hub Pallet (Manifested)',
+  donate: 'Local Donation',
+  recycle: 'Local Recycling',
+  warehouse: 'Warehouse Return',
+  return_to_seller: 'Return to Seller',
+  returnless_refund: 'Keep It — Refund Issued',
+};
 
 const STATUS_STYLE: Record<SubmittedReturn['status'], { label: string; cls: string }> = {
   pending_seller_approval: { label: 'Needs your approval', cls: 'bg-warning/20 text-warning' },
@@ -39,6 +58,14 @@ const STATUS_STYLE: Record<SubmittedReturn['status'], { label: string; cls: stri
 
 function formatPrice(cents: number) {
   return `₹${(cents / 100).toLocaleString('en-IN')}`;
+}
+
+// routing.localMargin/warehouseMargin come from the routing engine in rupees
+// (apps/api/src/lib/routing-engine.ts), not cents — a separate formatter from
+// formatPrice() (which is for genuinely-cents fields like priceCents) avoids
+// re-introducing the /100-twice bug this replaced.
+function formatRupees(rupees: number) {
+  return `₹${Math.round(rupees).toLocaleString('en-IN')}`;
 }
 
 function formatDateTime(iso: string) {
@@ -61,189 +88,8 @@ function computeEcoCredits(category: string, priceCents: number): number {
   return Math.round(co2 * 3 + rupees * 0.002);
 }
 
-function ConfidenceBar({ value }: { value: number }) {
-  const pct = Math.round(value * 100);
-  const label = value >= 0.8 ? 'High' : value >= 0.6 ? 'Medium' : 'Low';
-  const color = value >= 0.8 ? 'bg-success' : value >= 0.6 ? 'bg-warning' : 'bg-danger';
-  return (
-    <div>
-      <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-        <span>AI Confidence</span>
-        <span className="font-semibold">{label} ({pct}%)</span>
-      </div>
-      <div className="h-2 w-full rounded-full bg-secondary">
-        <div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function HealthCardOverlay({
-  ret,
-  onClose,
-}: {
-  ret: SubmittedReturn;
-  onClose: () => void;
-}) {
-  const grading = ret.gradingResult;
-  const gradeCls = grading?.grade ? GRADE_STYLE[grading.grade] : 'bg-secondary text-muted-foreground border-border';
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      {/* Translucent backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-
-      {/* Card */}
-      <div
-        className="relative z-10 w-full max-w-lg rounded-2xl border border-border bg-card/95 p-6 shadow-2xl backdrop-blur-md"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
-              Product Health Card
-            </p>
-            <h2 className="mt-1 text-lg font-semibold text-foreground">{ret.productName}</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-muted-foreground hover:text-foreground"
-          >
-            ✕
-          </button>
-        </div>
-
-        {grading ? (
-          <div className="space-y-4">
-            {/* Health Card narrative — the trust layer, minted at the return click */}
-            {ret.healthCard && (
-              <div className="rounded-lg border border-brand/30 bg-brand/5 p-3">
-                {'fallback' in ret.healthCard ? (
-                  <p className="text-sm text-muted-foreground">{ret.healthCard.summary}</p>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm text-foreground">{ret.healthCard.summary}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 flex-1 rounded-full bg-secondary">
-                        <div
-                          className="h-1.5 rounded-full bg-success"
-                          style={{ width: `${ret.healthCard.trustScore}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold text-success">
-                        {ret.healthCard.trustScore}/100 trust
-                      </span>
-                    </div>
-                    {ret.healthCard.notVerified.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Not verified from photos: {ret.healthCard.notVerified.join('; ')}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Grade */}
-            <div className="space-y-3">
-              {grading.grade && (
-                <div className="flex items-center gap-3">
-                  <span className={`rounded-xl border px-4 py-2 text-base font-bold tracking-wide ${gradeCls}`}>
-                    Grade {grading.grade}
-                  </span>
-                  <p className="text-sm text-muted-foreground">
-                    {grading.grade === 'A'
-                      ? 'Excellent condition — minimal wear, sale-ready.'
-                      : grading.grade === 'B'
-                      ? 'Good condition — minor cosmetic wear, functional.'
-                      : grading.grade === 'C'
-                      ? 'Fair condition — visible wear, may need attention.'
-                      : 'Salvage — not suitable for resale.'}
-                  </p>
-                </div>
-              )}
-              <ConfidenceBar value={grading.confidence} />
-            </div>
-
-            {/* Authenticity */}
-            <div className={`flex items-center gap-2 rounded-lg border p-3 ${
-              grading.authenticityMatch
-                ? 'border-success/30 bg-success/10'
-                : 'border-warning/30 bg-warning/10'
-            }`}>
-              <span className={grading.authenticityMatch ? 'text-success' : 'text-warning'}>
-                {grading.authenticityMatch ? '✓' : '⚠'}
-              </span>
-              <p className="text-sm">
-                {grading.authenticityMatch
-                  ? 'Authenticity verified — matches product records'
-                  : 'Authenticity mismatch — label inconsistency detected'}
-              </p>
-            </div>
-
-            {/* Defects */}
-            {grading.defects.length > 0 && (
-              <div>
-                <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Detected issues
-                </p>
-                <ul className="space-y-1.5">
-                  {grading.defects.map((d) => (
-                    <li key={d} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="mt-0.5 text-warning">•</span>
-                      {d}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {grading.defects.length === 0 && (
-              <p className="text-sm text-success">No defects detected.</p>
-            )}
-
-            {/* Functional check */}
-            <div className="rounded-lg border border-border bg-secondary/60 p-3">
-              <p className="text-xs text-muted-foreground">
-                Functional state:{' '}
-                <span className={grading.functionallyVerifiable ? 'text-success' : 'text-warning'}>
-                  {grading.functionallyVerifiable
-                    ? 'Verified from photos'
-                    : 'Cannot verify from photos — will be tested in person'}
-                </span>
-              </p>
-            </div>
-
-            {/* Wardrobe flag */}
-            {grading.wardrobingFlag && (
-              <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">
-                <p className="text-sm text-warning">
-                  Wardrobe return flag: evidence of extended use detected.
-                </p>
-              </div>
-            )}
-
-            <p className="text-xs text-muted-foreground">
-              This card travels with the item to its next owner.
-            </p>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No photos submitted — item will be graded in person at pickup.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function SellerReturnDetail({ returnId }: Props) {
   const [ret, setRet] = useState<SubmittedReturn | null | 'loading'>('loading');
-  const [showHealthCard, setShowHealthCard] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
   const [matchInfo, setMatchInfo] = useState<{ candidateCount: number; sessionId: string } | null>(null);
@@ -287,6 +133,12 @@ export function SellerReturnDetail({ returnId }: Props) {
   const isPendingApproval = ret.status === 'pending_seller_approval';
   const isSellerApproved = ret.status === 'seller_approved';
   const isDealComplete = ret.status === 'deal_completed';
+  // Spec 026: the seller's route picker needs to show for EVERY return still
+  // awaiting a dispatch decision, not just the ones the AI itself routed to
+  // local_resale (the only path that starts in 'pending_seller_approval') —
+  // otherwise a donate/refurbish/recycle/liquidate recommendation would never
+  // give the seller a chance to pick anything at all.
+  const needsSellerDecision = isPendingApproval || ret.status === 'awaiting_pickup';
 
   // Spec 022: approval is now a real, sequenced backend action — the return
   // record must land before matching is initiated (initiateMatchSession looks
@@ -299,7 +151,7 @@ export function SellerReturnDetail({ returnId }: Props) {
     const currentGrading = grading;
     const currentRouting = routing;
 
-    if (!currentGrading?.grade || currentGrading.grade === 'Salvage' || currentRouting?.decision !== 'local_resale') {
+    if (!currentGrading?.grade || currentGrading.grade === 'Salvage' || !currentRouting) {
       setApproveError('This return is missing the grading data needed to start local matching.');
       return;
     }
@@ -307,6 +159,24 @@ export function SellerReturnDetail({ returnId }: Props) {
     setApproving(true);
     setApproveError(null);
     setMatchInfo(null);
+
+    // Spec 026: the seller can dispatch to local_resale even when it wasn't
+    // the AI's own recommendation (picked from an alternative row) — persist
+    // that as the real decision before the approval flow below, which reads
+    // routing back from the store fresh at each step.
+    if (currentRouting.decision !== 'local_resale') {
+      applySellerRouteChoice(
+        currentRet.returnId,
+        {
+          ...currentRouting,
+          decision: 'local_resale',
+          evBreakdown: currentRouting.evBreakdown
+            ? { ...currentRouting.evBreakdown, chosen: 'local_resale' }
+            : undefined,
+        },
+        `Seller dispatched to ${ROUTE_LABEL.local_resale} instead of the recommended ${ROUTE_LABEL[currentRouting.decision]}`,
+      );
+    }
 
     try {
       const nowMs = Date.now();
@@ -374,8 +244,49 @@ export function SellerReturnDetail({ returnId }: Props) {
   }
 
   function handleSendToWarehouse() {
-    if (!ret || ret === 'loading') return;
-    setRet({ ...ret, status: 'in_transit' });
+    if (!ret || ret === 'loading' || !routing) return;
+    // Spec 026: persist the decision swap too when warehouse wasn't already
+    // the AI's own recommendation — otherwise the stored decision would keep
+    // saying (e.g.) "donate" even though the seller actually sent it to the
+    // warehouse.
+    const base =
+      routing.decision !== 'warehouse'
+        ? applySellerRouteChoice(
+            ret.returnId,
+            {
+              ...routing,
+              decision: 'warehouse',
+              evBreakdown: routing.evBreakdown ? { ...routing.evBreakdown, chosen: 'warehouse' } : undefined,
+            },
+            `Seller sent to warehouse instead of the recommended ${ROUTE_LABEL[routing.decision]}`,
+          )
+        : ret;
+    if (!base) return;
+    const updated: SubmittedReturn = { ...base, status: 'in_transit' };
+    saveReturn(updated);
+    setRet(updated);
+  }
+
+  // Spec 026: the seller dispatches to any other VIABLE route from the same
+  // EV breakdown — refurbish, donate, recycle, liquidate, etc. `local_resale`
+  // goes through handleApprove() (real matching/agent flow) and `warehouse`
+  // through handleSendToWarehouse() above; this covers the rest.
+  function handleChooseOtherRoute(path: ReturnRoutingDecision['decision']) {
+    if (!ret || ret === 'loading' || !routing?.evBreakdown) return;
+    const target = routing.evBreakdown.paths.find((p) => p.path === path);
+    if (!target || !target.viable) return;
+
+    const wasRecommended = path === routing.decision;
+    const newDecision: ReturnRoutingDecision = {
+      ...routing,
+      decision: path,
+      evBreakdown: { ...routing.evBreakdown, chosen: path },
+    };
+    const note = wasRecommended
+      ? `Seller confirmed the recommended ${ROUTE_LABEL[path]}`
+      : `Seller dispatched to ${ROUTE_LABEL[path]} instead of the recommended ${ROUTE_LABEL[routing.decision]}`;
+    const updated = applySellerRouteChoice(ret.returnId, newDecision, note);
+    if (updated) setRet(updated);
   }
 
   function handleDealComplete() {
@@ -393,13 +304,8 @@ export function SellerReturnDetail({ returnId }: Props) {
   }
 
   return (
-    <>
-      {showHealthCard && (
-        <HealthCardOverlay ret={ret} onClose={() => setShowHealthCard(false)} />
-      )}
-
-      <div className="space-y-5">
-        {/* Back */}
+    <div className="space-y-5">
+      {/* Back */}
         <Link href="/seller/returns" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-brand">
           ← Returns queue
         </Link>
@@ -413,7 +319,7 @@ export function SellerReturnDetail({ returnId }: Props) {
           const next = () => setPhotoIdx((i) => (i + 1) % total);
 
           return (
-            <div className="flex overflow-hidden rounded-2xl border border-border bg-card">
+            <div className="flex overflow-hidden rounded-2xl bg-card ring-1 ring-hairline shadow-[0_1px_2px_rgba(35,47,62,0.04)]">
               {/* LEFT — image */}
               <div className="relative w-72 shrink-0 bg-secondary/40">
                 {total > 0 ? (
@@ -543,84 +449,50 @@ export function SellerReturnDetail({ returnId }: Props) {
               {routing?.localMargin !== undefined && (
                 <div className="rounded-xl bg-success/10 p-3 text-center">
                   <p className="text-xs text-muted-foreground">Value recovered</p>
-                  <p className="mt-1 text-2xl font-bold text-success">+{formatPrice(routing.localMargin)}</p>
+                  <p className="mt-1 text-2xl font-bold text-success">+{formatRupees(routing.localMargin)}</p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* ── Seller approval CTA (Grade A / local_resale) ── */}
-        {isPendingApproval && routing?.decision === 'local_resale' && (
-          <div className="rounded-2xl border-2 border-warning/40 bg-warning/5 p-6">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 text-2xl">⚡</span>
-              <div className="flex-1">
+        {/* ── Action required banner — the actual choice now lives in the
+            Intelligent Bridge card below, where all the routes already are ── */}
+        {needsSellerDecision && (
+          <div className="rounded-2xl border-2 border-warning/40 bg-warning/5 p-5">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚡</span>
+              <div>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-warning">
                   Action required
                 </p>
-                <p className="mt-1 text-xl font-bold text-foreground">
-                  Approve for local listing
+                <p className="mt-0.5 text-sm text-foreground">
+                  This item is graded and routed — pick how to handle it in the Intelligent Bridge
+                  breakdown below. The AI's recommendation is highlighted; you can dispatch to any
+                  other viable route instead.
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  This item has been AI-graded as{' '}
-                  <span className="font-semibold text-foreground">Grade {grading?.grade}</span>.
-                  Approving creates a local listing — the rescue pipeline will handle pricing and buyer matching. No warehouse trip needed.
-                </p>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {routing.localMargin !== undefined && (
-                    <div className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-center">
-                      <p className="text-xs text-muted-foreground">Est. value recovered</p>
-                      <p className="mt-1 text-lg font-bold text-success">+{formatPrice(routing.localMargin)}</p>
-                    </div>
-                  )}
-                  <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
-                    <p className="text-xs text-muted-foreground">CO₂ avoided</p>
-                    <p className="mt-1 text-lg font-bold text-foreground">{routing.co2SavedKg} kg</p>
-                  </div>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    disabled={approving}
-                    onClick={() => void handleApprove()}
-                    className="flex-1 rounded-xl bg-success px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60 sm:flex-none"
-                  >
-                    {approving ? 'Starting local matching…' : 'Approve for Local Listing'}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={approving}
-                    onClick={handleSendToWarehouse}
-                    className="flex-1 rounded-xl border border-border bg-card px-5 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground disabled:opacity-60 sm:flex-none"
-                  >
-                    Send to Warehouse Instead
-                  </button>
-                </div>
-
-                {approveError && (
-                  <div className="mt-4 rounded-lg border border-danger/30 bg-danger/10 p-4">
-                    <p className="text-sm font-semibold text-danger">Approval didn't go through</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{approveError}</p>
-                    <button
-                      type="button"
-                      onClick={() => void handleApprove()}
-                      className="mt-3 rounded-lg border border-danger/40 px-4 py-2 text-xs font-semibold text-danger hover:bg-danger/10"
-                    >
-                      Try again
-                    </button>
-                  </div>
-                )}
-
-                {agentWarning && (
-                  <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-4">
-                    <p className="text-sm text-warning">{agentWarning}</p>
-                  </div>
-                )}
               </div>
             </div>
+
+            {approveError && (
+              <div className="mt-4 rounded-lg border border-danger/30 bg-danger/10 p-4">
+                <p className="text-sm font-semibold text-danger">Approval didn't go through</p>
+                <p className="mt-1 text-sm text-muted-foreground">{approveError}</p>
+                <button
+                  type="button"
+                  onClick={() => void handleApprove()}
+                  className="mt-3 rounded-lg border border-danger/40 px-4 py-2 text-xs font-semibold text-danger hover:bg-danger/10"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+
+            {agentWarning && (
+              <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-4">
+                <p className="text-sm text-warning">{agentWarning}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -652,6 +524,7 @@ export function SellerReturnDetail({ returnId }: Props) {
                   </Link>
                   .
                 </p>
+                <CascadeTimeline returnId={ret.returnId} />
               </div>
             </div>
             <div className="mt-4 flex justify-end">
@@ -667,81 +540,47 @@ export function SellerReturnDetail({ returnId }: Props) {
           </div>
         )}
 
-        {/* ── AI Grading ── */}
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              AI Grading — doorstep assessment
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowHealthCard(true)}
-              className="rounded-lg border border-brand/30 bg-brand/5 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
-            >
-              View Condition Report Card →
-            </button>
-          </div>
-
-          {grading ? (
-            <div className="space-y-4">
-              {/* Grade pill + authenticity inline */}
-              <div className="flex flex-wrap items-center gap-3">
-                {grading.grade && (
-                  <span className={`rounded-xl border px-4 py-2 text-sm font-bold tracking-wide ${gradeCls}`}>
-                    Grade {grading.grade}
-                  </span>
-                )}
-                {grading.authenticityMatch ? (
-                  <span className="text-sm text-success">✓ Authenticity verified</span>
-                ) : (
-                  <span className="text-sm text-warning">⚠ Authenticity mismatch detected</span>
-                )}
-              </div>
-
-              <ConfidenceBar value={grading.confidence} />
-
-              {grading.defects.length > 0 && (
-                <ul className="space-y-1">
-                  {grading.defects.map((d) => (
-                    <li key={d} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="mt-0.5 text-warning">•</span>
-                      {d}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {grading.wardrobingFlag && (
-                <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">
-                  <p className="text-sm text-warning">Wardrobe return flag: evidence of extended use detected.</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-border bg-secondary p-4">
-              <p className="text-sm text-muted-foreground">
-                No photos submitted — item will be graded in person at pickup.
-              </p>
-            </div>
-          )}
-        </Card>
+        {/* ── Product Health Card — the full trust document, right on the
+            page. Not hidden behind a click: this IS the AI grading report. ── */}
+        <ReturnHealthCardDeep
+          productName={ret.productName}
+          returnId={ret.returnId}
+          grading={grading}
+          healthCard={ret.healthCard}
+          transitions={ret.transitions}
+          submittedAt={ret.submittedAt}
+        />
 
         {/* ── Intelligent Bridge — glass-box EV breakdown ── */}
         {routing?.evBreakdown && (
-          <Card>
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Intelligent Bridge — why {routing.decision.replace(/_/g, ' ')}
-            </p>
+          <Card className="border-l-2 border-l-brand">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-brand" />
+              <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
+                Intelligent Bridge — why {routing.decision.replace(/_/g, ' ')}
+              </p>
+            </div>
             <p className="mb-4 text-sm text-muted-foreground">{routing.reasoning}</p>
+            {needsSellerDecision && (
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-warning">
+                Pick how to handle this return — the AI's recommendation is highlighted
+              </p>
+            )}
             <div className="space-y-2">
               {[...routing.evBreakdown.paths]
                 .sort((a, b) => b.evCents - a.evCents)
                 .map((p) => {
                   const isChosen = p.path === routing.evBreakdown!.chosen;
+                  const canDispatch = needsSellerDecision && p.viable;
+                  function dispatch() {
+                    if (p.path === 'local_resale') void handleApprove();
+                    else if (p.path === 'warehouse') handleSendToWarehouse();
+                    else handleChooseOtherRoute(p.path);
+                  }
                   return (
                     <div key={p.path} className="space-y-1">
                       <div
-                        className={`flex items-center justify-between rounded-lg px-3 py-2 ${
+                        className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 ${
                           isChosen ? 'bg-brand/10 ring-1 ring-brand/40' : 'bg-secondary/50'
                         } ${p.viable ? '' : 'opacity-60'}`}
                       >
@@ -749,13 +588,29 @@ export function SellerReturnDetail({ returnId }: Props) {
                           {isChosen && '✓ '}
                           {p.path.replace(/_/g, ' ')}
                         </span>
-                        <span
-                          className={`font-mono text-sm tabular-nums ${
-                            p.evCents >= 0 ? 'text-foreground' : 'text-danger'
-                          }`}
-                        >
-                          {p.evCents >= 0 ? '+' : '−'}
-                          {formatPrice(Math.abs(p.evCents))}
+                        <span className="flex items-center gap-3">
+                          <span
+                            className={`font-mono text-sm tabular-nums ${
+                              p.evCents >= 0 ? 'text-foreground' : 'text-danger'
+                            }`}
+                          >
+                            {p.evCents >= 0 ? '+' : '−'}
+                            {formatPrice(Math.abs(p.evCents))}
+                          </span>
+                          {canDispatch && (
+                            <button
+                              type="button"
+                              disabled={approving}
+                              onClick={dispatch}
+                              className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 ${
+                                isChosen
+                                  ? 'bg-brand text-brand-foreground'
+                                  : 'border border-brand/40 text-brand hover:bg-brand/10'
+                              }`}
+                            >
+                              {isChosen ? 'Confirm & dispatch' : 'Choose instead'}
+                            </button>
+                          )}
                         </span>
                       </div>
                       {!p.viable && p.gateReason && (
@@ -783,24 +638,26 @@ export function SellerReturnDetail({ returnId }: Props) {
               {routing.localMargin !== undefined && (
                 <div className="rounded-xl bg-success/10 p-4 text-center">
                   <p className="text-xs text-muted-foreground">Local route net</p>
-                  <p className="mt-1 text-2xl font-bold text-success">+{formatPrice(routing.localMargin)}</p>
+                  <p className="mt-1 text-2xl font-bold text-success">+{formatRupees(routing.localMargin)}</p>
                 </div>
               )}
               {routing.warehouseMargin !== undefined && (
                 <div className="rounded-xl bg-danger/10 p-4 text-center">
                   <p className="text-xs text-muted-foreground">Warehouse route net</p>
-                  <p className="mt-1 text-2xl font-bold text-danger">−{formatPrice(Math.abs(routing.warehouseMargin))}</p>
+                  <p className="mt-1 text-2xl font-bold text-danger">−{formatRupees(Math.abs(routing.warehouseMargin))}</p>
                 </div>
               )}
             </div>
             {routing.localMargin !== undefined && routing.warehouseMargin !== undefined && (
-              <p className="mt-3 text-center text-sm font-semibold text-success">
-                Local routing saves {formatPrice(routing.localMargin - routing.warehouseMargin)} vs warehouse
-              </p>
+              <div className="mt-3 flex items-center justify-center gap-1.5 rounded-full bg-success/10 py-2">
+                <span className="size-1.5 rounded-full bg-success" />
+                <p className="text-sm font-semibold text-success">
+                  Local routing saves {formatRupees(routing.localMargin - routing.warehouseMargin)} vs warehouse
+                </p>
+              </div>
             )}
           </Card>
         )}
       </div>
-    </>
   );
 }

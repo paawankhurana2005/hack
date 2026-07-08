@@ -60,6 +60,11 @@ export interface AgentState {
    *  (no real geo data) made the escalation call. */
   escalatedAtDay?: number;
   escalatedGeoDemandIndex?: number;
+  /** The raw PricingDecision from the most recent real `/api/pricing/decide`
+   *  call — the full feature vector + bandit exploration scores, for the
+   *  technical trace view (agent showcase). Undefined when the local
+   *  fallback engine made the last call (API was unreachable). */
+  lastPricingDecision?: PricingDecision;
 }
 
 const inr = (cents: number) => ({ amountCents: cents, currency: 'INR' as const });
@@ -98,6 +103,14 @@ function buildInitial(listing: CasualListing): AgentState {
   const price = listing.listedPrice.amountCents;
   const floor = listing.floorCents ?? Math.round(price * 0.5);
   const retail = listing.retailCents ?? Math.round(price / 0.55);
+  // A return-sourced listing's birth is the visual payoff of "the agent takes
+  // the rate and publishes it to the marketplace" — make that moment loud and
+  // explicit (listing id + return id + real price) instead of the generic
+  // one-liner every other listing type gets.
+  const returnId = returnIdFromItemId(listing.itemId ?? listing.id);
+  const publishText = returnId
+    ? `Listing published to marketplace: ${listing.id} @ ${formatMoney(inr(price))} (from return ${returnId}). Agent is watching the market within a 4km radius.`
+    : `Listed at ${formatMoney(inr(price))} within a 4km radius. Agent is watching the market.`;
   return {
     id: listing.id,
     itemId: listing.itemId ?? listing.id,
@@ -120,7 +133,7 @@ function buildInitial(listing: CasualListing): AgentState {
       {
         day: 0,
         phase: 'acted',
-        text: `Listed at ${formatMoney(inr(price))} within a 4km radius. Agent is watching the market.`,
+        text: publishText,
         at: listing.listedAt,
       },
     ],
@@ -248,7 +261,13 @@ function simulateDayEvent(s: AgentState, viewsToday: number): DemandEvent {
 async function decideViaEngine(
   s: AgentState,
   event: DemandEvent,
-): Promise<{ decision: AgentDecision; acted: string; geoDemandIndex: number; modelMeta?: AgentModelMeta } | null> {
+): Promise<{
+  decision: AgentDecision;
+  acted: string;
+  geoDemandIndex: number;
+  modelMeta?: AgentModelMeta;
+  pricingDecision: PricingDecision;
+} | null> {
   const anchor = Math.round(s.ctx.comparableCents / 100);
   const floor = Math.round(s.floorCents / 100);
   // Return-sourced listings (birthAgentFromReturn()) are IDed `item_ret_${returnId}`
@@ -284,10 +303,16 @@ async function decideViaEngine(
   const anchorCents = Math.round(pd.anchorPrice * 100);
   const marginCents = Math.round(pd.expectedMargin * 100);
   const firedRules = pd.guardrailsApplied.filter((g) => g.triggered).map((g) => g.rule);
+  // geoDemandIndex was already computed by the pricing engine (used internally
+  // for the Sales Agent's relist comparison) but never shown to the seller —
+  // surface it as a glass-box factor like the others, same 0..1 scale bucketed
+  // the way AgentSnapshot.ctx.localDemand already labels demand elsewhere.
+  const demandLabel = pd.geoDemandIndex >= 0.66 ? 'high' : pd.geoDemandIndex >= 0.33 ? 'medium' : 'low';
   const factors = [
     { label: 'Local median', value: formatMoney(inr(anchorCents)) },
     { label: 'Chosen lever', value: `${pd.chosenArm}× median` },
     { label: 'Expected margin', value: formatMoney(inr(marginCents)) },
+    { label: 'Region demand', value: `${demandLabel} (${pd.geoDemandIndex.toFixed(2)})` },
     ...(firedRules.length ? [{ label: 'Guardrails', value: firedRules.join(', ') }] : []),
   ];
 
@@ -301,6 +326,7 @@ async function decideViaEngine(
       acted,
       geoDemandIndex: pd.geoDemandIndex,
       modelMeta: pd.narrationModelMeta,
+      pricingDecision: pd,
     };
   }
 
@@ -322,6 +348,7 @@ async function decideViaEngine(
       acted,
       geoDemandIndex: pd.geoDemandIndex,
       modelMeta: pd.narrationModelMeta,
+      pricingDecision: pd,
     };
   }
   const acted = `Holding at ${formatMoney(
@@ -332,6 +359,7 @@ async function decideViaEngine(
     acted,
     geoDemandIndex: pd.geoDemandIndex,
     modelMeta: pd.narrationModelMeta,
+    pricingDecision: pd,
   };
 }
 
@@ -402,6 +430,7 @@ export async function tick(
     decision = viaEngine.decision;
     acted = viaEngine.acted;
     modelMeta = viaEngine.modelMeta;
+    s.lastPricingDecision = viaEngine.pricingDecision;
   } else {
     decision = decideAgentAction({
       day: s.day,

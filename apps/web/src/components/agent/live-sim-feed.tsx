@@ -9,6 +9,7 @@
 import { useEffect, useRef } from 'react';
 import type { AgentAction, AgentEvent } from '@reloop/shared';
 import { ModelMetaBadge } from './model-meta-badge';
+import { RawEventLog } from './raw-event-log';
 
 const ACTION_LABEL: Partial<Record<AgentAction, string>> = {
   hold: 'Held',
@@ -19,11 +20,21 @@ const ACTION_LABEL: Partial<Record<AgentAction, string>> = {
   relist: 'Relisted',
 };
 
-export function LiveSimFeed({ events }: { events: AgentEvent[] }) {
+export function LiveSimFeed({
+  events,
+  thinking,
+  showTrace,
+}: {
+  events: AgentEvent[];
+  thinking?: boolean;
+  /** Opt-in technical trace view — renders the real structured event JSON
+   *  under each line. Off by default. */
+  showTrace?: boolean;
+}) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [events.length]);
+  }, [events.length, thinking]);
 
   return (
     <div className="rounded-2xl bg-card ring-1 ring-border">
@@ -56,10 +67,17 @@ export function LiveSimFeed({ events }: { events: AgentEvent[] }) {
                 </div>
                 <p className="text-sm leading-snug text-muted-foreground">{e.text}</p>
                 <div className="mt-1"><ModelMetaBadge modelMeta={e.modelMeta} /></div>
+                {showTrace && <RawEventLog event={e} />}
               </div>
             </li>
           ))}
         </ol>
+        {thinking && (
+          <div className="flex items-center gap-2 pl-5 pt-2 text-muted-foreground">
+            <span className="size-1.5 animate-pulse rounded-full bg-brand" />
+            <span className="font-mono text-[11px]">working through the portfolio…</span>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
     </div>

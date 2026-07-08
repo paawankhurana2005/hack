@@ -151,6 +151,32 @@ export type PricingDecision = {
    *  template — distinct from `modelVersion`, which is the PRICING model
    *  (xgboost-http/heuristic-v1), not the narration model. */
   narrationModelMeta?: { model: string; usedFallback: boolean; latencyMs: number };
+  /** The exact 41-field feature vector this decision read — everything the
+   *  reward model PERCEIVED. Surfaced for the technical trace view (agent
+   *  showcase); never shown in the default seller-facing UI. */
+  stateUsed: PricingStateVector;
+  /** The bandit's Thompson-sampled score per arm (predicted reward + explore
+   *  noise), the exact numbers `RepriceBandit.decide()` compared to pick
+   *  `chosenArm` — proof the EXPLORE step is real, not just the model's raw
+   *  prediction. Infeasible arms (outside floor/ceiling) score -1e9. */
+  sampledScores: Record<PriceArm, number>;
+};
+
+/** Real, frozen snapshot of the trained XGBoost warm-start model's offline
+ *  evaluation (spec 014, Phase 2) — served by GET /api/pricing/model-info for
+ *  the technical trace view. `ml/pricing/runs/` (where this is generated) is
+ *  gitignored, so the API serves a committed copy of the real numbers rather
+ *  than reading the training run's output directory at request time. */
+export type PricingModelInfo = {
+  modelVersion: string;
+  valMae: number;
+  valMape: number;
+  trainRows: number;
+  valRows: number;
+  featureDim: number;
+  dataSource: string;
+  /** [featureName, SHAP-style importance] pairs, highest first. */
+  topFeatures: [string, number][];
 };
 
 /** The outcome logged after a sale or reroute — the training signal for Stage 2. */

@@ -2,12 +2,27 @@
 //   POST /api/pricing/decide        — an event fires → return a clamped, narrated price
 //   POST /api/pricing/outcome       — log a sale/reroute result → reward → bandit update
 //   GET  /api/pricing/state/:listingId — current pooled bandit posteriors (for dashboards)
+//   GET  /api/pricing/model-info    — the real trained model's offline eval (technical trace view)
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import { z } from 'zod';
-import { PRICE_ARMS } from '@reloop/shared';
+import { PRICE_ARMS, type PricingModelInfo } from '@reloop/shared';
 import type { RepriceEngine } from '../services/pricing/reprice-engine.js';
 import { getReqId, log } from '../lib/logger.js';
+
+const here = dirname(fileURLToPath(import.meta.url)); // apps/api/src/routes
+// A committed, frozen snapshot of ml/pricing's real training run — the actual
+// XGBoost warm-start's SHAP-style feature importances + val MAE/MAPE
+// (ml/pricing/runs/warmstart/v1/eval_results.json). That directory is
+// gitignored (ml/pricing/.gitignore), so it never reaches the deployed API;
+// this file is a real, honest copy of its numbers, not a fabrication —
+// re-copy it whenever the model is retrained.
+const modelInfo: PricingModelInfo = JSON.parse(
+  readFileSync(join(here, '../data/pricing-model-info.json'), 'utf-8'),
+) as PricingModelInfo;
 
 const eventTypeEnum = z.enum([
   'comp_sold',
@@ -106,6 +121,10 @@ export function createPricingRouter(engine: RepriceEngine): Router {
       return;
     }
     res.json(state);
+  });
+
+  router.get('/model-info', (_req, res) => {
+    res.json(modelInfo);
   });
 
   return router;

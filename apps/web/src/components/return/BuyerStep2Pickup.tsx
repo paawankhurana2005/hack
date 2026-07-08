@@ -8,6 +8,7 @@ import type {
   ReturnReason,
   ReturnManifest,
   ReturnJobResult,
+  ReturnStateTransition,
 } from '@reloop/shared';
 import { mockGradeItem, mockRouteItem } from '@/lib/mocks/return-flow';
 import { gradeReturnItem, routeReturnItem, createReturnHealthCard } from '@/lib/api-client';
@@ -15,6 +16,7 @@ import type { CapturedAngle } from './BuyerStep1';
 import { saveReturn, generateReturnId } from '@/lib/mocks/return-store';
 import { initReturn, submitReturnPhotos, pollReturnStatus } from '@/lib/return-pipeline-api';
 import { Card } from '@/components/ui/card';
+import { ReturnHealthCardDeep } from './health-card';
 import { LeafletMap } from '@/components/map/LeafletMap';
 import {
   ScanIcon,
@@ -128,6 +130,13 @@ export function BuyerStep2Pickup({
   const [grading, setGrading] = useState<ReturnGradingResult | null>(null);
   const [routing, setRouting] = useState<ReturnRoutingDecision | null>(null);
   const [healthCard, setHealthCard] = useState<HealthCardResult | null>(null);
+  // Mirrors what's persisted via saveReturn() below — kept in state too so the
+  // deep Health Card (which shows the real returnId + lifecycle timeline) has
+  // something to render; the effect's own `returnId`/`transitions` locals
+  // only ever lived inside its closure otherwise.
+  const [submittedReturnId, setSubmittedReturnId] = useState('');
+  const [submittedAt, setSubmittedAt] = useState('');
+  const [transitions, setTransitions] = useState<ReturnStateTransition[]>([]);
 
   useEffect(() => {
     // Spec 025: resolves a job's raw (possibly-fallback) results into the same
@@ -262,6 +271,12 @@ export function BuyerStep2Pickup({
       const isGradeALocalResale =
         gradingResult?.grade === 'A' && routingDecision?.decision === 'local_resale';
 
+      const nowIso = new Date().toISOString();
+      const returnTransitions: ReturnStateTransition[] = [
+        { from: 'initiated', to: 'evidence_captured', at: nowIso },
+        { from: 'evidence_captured', to: 'routed', at: nowIso, decision: routingDecision ?? undefined },
+      ];
+
       saveReturn({
         returnId,
         orderId,
@@ -275,17 +290,17 @@ export function BuyerStep2Pickup({
         gradingResult,
         routingDecision,
         healthCard: card ?? undefined,
-        submittedAt: new Date().toISOString(),
+        submittedAt: nowIso,
         agentArrivesAt: new Date(Date.now() + 3 * 3600000).toISOString(),
         status: isGradeALocalResale ? 'pending_seller_approval' : 'awaiting_pickup',
         // Spec 016: the lifecycle starts here — decided before the item moves.
         lifecycleState: 'routed',
-        transitions: [
-          { from: 'initiated', to: 'evidence_captured', at: new Date().toISOString() },
-          { from: 'evidence_captured', to: 'routed', at: new Date().toISOString(), decision: routingDecision ?? undefined },
-        ],
+        transitions: returnTransitions,
       });
 
+      setSubmittedReturnId(returnId);
+      setSubmittedAt(nowIso);
+      setTransitions(returnTransitions);
       setPhase('ready');
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -367,7 +382,6 @@ export function BuyerStep2Pickup({
     routing.decision !== 'warehouse' &&
     routing.decision !== 'return_to_seller' &&
     routing.decision !== 'returnless_refund';
-  const cardFallback = healthCard && 'fallback' in healthCard;
 
   return (
     <div className="space-y-5">
@@ -492,51 +506,14 @@ export function BuyerStep2Pickup({
 
       {/* Product Health Card — the trust layer, minted at the return click */}
       {healthCard && (
-        <Card>
-          <div className="mb-3 flex items-center gap-2">
-            <ShieldIcon className="h-4 w-4 text-brand" />
-            <p className="font-mono text-[10px] uppercase tracking-widest text-brand">
-              Product Health Card
-            </p>
-          </div>
-          {cardFallback ? (
-            <p className="text-sm text-muted-foreground">{(healthCard as { summary: string }).summary}</p>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-foreground">{(healthCard as ReturnHealthCard).summary}</p>
-              <div className="flex items-center gap-2">
-                <div className="h-1.5 flex-1 rounded-full bg-secondary">
-                  <div
-                    className="h-1.5 rounded-full bg-success"
-                    style={{ width: `${(healthCard as ReturnHealthCard).trustScore}%` }}
-                  />
-                </div>
-                <span className="text-xs font-semibold text-success">
-                  {(healthCard as ReturnHealthCard).trustScore}/100 trust score
-                </span>
-              </div>
-              {(healthCard as ReturnHealthCard).verifiedAttributes.length > 0 && (
-                <ul className="space-y-1">
-                  {(healthCard as ReturnHealthCard).verifiedAttributes.map((a) => (
-                    <li key={a} className="flex items-start gap-2 text-sm text-success">
-                      <span className="mt-0.5">✓</span>{a}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {(healthCard as ReturnHealthCard).notVerified.length > 0 && (
-                <ul className="space-y-1">
-                  {(healthCard as ReturnHealthCard).notVerified.map((a) => (
-                    <li key={a} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="mt-0.5">–</span>{a}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-xs text-muted-foreground">This card travels with the item to its next owner.</p>
-            </div>
-          )}
-        </Card>
+        <ReturnHealthCardDeep
+          productName={productName}
+          returnId={submittedReturnId}
+          grading={grading}
+          healthCard={healthCard}
+          transitions={transitions}
+          submittedAt={submittedAt}
+        />
       )}
 
       {/* Intelligent Bridge — glass-box EV breakdown (logic decides, model narrates) */}
@@ -643,6 +620,26 @@ export function BuyerStep2Pickup({
               <p className="mt-1 text-xs text-muted-foreground">
                 Every unit carries its Health Card — manifested pallets sell for 30–50% more than
                 mystery lots, with no {routing.warehouseDistanceKm ?? 580}km linehaul.
+              </p>
+            </div>
+          )}
+
+          {routing.decision === 'donate' && (
+            <div className="mt-4 rounded-lg border border-success/30 bg-success/10 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-success">
+                  Going to a local NGO partner{routing.radiusKm ? ` ${routing.radiusKm}km away` : ''}
+                </p>
+                {routing.voucherEcoCredits !== undefined && routing.voucherEcoCredits > 0 && (
+                  <span className="whitespace-nowrap rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">
+                    +{routing.voucherEcoCredits} EcoCredits
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {routing.voucherEcoCredits !== undefined && routing.voucherEcoCredits > 0
+                  ? `You'll earn ${routing.voucherEcoCredits} EcoCredits for choosing to donate locally — no ${routing.warehouseDistanceKm ?? 580}km linehaul, maximum social impact.`
+                  : `No ${routing.warehouseDistanceKm ?? 580}km linehaul, maximum social impact.`}
               </p>
             </div>
           )}

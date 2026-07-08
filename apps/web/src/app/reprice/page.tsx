@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SellThroughCurve } from '@/components/pricing/sell-through-curve';
+import { ModelTracePanel } from '@/components/pricing/model-trace-panel';
 import { decidePricing, ApiRequestError, type PricingDecideRequest } from '@/lib/api-client';
 
 const GRADES: ConditionGrade[] = ['new', 'like-new', 'good', 'fair', 'poor'];
@@ -35,6 +36,7 @@ export default function RepricePage() {
   const [decision, setDecision] = useState<PricingDecision | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showTrace, setShowTrace] = useState(false);
 
   async function fire(event: (typeof EVENTS)[number]) {
     setLoading(true);
@@ -96,6 +98,19 @@ export default function RepricePage() {
           <p className="mt-3 text-xs text-muted-foreground">
             Sample listing: iPhone 13, local median {inr(18000)}, floor {inr(9000)}, Amazon new {inr(25000)}.
           </p>
+          <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+            <button
+              onClick={() => setShowTrace((v) => !v)}
+              className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${
+                showTrace ? 'bg-brand text-brand-foreground ring-brand' : 'bg-secondary ring-border'
+              }`}
+            >
+              {showTrace ? 'Hide' : 'Show'} technical trace
+            </button>
+            <span className="text-xs text-muted-foreground">
+              Real feature vector, bandit exploration scores, and the trained model's own SHAP importances.
+            </span>
+          </div>
         </Card>
 
         {error && (
@@ -163,6 +178,8 @@ export default function RepricePage() {
               <h3 className="mb-3 text-sm font-semibold">Sell-through curve</h3>
               <SellThroughCurve decision={decision} />
             </Card>
+
+            {showTrace && <ModelTracePanel decision={decision} />}
           </>
         )}
       </div>

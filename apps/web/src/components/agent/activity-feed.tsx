@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import type { AgentEvent, AgentPhase } from '@reloop/shared';
 import { ModelMetaBadge } from './model-meta-badge';
+import { RawEventLog } from './raw-event-log';
 
 const PHASE_META: Record<AgentPhase, { label: string; dot: string; text: string }> = {
   perceived: { label: 'Perceived', dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
@@ -12,7 +13,22 @@ const PHASE_META: Record<AgentPhase, { label: string; dot: string; text: string 
 };
 
 /** The live agent reasoning log — perceived → diagnosed → acted, with numbers. */
-export function ActivityFeed({ events, thinking }: { events: AgentEvent[]; thinking?: boolean }) {
+export function ActivityFeed({
+  events,
+  thinking,
+  notifiedEventKeys,
+  showTrace,
+}: {
+  events: AgentEvent[];
+  thinking?: boolean;
+  /** Spec 026: entries keyed `${day}-${index}` (matching this component's own
+   *  `<li>` key) that fired a real seller notification — renders a small
+   *  badge next to them. Optional and unused by existing callers. */
+  notifiedEventKeys?: Set<string>;
+  /** Opt-in technical trace view — renders the real structured event JSON
+   *  under each friendly line. Off by default. */
+  showTrace?: boolean;
+}) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -31,8 +47,10 @@ export function ActivityFeed({ events, thinking }: { events: AgentEvent[]; think
           {events.map((e, i) => {
             const meta = PHASE_META[e.phase];
             const newDay = i === 0 || events[i - 1]!.day !== e.day;
+            const key = `${e.day}-${i}`;
+            const notified = notifiedEventKeys?.has(key) ?? false;
             return (
-              <li key={`${e.day}-${i}`}>
+              <li key={key}>
                 {newDay && (
                   <div className="mb-1 mt-3 first:mt-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
                     Day {e.day}
@@ -47,6 +65,11 @@ export function ActivityFeed({ events, thinking }: { events: AgentEvent[]; think
                     <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
                       {meta.label}
                     </span>
+                    {notified && (
+                      <span className="ml-2 rounded-full bg-brand/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-brand">
+                        🔔 Notified
+                      </span>
+                    )}
                     <p className={`text-sm leading-snug ${meta.text}`}>{e.text}</p>
                     {e.factors && e.factors.length > 0 && (
                       <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
@@ -63,12 +86,20 @@ export function ActivityFeed({ events, thinking }: { events: AgentEvent[]; think
                         {Math.round(e.priceToCents / 100).toLocaleString('en-IN')}
                         {e.floorCents !== undefined && (
                           <span className="text-muted-foreground">
-                            {'  '}· floor ₹{Math.round(e.floorCents / 100).toLocaleString('en-IN')}
+                            {'  '}·{' '}
+                            {e.priceToCents <= e.floorCents
+                              ? `at your ₹${Math.round(e.floorCents / 100).toLocaleString('en-IN')} floor`
+                              : `still ₹${Math.round(
+                                  (e.priceToCents - e.floorCents) / 100,
+                                ).toLocaleString('en-IN')} above your ₹${Math.round(
+                                  e.floorCents / 100,
+                                ).toLocaleString('en-IN')} floor`}
                           </span>
                         )}
                       </p>
                     )}
                     {e.phase === 'acted' && <div><ModelMetaBadge modelMeta={e.modelMeta} /></div>}
+                    {showTrace && <RawEventLog event={e} />}
                   </div>
                 </div>
               </li>

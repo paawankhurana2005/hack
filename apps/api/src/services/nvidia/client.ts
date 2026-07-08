@@ -3,7 +3,7 @@
 // in one place.
 
 import type { Config } from '../../config.js';
-import { traceModelCall, type TraceMeta } from '../../lib/langfuse.js';
+import { traceModelCall, type ModelCallResult, type TraceMeta } from '../../lib/langfuse.js';
 
 export interface ChatContentPart {
   type: 'text' | 'image_url';
@@ -38,7 +38,7 @@ export async function nvidiaChat(cfg: Config, req: ChatRequest): Promise<string>
   return traceModelCall(req.traceMeta ?? {}, req.model, req.messages, () => doChat(cfg, req));
 }
 
-async function doChat(cfg: Config, req: ChatRequest): Promise<string> {
+async function doChat(cfg: Config, req: ChatRequest): Promise<ModelCallResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -77,10 +77,18 @@ async function doChat(cfg: Config, req: ChatRequest): Promise<string> {
 
   const data = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   };
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('empty model response');
-  return content;
+  return {
+    output: content,
+    usage: data.usage && {
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      totalTokens: data.usage.total_tokens,
+    },
+  };
 }
 
 /** Pull the first balanced JSON object out of arbitrary model text. */
