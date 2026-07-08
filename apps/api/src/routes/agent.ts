@@ -19,6 +19,8 @@ const schema = z.object({
   routeRecommendation: z.enum(['donate', 'recycle']).optional(),
   day: z.number(),
   title: z.string().max(200),
+  listingId: z.string().optional(),
+  returnId: z.string().optional(),
 });
 
 function apiError(code: string, message: string): ApiError {
@@ -35,12 +37,19 @@ export function createAgentRouter(cfg: Config): Router {
       return res.status(400).json(apiError('invalid_request', message));
     }
     const request = parsed.data as AgentNarrateRequest;
+    const start = Date.now();
     try {
-      const text = await narrateAgentDecision(cfg, request);
-      return res.json({ text });
+      const { text, usedFallback } = await narrateAgentDecision(cfg, request);
+      return res.json({
+        text,
+        modelMeta: { model: cfg.PRICING_MODEL, usedFallback, latencyMs: Date.now() - start },
+      });
     } catch {
       // Belt and braces — the service already falls back, but never fail here.
-      return res.json({ text: fallbackNarration(request) });
+      return res.json({
+        text: fallbackNarration(request),
+        modelMeta: { model: cfg.PRICING_MODEL, usedFallback: true, latencyMs: Date.now() - start },
+      });
     }
   });
 

@@ -6,6 +6,11 @@ import type { AgentNarrateRequest } from '@reloop/shared';
 import type { Config } from '../../config.js';
 import { nvidiaChat } from '../nvidia/client.js';
 
+export interface NarrateResult {
+  text: string;
+  usedFallback: boolean;
+}
+
 const SYSTEM_PROMPT = `You are ReLoop's autonomous listing agent. You have just taken an action on a
 second-hand listing to help it sell. Write EXACTLY ONE plain-English sentence, in
 the first person ("I"), explaining what you did and why, using the specific
@@ -40,7 +45,7 @@ export function fallbackNarration(req: AgentNarrateRequest): string {
 export async function narrateAgentDecision(
   cfg: Config,
   req: AgentNarrateRequest,
-): Promise<string> {
+): Promise<NarrateResult> {
   const userMsg = JSON.stringify({
     action: req.action,
     diagnosis: req.diagnosis,
@@ -64,10 +69,11 @@ export async function narrateAgentDecision(
       ],
       maxTokens: 80,
       temperature: 0.4,
+      traceMeta: { name: 'agent.narrate', listingId: req.listingId, returnId: req.returnId },
     });
     const cleaned = text.trim().replace(/^["']|["']$/g, '');
-    return cleaned || fallbackNarration(req);
+    return cleaned ? { text: cleaned, usedFallback: false } : { text: fallbackNarration(req), usedFallback: true };
   } catch {
-    return fallbackNarration(req);
+    return { text: fallbackNarration(req), usedFallback: true };
   }
 }

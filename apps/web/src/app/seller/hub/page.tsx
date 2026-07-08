@@ -9,14 +9,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   decideRoute,
-  estimateImpact,
   PALLET_CAPACITY,
   posteriorFromPointGrade,
   tagDefects,
-  type ConditionGrade,
   type Grade,
-  type ItemCategory,
-  type Money,
   type ReturnItemState,
   type ReturnRoutingDecision,
   type ReturnStateTransition,
@@ -26,20 +22,12 @@ import Link from 'next/link';
 import {
   getSubmittedReturns,
   lifecycleOf,
-  linkListing,
   linkLot,
   recordTransition,
   type SubmittedReturn,
 } from '@/lib/mocks/return-store';
 import { getBatches, stageReturnIntoLot, type BulkBatch } from '@/lib/mocks/bulk-exchange-store';
-import { addListing } from '@/lib/listings-store';
-import { ensureAgent } from '@/lib/agent-store';
-import { createReturnHealthCard } from '@/lib/api-client';
-import { demandCurve, SKU_TO_STORE_PRODUCT } from '@/lib/demand-graph';
-import { findStoreProduct } from '@/mock/store-products';
-import { currentAccountId } from '@/lib/storage';
-import { getAccount } from '@/lib/accounts';
-import type { CasualListing } from '@/mock/casual-listings';
+import { birthAgentFromReturn, categoryOf, LIST_FRAC, round50 } from '@/lib/return-agent-bridge';
 
 const GRADES: Grade[] = ['A', 'B', 'C', 'Salvage'];
 
@@ -88,163 +76,33 @@ const PATH_LABEL: Record<ReturnRoutingDecision['decision'], string> = {
 
 const CHECKPOINT_FLOW: ReturnItemState[] = ['routed', 'pickup_verified', 'at_local_hub', 'hub_verified'];
 
-function categoryOf(r: SubmittedReturn): ItemCategory {
-  if (r.category === 'electronics') return 'electronics';
-  if (r.category === 'apparel') return 'fashion';
-  if (r.category === 'kitchenware') return 'home';
-  return 'other';
-}
-
 function inr(paise: number) {
   return `₹${Math.round(Math.abs(paise) / 100).toLocaleString('en-IN')}`;
 }
 
-const money = (amountCents: number): Money => ({ amountCents, currency: 'INR' });
-
-// Return grade → the marketplace's condition vocabulary.
-const CONDITION_OF: Record<Grade, ConditionGrade> = {
-  A: 'like-new',
-  B: 'good',
-  C: 'fair',
-  Salvage: 'poor',
-};
-
-// Open-box list price as a fraction of new retail, by verified grade.
-const LIST_FRAC: Record<Grade, number> = { A: 0.78, B: 0.68, C: 0.55, Salvage: 0.35 };
-
-const round50 = (paise: number) => Math.max(5000, Math.round(paise / 5000) * 5000);
-
 /**
  * Spec 016 Stage 7 — the hub dispatch births the autonomous executor: a real
- * marketplace listing (buyable by other accounts) plus a Listing Agent instance
- * whose floor is the routing engine's route-elsewhere (warehouse/salvage) value —
- * so the agent escalates back to the Bridge exactly when local resale stops
- * beating "send it up the chain".
+ * marketplace listing plus a Listing Agent instance. Spec 026: this is now a
+ * thin wrapper over the shared birthAgentFromReturn() helper, so the direct
+ * seller-returns approval flow can birth an equivalent listing too.
  */
 async function birthReturnListing(
   ret: SubmittedReturn,
   benchGrade: Grade,
   benchResult: ReturnType<typeof decideRoute>,
-  category: ItemCategory,
   packagingSealed: boolean,
   sellerApprovedPriceCents?: number,
 ): Promise<string> {
-  const retailCents = ret.priceCents;
-  // Spec 023: a seller's own call on a "slightly damaged but resellable" item
-  // overrides the engine's grade-based default list price outright.
-  const listedCents = sellerApprovedPriceCents ?? round50(retailCents * LIST_FRAC[benchGrade]);
-  const comparableCents = Math.round(retailCents * 0.6); // same clearing proxy the bench profile uses
-  const storeProductId = ret.sku ? SKU_TO_STORE_PRODUCT[ret.sku] : undefined;
-  const storeProduct = storeProductId ? findStoreProduct(storeProductId) : undefined;
-
-  // Floor = what the item is worth if the agent gives up locally — the better of
-  // the warehouse linehaul and the manifested hub pallet (016.1: the pallet is
-  // now honestly the route-elsewhere value), clamped to a sane band under list.
-  const salvageEv = Math.max(
-    benchResult.evByPath.find((p) => p.path === 'warehouse')?.evCents ?? 0,
-    benchResult.evByPath.find((p) => p.path === 'liquidate')?.evCents ?? 0,
-  );
-  const floorCents = Math.max(
-    Math.round(listedCents * 0.4),
-    Math.min(Math.max(0, salvageEv), Math.round(listedCents * 0.85)),
-    // A seller-approved price is a floor, never just a starting point — the
-    // agent's own reprice loop must not discount below what the seller called.
-    sellerApprovedPriceCents ?? 0,
-  );
-
-  const dg = demandCurve({
-    category,
-    priceCents: listedCents,
-    retailCents,
-    radiusKm: benchResult.radiusKm ?? 4,
-    sku: ret.sku,
-    storeProductId,
-  });
-
-  const now = new Date().toISOString();
-  const listingId = `lst_ret_${ret.returnId}`;
-  const itemId = `item_ret_${ret.returnId}`;
-  const sellerId = currentAccountId();
   const driverScan = ret.transitions?.find((t) => t.to === 'pickup_verified');
-
-  // Bench verification supersedes the doorstep grade — regenerate the Health
-  // Card's narrative summary against the human-verified evidence rather than
-  // reusing the doorstep-time card. Falls back to a deterministic template so
-  // dispatch is never blocked on an LLM call; the `history` provenance below
-  // (which the API doesn't know about) is always kept regardless of outcome.
-  let cardSummary = `Doorstep-graded ${benchGrade}, physically verified at the local hub bench. ${
-    ret.gradingResult?.defects[0] ?? 'No notable defects.'
-  }`;
-  try {
-    const card = await createReturnHealthCard({
-      gradingResult: {
-        grade: benchGrade,
-        confidence: 0.98,
-        defects: ret.gradingResult?.defects ?? [],
-        authenticityMatch: ret.gradingResult?.authenticityMatch ?? true,
-        wardrobingFlag: ret.gradingResult?.wardrobingFlag ?? false,
-        functionallyVerifiable: ret.gradingResult?.functionallyVerifiable ?? true,
-        rawReason: ret.reason,
-      },
-    });
-    if (!('fallback' in card)) cardSummary = card.summary;
-  } catch {
-    // Enrichment only — the hand-built summary above is a perfectly good fallback.
-  }
-
-  const listing: CasualListing = {
-    id: listingId,
-    itemId,
-    title: ret.productName,
-    imageUrl: storeProduct?.imageUrl ?? ret.photoUrls?.[0] ?? '',
-    listedPrice: money(listedCents),
-    status: 'listed',
-    views: 0,
-    listedAt: now,
-    sellerId,
-    sellerName: getAccount(sellerId)?.name ?? 'ReLoop Local Hub',
-    // Shop-rendering data: the Health Card minted through the return's own checkpoints.
-    originalPrice: money(retailCents),
-    card: {
-      id: `hc_${ret.returnId}`,
-      productId: storeProductId ?? ret.orderId,
-      itemId,
-      title: ret.productName,
-      grade: CONDITION_OF[benchGrade],
-      confidence: 0.98, // human-verified at the bench
-      summary: cardSummary,
-      detectedIssues: ret.gradingResult?.defects ?? [],
-      authenticityVerified: ret.gradingResult?.authenticityMatch ?? true,
-      packagingSealed,
-      listingPrice: money(listedCents),
-      history: [
-        { label: 'Graded at the doorstep', at: ret.submittedAt },
-        ...(driverScan ? [{ label: 'Driver verified at pickup', at: driverScan.at }] : []),
-        { label: 'Hub bench verified · repackaged', at: now },
-      ],
-      healthCardUrl: `/card/${itemId}`,
-      issuedAt: now,
-    },
-    impact: estimateImpact(category, money(listedCents)),
-    // Agent metadata — the demand graph drives the market the agent reasons over.
-    category,
-    grade: CONDITION_OF[benchGrade],
-    floorCents,
-    retailCents,
-    market: {
-      comparableCents,
-      localDemand: dg.localDemand,
-      holdingCostPerDayCents: Math.max(2000, Math.round(listedCents * 0.01)),
-      baseViewsPerDay: dg.baseViewsPerDay,
-    },
-    returnId: ret.returnId,
-    storeProductId,
-  };
-
-  addListing(listing);
-  ensureAgent(listing);
-  linkListing(ret.returnId, listingId);
-  return listingId;
+  return birthAgentFromReturn({
+    ret,
+    grade: benchGrade,
+    evByPath: benchResult.evByPath,
+    packagingSealed,
+    radiusKm: benchResult.radiusKm ?? 4,
+    sellerApprovedPriceCents,
+    driverScanAt: driverScan?.at,
+  });
 }
 
 export default function HubBenchPage() {
@@ -391,14 +249,7 @@ export default function HubBenchPage() {
         Number.isFinite(approvedRupees) && approvedRupees > 0
           ? Math.round(approvedRupees * 100)
           : undefined;
-      await birthReturnListing(
-        selected,
-        benchGrade,
-        benchResult,
-        categoryOf(selected),
-        sealIntact,
-        sellerApprovedPriceCents,
-      );
+      await birthReturnListing(selected, benchGrade, benchResult, sealIntact, sellerApprovedPriceCents);
     }
     // Spec 016.1: liquidate-bound items join the open hub pallet for their
     // category — the lot engine re-prices the pallet and re-runs ship-vs-wait

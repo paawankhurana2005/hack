@@ -183,9 +183,22 @@ export class RepriceEngine {
       guardrailsApplied: guard.guardrailsApplied,
       geoDemandIndex: state.geoDemandIndex,
     };
-    decision.reason = guard.shouldReroute
-      ? `Below floor ₹${floor} — handing off to the Intelligent Bridge to reroute.`
-      : await narrateDecision(decision, this.llm);
+    if (guard.shouldReroute) {
+      decision.reason = `Below floor ₹${floor} — handing off to the Intelligent Bridge to reroute.`;
+    } else {
+      const narrateStart = Date.now();
+      const narrated = await narrateDecision(decision, this.llm, {
+        name: 'pricing.narrate',
+        listingId: req.listingId,
+        returnId: req.returnId,
+      });
+      decision.reason = narrated.text;
+      decision.narrationModelMeta = {
+        model: this.llm?.modelName ?? 'template',
+        usedFallback: narrated.usedFallback,
+        latencyMs: Date.now() - narrateStart,
+      };
+    }
 
     this.lastByListing.set(req.listingId, {
       bucket,

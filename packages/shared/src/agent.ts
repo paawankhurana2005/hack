@@ -75,6 +75,15 @@ export interface AgentDecision {
   confidence: number; // 0..1
 }
 
+/** Proof that a narration line came from a real model call, not the
+ *  deterministic template fallback — surfaced in-app as a small, plain-
+ *  language badge (never shown as raw trace ids/model internals to sellers). */
+export interface AgentModelMeta {
+  model: string;
+  usedFallback: boolean;
+  latencyMs: number;
+}
+
 /** One entry in a listing's activity feed. */
 export interface AgentEvent {
   day: number;
@@ -89,6 +98,13 @@ export interface AgentEvent {
   /** Spec 022: the deterministic factors behind a 'diagnosed' event — the
    *  itemized "why" underneath the one-line diagnosis text. */
   factors?: AgentFactor[];
+  /** Which listing produced this event — unset on a single-listing feed
+   *  (it's already unambiguous there); set by the Sales Agent's portfolio
+   *  sweep so a flattened multi-listing feed can label each line. */
+  listingId?: string;
+  listingTitle?: string;
+  /** Set when this event's narration came from an LLM call (see AgentModelMeta). */
+  modelMeta?: AgentModelMeta;
 }
 
 /** Request body for POST /api/agent/narrate (LLM phrases the acted line). */
@@ -104,10 +120,15 @@ export interface AgentNarrateRequest {
   routeRecommendation?: RouteRecommendation;
   day: number;
   title: string;
+  /** Spec 026: Langfuse trace correlation — the listing/return this
+   *  narration is for, so a trace can be found by either id later. */
+  listingId?: string;
+  returnId?: string;
 }
 
 export interface AgentNarrateResponse {
   text: string;
+  modelMeta?: AgentModelMeta;
 }
 
 /** Result of one portfolio-level Sales Agent run (spec 024) — a batch driver
@@ -116,6 +137,10 @@ export interface AgentNarrateResponse {
 export interface SalesAgentDigest {
   ranAt: string; // ISO
   listingsReviewed: number;
+  /** Spec 026: listings skipped this pass because a human has them open
+   *  (agent-lock.ts) — surfaced so the Live Simulation view can explain why
+   *  a listing didn't move instead of looking broken. */
+  listingsLocked: number;
   actionsByType: Partial<Record<AgentAction, number>>;
   events: AgentEvent[];
   narrative: string;

@@ -12,7 +12,9 @@ import { createLocalRoutingListing, RESCUE_WINDOW_HOURS } from '@/lib/mocks/exch
 import { upsertReturnRecord, initiateMatching, ApiRequestError } from '@/lib/api-client';
 import { earnSeller } from '@/lib/credits-store';
 import { currentAccountId } from '@/lib/storage';
+import { birthAgentFromReturn } from '@/lib/return-agent-bridge';
 import { Card } from '@/components/ui/card';
+import type { Grade } from '@reloop/shared';
 
 interface Props {
   returnId: string;
@@ -245,6 +247,9 @@ export function SellerReturnDetail({ returnId }: Props) {
   const [approving, setApproving] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
   const [matchInfo, setMatchInfo] = useState<{ candidateCount: number; sessionId: string } | null>(null);
+  // Spec 026: non-blocking — matching/Mongo already succeeded by the time this
+  // runs, so a failure here shouldn't undo the approval, just flag it.
+  const [agentWarning, setAgentWarning] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
   const [photoIdx, setPhotoIdx] = useState(0);
 
@@ -339,6 +344,23 @@ export function SellerReturnDetail({ returnId }: Props) {
           distanceSavedKm: currentRouting.warehouseDistanceKm ?? 580,
           imageUrl: currentRet.photoUrls?.[0],
         });
+
+        // Spec 026: also birth the Listing/Sales Agent's real marketplace
+        // listing — previously only the seller/hub bench-approval path did
+        // this, so a return approved here was invisible to the Sales Agent.
+        try {
+          await birthAgentFromReturn({
+            ret: updated,
+            grade: currentGrading.grade as Grade,
+            evByPath: currentRouting.evBreakdown?.paths ?? [],
+            packagingSealed: currentGrading.packagingSealed ?? false,
+            radiusKm: currentRouting.radiusKm ?? 5,
+          });
+        } catch {
+          setAgentWarning(
+            'Local listing created, but the Sales Agent couldn’t start — refresh to retry.',
+          );
+        }
       }
     } catch (err) {
       setApproveError(
@@ -589,6 +611,12 @@ export function SellerReturnDetail({ returnId }: Props) {
                     >
                       Try again
                     </button>
+                  </div>
+                )}
+
+                {agentWarning && (
+                  <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-4">
+                    <p className="text-sm text-warning">{agentWarning}</p>
                   </div>
                 )}
               </div>

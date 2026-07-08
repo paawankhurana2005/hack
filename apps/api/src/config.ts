@@ -14,7 +14,11 @@ const schema = z.object({
   GRADING_PROVIDER: z.enum(['chat-vlm', 'trained-local']).default('trained-local'),
   GRADING_MODEL_URL: z.string().url().default('http://127.0.0.1:8000'),
   GRADING_MODEL: z.string().min(1).default('meta/llama-3.2-90b-vision-instruct'),
-  PRICING_MODEL: z.string().min(1).default('meta/llama-3.3-70b-instruct'),
+  // meta/llama-3.3-70b-instruct is currently DEGRADED on NVIDIA's hosted
+  // endpoint (confirmed via a direct API probe, 2026-07-07) — every call
+  // fails and narration silently falls back to the deterministic template.
+  // 3.1-70b-instruct is confirmed working; swap back once 3.3 recovers.
+  PRICING_MODEL: z.string().min(1).default('meta/llama-3.1-70b-instruct'),
   PORT: z.coerce.number().int().positive().default(4000),
   WEB_ORIGIN: z.string().url().default('http://localhost:3000'),
   // MongoDB Atlas — backs dummy login. Optional: when unset, auth routes return

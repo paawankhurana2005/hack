@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { AgentEvent, AgentPhase } from '@reloop/shared';
+import { ModelMetaBadge } from './model-meta-badge';
 
 const PHASE_META: Record<AgentPhase, { label: string; dot: string; text: string }> = {
   perceived: { label: 'Perceived', dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
@@ -67,6 +68,7 @@ export function ActivityFeed({ events, thinking }: { events: AgentEvent[]; think
                         )}
                       </p>
                     )}
+                    {e.phase === 'acted' && <div><ModelMetaBadge modelMeta={e.modelMeta} /></div>}
                   </div>
                 </div>
               </li>

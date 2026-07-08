@@ -147,6 +147,10 @@ export type PricingDecision = {
    *  otherwise. Surfaced for glass-box reasoning: it's what the Sales Agent's
    *  `relist` lever compares against the value recorded at escalation time. */
   geoDemandIndex: number;
+  /** Spec 026: proof `reason` came from a real LLM call vs. the deterministic
+   *  template — distinct from `modelVersion`, which is the PRICING model
+   *  (xgboost-http/heuristic-v1), not the narration model. */
+  narrationModelMeta?: { model: string; usedFallback: boolean; latencyMs: number };
 };
 
 /** The outcome logged after a sale or reroute — the training signal for Stage 2. */

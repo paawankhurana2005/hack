@@ -10,6 +10,7 @@ import {
   simulateDailyViews,
   type AgentDecision,
   type AgentEvent,
+  type AgentModelMeta,
   type ConditionGrade,
   type DemandEvent,
   type DemandEventType,
@@ -171,9 +172,16 @@ function fallbackNarration(s: AgentState, d: AgentDecision): string {
   }
 }
 
-async function narrate(s: AgentState, d: AgentDecision): Promise<string> {
+// Return-sourced listings (birthAgentFromReturn()) are IDed `item_ret_${returnId}`
+// — recoverable without a new field. Shared by narrate() and decideViaEngine()
+// below, both of which need it for Langfuse trace correlation / real geo-demand.
+function returnIdFromItemId(itemId: string): string | undefined {
+  return itemId.startsWith('item_ret_') ? itemId.replace('item_ret_', '') : undefined;
+}
+
+async function narrate(s: AgentState, d: AgentDecision): Promise<{ text: string; modelMeta?: AgentModelMeta }> {
   try {
-    const { text } = await narrateAgent({
+    const res = await narrateAgent({
       action: d.action,
       diagnosis: d.diagnosis,
       priceFromCents: s.priceCents,
@@ -185,10 +193,13 @@ async function narrate(s: AgentState, d: AgentDecision): Promise<string> {
       routeRecommendation: d.routeRecommendation,
       day: s.day,
       title: s.title,
+      listingId: s.id,
+      returnId: returnIdFromItemId(s.itemId),
     });
-    return text.trim() || fallbackNarration(s, d);
+    const text = res.text.trim() || fallbackNarration(s, d);
+    return { text, modelMeta: res.modelMeta };
   } catch {
-    return fallbackNarration(s, d);
+    return { text: fallbackNarration(s, d), modelMeta: undefined };
   }
 }
 
@@ -237,13 +248,13 @@ function simulateDayEvent(s: AgentState, viewsToday: number): DemandEvent {
 async function decideViaEngine(
   s: AgentState,
   event: DemandEvent,
-): Promise<{ decision: AgentDecision; acted: string; geoDemandIndex: number } | null> {
+): Promise<{ decision: AgentDecision; acted: string; geoDemandIndex: number; modelMeta?: AgentModelMeta } | null> {
   const anchor = Math.round(s.ctx.comparableCents / 100);
   const floor = Math.round(s.floorCents / 100);
-  // Return-sourced listings (birthReturnListing() in seller/hub/page.tsx) are IDed
-  // `item_ret_${returnId}` — recoverable without a new field, and it's the only
-  // case where a real server-side pincode exists to resolve geo-demand from.
-  const returnId = s.itemId.startsWith('item_ret_') ? s.itemId.replace('item_ret_', '') : undefined;
+  // Return-sourced listings (birthAgentFromReturn()) are IDed `item_ret_${returnId}`
+  // — it's the only case where a real server-side pincode exists to resolve
+  // geo-demand from.
+  const returnId = returnIdFromItemId(s.itemId);
   const req: PricingDecideRequest = {
     listingId: s.id,
     currentPrice: Math.round(s.priceCents / 100),
@@ -289,6 +300,7 @@ async function decideViaEngine(
       decision: { action: 'escalate_route', routeRecommendation: 'recycle', diagnosis: pd.reason, factors, confidence: 0.9 },
       acted,
       geoDemandIndex: pd.geoDemandIndex,
+      modelMeta: pd.narrationModelMeta,
     };
   }
 
@@ -309,12 +321,18 @@ async function decideViaEngine(
       decision: { action: 'reprice', newPriceCents: finalCents, diagnosis, factors, confidence: 0.85 },
       acted,
       geoDemandIndex: pd.geoDemandIndex,
+      modelMeta: pd.narrationModelMeta,
     };
   }
   const acted = `Holding at ${formatMoney(
     inr(s.priceCents),
   )} — that's already where the reward model wants it for this market.`;
-  return { decision: { action: 'hold', diagnosis, factors, confidence: 0.7 }, acted, geoDemandIndex: pd.geoDemandIndex };
+  return {
+    decision: { action: 'hold', diagnosis, factors, confidence: 0.7 },
+    acted,
+    geoDemandIndex: pd.geoDemandIndex,
+    modelMeta: pd.narrationModelMeta,
+  };
 }
 
 // --- The tick: one simulated day --------------------------------------------
@@ -379,9 +397,11 @@ export async function tick(
   const viaEngine = await decideViaEngine(s, triggerEvent);
   let decision: AgentDecision;
   let acted: string;
+  let modelMeta: AgentModelMeta | undefined;
   if (viaEngine) {
     decision = viaEngine.decision;
     acted = viaEngine.acted;
+    modelMeta = viaEngine.modelMeta;
   } else {
     decision = decideAgentAction({
       day: s.day,
@@ -397,7 +417,13 @@ export async function tick(
       hasImproved: s.hasImproved,
       ctx: s.ctx,
     });
-    acted = narrateWithLlm ? await narrate(s, decision) : fallbackNarration(s, decision);
+    if (narrateWithLlm) {
+      const narrated = await narrate(s, decision);
+      acted = narrated.text;
+      modelMeta = narrated.modelMeta;
+    } else {
+      acted = fallbackNarration(s, decision);
+    }
   }
   const priceFrom = s.priceCents;
 
@@ -428,7 +454,7 @@ export async function tick(
 
   const newEvents: AgentEvent[] = [];
   if (decision.action === 'hold') {
-    newEvents.push({ day: s.day, phase: 'acted', text: acted, at: now, action: 'hold' });
+    newEvents.push({ day: s.day, phase: 'acted', text: acted, at: now, action: 'hold', modelMeta });
   } else {
     newEvents.push({
       day: s.day,
@@ -456,6 +482,7 @@ export async function tick(
       priceToCents: decision.action === 'reprice' ? s.priceCents : undefined,
       floorCents: decision.action === 'reprice' ? s.floorCents : undefined,
       routeRecommendation: decision.routeRecommendation,
+      modelMeta,
     });
   }
 

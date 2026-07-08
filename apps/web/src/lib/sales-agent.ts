@@ -50,22 +50,35 @@ function notify(sellerId: string, state: AgentState, event: AgentEvent): void {
 }
 
 /** Review every listing a seller owns and act where warranted. Deterministic
- *  and fast (no LLM per listing) — a single portfolio narration sentence is
- *  built from the aggregated counts afterward. */
-export async function runSalesAgent(sellerId: string): Promise<SalesAgentDigest> {
+ *  and fast by default (no LLM per listing) — a single portfolio narration
+ *  sentence is built from the aggregated counts afterward.
+ *
+ *  `narrateWithLlm` (default false, the background-cadence behavior) lets the
+ *  Live Simulation view (spec 026) opt into richer per-listing LLM narration
+ *  — acceptable at hackathon-portfolio scale and its slower ~2s tick cadence,
+ *  but NOT the default, since a real portfolio ticking every few minutes
+ *  should stay cheap and fast. */
+export async function runSalesAgent(
+  sellerId: string,
+  { narrateWithLlm = false }: { narrateWithLlm?: boolean } = {},
+): Promise<SalesAgentDigest> {
   const listings = sellerListings(sellerId);
   const actionsByType: Partial<Record<AgentAction, number>> = {};
   const events: AgentEvent[] = [];
   let listingsReviewed = 0;
+  let listingsLocked = 0;
 
   function record(action: AgentAction, event: AgentEvent, state: AgentState): void {
     actionsByType[action] = (actionsByType[action] ?? 0) + 1;
-    events.push(event);
+    events.push({ ...event, listingId: state.id, listingTitle: state.title });
     if (action !== 'hold') notify(sellerId, state, event);
   }
 
   for (const listing of listings) {
-    if (isManuallyLocked(listing.id)) continue;
+    if (isManuallyLocked(listing.id)) {
+      listingsLocked += 1;
+      continue;
+    }
     const before = ensureAgent(listing);
     if (before.status === 'sold' || before.status === 'recycled' || before.status === 'donated') continue;
     listingsReviewed += 1;
@@ -86,7 +99,7 @@ export async function runSalesAgent(sellerId: string): Promise<SalesAgentDigest>
     if (!isAgentActive(before)) continue;
 
     const beforeLen = before.events.length;
-    const after = await tick(before.id, { narrateWithLlm: false });
+    const after = await tick(before.id, { narrateWithLlm });
     if (!after) continue;
     const added = after.events.slice(beforeLen);
     const last = added[added.length - 1];
@@ -103,7 +116,7 @@ export async function runSalesAgent(sellerId: string): Promise<SalesAgentDigest>
           parts.length ? `: ${parts.join(', ')}` : ' — everything is holding steady'
         }.`;
 
-  return { ranAt: new Date().toISOString(), listingsReviewed, actionsByType, events, narrative };
+  return { ranAt: new Date().toISOString(), listingsReviewed, actionsByType, events, narrative, listingsLocked };
 }
 
 // --- Phase 5: opt-in scheduled runs ------------------------------------------

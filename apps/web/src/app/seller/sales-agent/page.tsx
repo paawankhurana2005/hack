@@ -5,8 +5,8 @@
 // reprices, widens reach, escalates, or relists an escalated return-sourced
 // item whose local geo-demand has genuinely improved — and explains itself.
 
-import { useEffect, useState } from 'react';
-import type { SalesAgentDigest } from '@reloop/shared';
+import { useEffect, useRef, useState } from 'react';
+import type { AgentAction, AgentEvent, SalesAgentDigest } from '@reloop/shared';
 import { useRole } from '@/lib/role-context';
 import {
   DEFAULT_SCHEDULE_INTERVAL_MS,
@@ -15,8 +15,19 @@ import {
   runSalesAgent,
   runSalesAgentIfDue,
 } from '@/lib/sales-agent';
+import { LiveSimFeed } from '@/components/agent/live-sim-feed';
 
 const SCHEDULE_POLL_MS = 30_000; // how often we check "is a scheduled run due"
+
+// Spec 026: the "watch it happen" demo mode — a much faster, visible cadence
+// than the real "every 5 min" opt-in schedule above, with LLM narration on
+// (narrateWithLlm: true) since this view is explicitly about explaining
+// itself, not raw throughput. Distinct constant name from any per-listing
+// page's own tick interval on purpose — this is a portfolio-level cadence.
+const LIVE_SIM_TICK_MS = 2200;
+// Auto-stop once nothing has moved for this many consecutive ticks — the
+// portfolio is exhausted (sold/recycled/donated/paused everything active).
+const LIVE_SIM_STOP_AFTER_IDLE_TICKS = 2;
 
 const ACTION_LABEL: Record<string, string> = {
   hold: 'Held',
@@ -33,6 +44,15 @@ export default function SalesAgentPage() {
   const [running, setRunning] = useState(false);
   const [scheduled, setScheduled] = useState(false);
 
+  // Spec 026: Live Simulation — a fast, visible portfolio auto-loop for demos.
+  const [liveSim, setLiveSim] = useState(false);
+  const [tickCount, setTickCount] = useState(0);
+  const [liveEvents, setLiveEvents] = useState<AgentEvent[]>([]);
+  const [liveActionsByType, setLiveActionsByType] = useState<Partial<Record<AgentAction, number>>>({});
+  const [liveResolvedCount, setLiveResolvedCount] = useState(0);
+  const liveTicking = useRef(false);
+  const idleTicksRef = useRef(0);
+
   async function handleRun() {
     if (!account?.id || running) return;
     setRunning(true);
@@ -44,6 +64,48 @@ export default function SalesAgentPage() {
       setRunning(false);
     }
   }
+
+  function startLiveSimulation() {
+    setTickCount(0);
+    setLiveEvents([]);
+    setLiveActionsByType({});
+    setLiveResolvedCount(0);
+    idleTicksRef.current = 0;
+    setLiveSim(true);
+  }
+
+  useEffect(() => {
+    if (!liveSim || !account?.id) return;
+    const sellerId = account.id;
+    const timer = setTimeout(async () => {
+      if (liveTicking.current) return;
+      liveTicking.current = true;
+      try {
+        const result = await runSalesAgent(sellerId, { narrateWithLlm: true });
+        setTickCount((n) => n + 1);
+        setLiveEvents((prev) => [...prev, ...result.events]);
+        setLiveActionsByType((prev) => {
+          const merged = { ...prev };
+          for (const [action, count] of Object.entries(result.actionsByType)) {
+            merged[action as AgentAction] = (merged[action as AgentAction] ?? 0) + (count ?? 0);
+          }
+          return merged;
+        });
+        setLiveResolvedCount(
+          (n) => n + (result.actionsByType.escalate_route ?? 0) + (result.actionsByType.relist ?? 0),
+        );
+        if (result.listingsReviewed === 0) {
+          idleTicksRef.current += 1;
+          if (idleTicksRef.current >= LIVE_SIM_STOP_AFTER_IDLE_TICKS) setLiveSim(false);
+        } else {
+          idleTicksRef.current = 0;
+        }
+      } finally {
+        liveTicking.current = false;
+      }
+    }, LIVE_SIM_TICK_MS);
+    return () => clearTimeout(timer);
+  }, [liveSim, account?.id, tickCount]);
 
   // Phase 5: opt-in scheduled runs — polls every 30s to check whether the
   // (much longer) schedule interval has actually elapsed, via
@@ -111,6 +173,64 @@ export default function SalesAgentPage() {
             {lastRunAt ? `${Math.round((Date.now() - lastRunAt) / 60_000)}m ago` : 'not yet'}. Listings you're
             actively driving manually are skipped automatically.
           </p>
+        )}
+      </div>
+
+      {/* Spec 026: Live Simulation — fast, visible, for watching the whole
+          portfolio work in real time (demo mode; separate from the "every 5
+          min" background cadence above, which stays deterministic/cheap). */}
+      <div className="mt-4 rounded-2xl bg-card p-5 ring-1 ring-border">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Live simulation · fast demo mode — ticks every ~2s while this page is open
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Watch the agent work through your whole portfolio, explaining each move as it
+              happens.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={!account?.id}
+            onClick={() => (liveSim ? setLiveSim(false) : startLiveSimulation())}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40 ${
+              liveSim ? 'bg-danger text-white' : 'bg-brand text-brand-foreground'
+            }`}
+          >
+            {liveSim ? 'Stop Live Simulation' : 'Start Live Simulation'}
+          </button>
+        </div>
+
+        {(liveSim || tickCount > 0) && (
+          <div className="mt-4 grid gap-4 border-t border-border/60 pt-4 sm:grid-cols-3">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Tick</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{tickCount}</p>
+            </div>
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Actions so far
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+                {Object.values(liveActionsByType).reduce((a, b) => a + (b ?? 0), 0)}
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Listings resolved
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+                {liveResolvedCount}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {(liveSim || liveEvents.length > 0) && (
+          <div className="mt-4">
+            <LiveSimFeed events={liveEvents} />
+          </div>
         )}
       </div>
 

@@ -117,12 +117,14 @@ const pricingModelUrl = process.env.PRICING_MODEL_URL;
 const narrator: Completer | undefined = MOCK_MODE
   ? undefined
   : {
-      complete: (prompt: string) =>
+      modelName: config.PRICING_MODEL,
+      complete: (prompt: string, meta) =>
         nvidiaChat(config, {
           model: config.PRICING_MODEL,
           messages: [{ role: 'user', content: prompt }],
           maxTokens: 80,
           temperature: 0.3,
+          traceMeta: meta,
         }),
     };
 const repriceEngine = new RepriceEngine(

@@ -4,6 +4,7 @@
 // perceived, the rules decided, the words only describe — they never change the price.
 
 import type { PricingDecision, PricingReasonCode } from '@reloop/shared';
+import type { TraceMeta } from '../../lib/langfuse.js';
 
 export function fallbackNarration(decision: PricingDecision): string {
   const prior = decision.anchorPrice * decision.chosenArm;
@@ -32,12 +33,24 @@ export function fallbackNarration(decision: PricingDecision): string {
 }
 
 export interface Completer {
-  complete: (prompt: string) => Promise<string>;
+  /** Spec 026: which model this completer calls — surfaced in-app as proof a
+   *  real model call happened (see narrationModelMeta on PricingDecision). */
+  modelName: string;
+  complete: (prompt: string, meta?: TraceMeta) => Promise<string>;
+}
+
+export interface NarrateResult {
+  text: string;
+  usedFallback: boolean;
 }
 
 /** Try the LLM; fall back to the deterministic template. Never throws. */
-export async function narrateDecision(decision: PricingDecision, llm?: Completer): Promise<string> {
-  if (!llm) return fallbackNarration(decision);
+export async function narrateDecision(
+  decision: PricingDecision,
+  llm?: Completer,
+  meta?: TraceMeta,
+): Promise<NarrateResult> {
+  if (!llm) return { text: fallbackNarration(decision), usedFallback: true };
   try {
     const triggered = decision.guardrailsApplied.filter((g) => g.triggered).map((g) => g.rule);
     const prompt = [
@@ -49,9 +62,9 @@ export async function narrateDecision(decision: PricingDecision, llm?: Completer
       `Guardrails applied: ${triggered.join(', ') || 'none'}`,
       'One sentence only:',
     ].join('\n');
-    const out = (await llm.complete(prompt)).trim().split('\n')[0];
-    return out && out.length > 0 ? out : fallbackNarration(decision);
+    const out = (await llm.complete(prompt, meta)).trim().split('\n')[0];
+    return out && out.length > 0 ? { text: out, usedFallback: false } : { text: fallbackNarration(decision), usedFallback: true };
   } catch {
-    return fallbackNarration(decision);
+    return { text: fallbackNarration(decision), usedFallback: true };
   }
 }
