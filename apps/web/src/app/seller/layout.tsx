@@ -12,8 +12,6 @@ const nav = [
   { href: '/seller/sales-agent', label: 'Sales Agent' },
   { href: '/seller/local-listings', label: 'Local Listings' },
   { href: '/seller/listings', label: 'Listings' },
-  { href: '/seller/rescue', label: 'Rescue' },
-  { href: '/seller/inventory', label: 'Inventory' },
 ];
 
 export default function SellerLayout({ children }: { children: React.ReactNode }) {

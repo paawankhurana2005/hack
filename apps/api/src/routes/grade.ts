@@ -11,7 +11,7 @@ import type { GradingService } from '../services/grading/grading-service.js';
 import { skuToCategory } from '../lib/routing-engine.js';
 import { MOCK_MODE } from '../lib/env.js';
 import { mockGradeResult } from '../lib/mocks.js';
-import { log } from '../lib/logger.js';
+import { log, getReqId } from '../lib/logger.js';
 
 // Upload guards: cap the number of photos and the size of each base64 string so
 // a malicious or runaway client can't push huge payloads through this route.
@@ -81,6 +81,7 @@ export function createGradeHandler(gradingService: GradingService) {
     }
 
     const typedReason = reason as ReturnReason;
+    const t0 = Date.now();
 
     // Same capture spec the web used to render the angle slots — trust the
     // client-resolved category, else fall back to the SKU-derived one so both
@@ -131,6 +132,25 @@ export function createGradeHandler(gradingService: GradingService) {
         ...(missingLabels.length ? { missingAngles: missingLabels } : {}),
         ...(captureGuidance.length ? { captureGuidance } : {}),
       };
+
+      // Demo-visible inference log: one line per upload with what the model saw
+      // and decided. `provider` is the configured primary — a `grade fallback`
+      // warn below (or the absence of a serve.py inference line) means it fell
+      // back to the hosted VLM / mock.
+      log('info', 'grade.inference', {
+        reqId: getReqId(req),
+        provider: process.env.GRADING_PROVIDER ?? 'trained-local',
+        category: gradingCategory,
+        angles: providedAngles,
+        images: images.length,
+        grade: gradeResult.grade,
+        confidence: Number(gradeResult.confidence.toFixed(3)),
+        needsReview,
+        missingAngles: missingLabels,
+        defects: result.detectedIssues,
+        durationMs: Date.now() - t0,
+      });
+
       res.json(gradeResult);
     } catch (err) {
       // Degrade gracefully, but surface WHY so the fallback isn't silent.

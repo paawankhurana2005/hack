@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import base64
 import io
+import time
 
 import torch
 from flask import Flask, jsonify, request
@@ -37,6 +38,13 @@ import inference
 from model import bucket, calibrate, load_grader
 
 app = Flask(__name__)
+
+MODEL_NAME = "ai-grading clip-condition"
+
+
+def _log(msg: str) -> None:
+    """One flushed line per inference so a demo terminal streams live."""
+    print(f"[grader] {msg}", flush=True)
 
 
 def _decode(b64: str) -> Image.Image:
@@ -89,10 +97,13 @@ def assess():
     except Exception as e:  # noqa: BLE001
         return jsonify({"error": f"bad image: {e}"}), 400
     try:
+        t0 = time.perf_counter()
         score = _score(img)
+        ms = int((time.perf_counter() - t0) * 1000)
     except FileNotFoundError as e:
         return jsonify({"error": str(e)}), 503  # -> app falls back to the VLM
     grade = _condition_grade(score)
+    _log(f"assess   model={MODEL_NAME}  score={score:.3f}  grade={grade}  {ms}ms")
     return jsonify({
         "grade": grade,                     # ConditionGrade the app expects
         "confidence": 0.85,
@@ -114,15 +125,20 @@ def grade():
     if not images:
         return jsonify({"error": "missing images {angle: base64}"}), 400
     try:
+        t0 = time.perf_counter()
         per = []
         for angle, b64 in images.items():
             s = _score(_decode(b64))
-            per.append({"angle": angle, "score": round(s, 4), "grade": bucket(s)})
+            g = bucket(s)
+            per.append({"angle": angle, "score": round(s, 4), "grade": g})
+            _log(f"grade    {str(angle):>8}: score={s:.3f}  ({g})")
     except FileNotFoundError as e:
         return jsonify({"error": str(e)}), 503
     scores = [p["score"] for p in per]
     overall = round(inference._aggregate(scores), 4) if scores else 0.0
     missing = [a for a in inference.required_angles(category) if a not in images] if category else []
+    ms = int((time.perf_counter() - t0) * 1000)
+    _log(f"grade    {category or '-'} -> overall={overall:.3f}  grade={bucket(overall)}  missing={missing}  {ms}ms")
     return jsonify({
         "score": overall,
         "grade": bucket(overall),
@@ -139,4 +155,11 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", "8000"))
     print(f"[serve] ai-grading condition grader on http://127.0.0.1:{port}")
+    # Warm the model at boot so the demo terminal shows it's ready and the first
+    # real upload isn't slowed by a cold load.
+    try:
+        load_grader("cpu")
+        print(f"[serve] model loaded: {MODEL_NAME} (ready)", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[serve] model NOT loaded ({e}); /assess will 503 -> app uses VLM fallback", flush=True)
     app.run(host="127.0.0.1", port=port)
