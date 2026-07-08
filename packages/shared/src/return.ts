@@ -25,6 +25,13 @@ export interface ReturnGradingResult {
   rawReason: ReturnReason;
   /** Spec 016: factory seal / packaging intact — gates the restock path. */
   packagingSealed?: boolean;
+  // Spec 025: angle-aware capture. A required angle missing (or low confidence)
+  // routes the item to in-person verification instead of a confident grade.
+  needsReview?: boolean;
+  /** Human labels of required angles that weren't photographed. */
+  missingAngles?: string[];
+  /** Closed-loop asks (e.g. "Add a Sole photo") when photos can't fully grade. */
+  captureGuidance?: string[];
 }
 
 export type Grade = 'A' | 'B' | 'C' | 'Salvage';
@@ -204,7 +211,10 @@ export interface MockOrder {
   priceCents: number;
   currency: string;
   sku: string;
-  category: 'electronics' | 'apparel' | 'kitchenware';
+  // Drives the doorstep-capture angle spec (spec 025). Widened beyond the
+  // original three so footwear gets sole/top/heel and home goods get
+  // overall/surface/base (see grading-capture.toGradingCategory).
+  category: 'electronics' | 'apparel' | 'kitchenware' | 'footwear' | 'home';
 }
 
 export interface ReturnHealthCard {

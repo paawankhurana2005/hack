@@ -51,6 +51,54 @@ export const ownedItems: UserOwnedItem[] = [
     originalListingImages: ['/catalog/boat-headphones.jpg'],
     originalSpecs: { Model: 'AirPods (2nd Gen)', Color: 'White' },
   },
+  {
+    id: 'own_aarav_iphone',
+    itemId: 'itm_aarav_iphone',
+    ownerId: 'user_aarav',
+    title: 'Apple iPhone 15 Pro Max',
+    category: 'electronics',
+    imageUrl: '/catalog/iphone-15-pro.png', // studio product shot
+    purchaseDate: '2026-07-02',
+    originalPrice: inr(15990000), // ₹1,59,900
+    description: 'Arrived last week — sticking with my current phone after all.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-19',
+    orderId: 'ORD-2005',
+    originalListingImages: ['/catalog/iphone-15-pro.png'],
+    originalSpecs: { Model: 'iPhone 15 Pro Max', Color: 'Natural Titanium', Storage: '256GB' },
+  },
+  {
+    id: 'own_aarav_nike_af1',
+    itemId: 'itm_aarav_nike_af1',
+    ownerId: 'user_aarav',
+    title: "Nike Air Force 1 '07",
+    category: 'sports',
+    imageUrl: '/catalog/official-nike-af1.jpg', // official Nike.com asset
+    purchaseDate: '2026-07-03',
+    originalPrice: inr(969500), // ₹9,695
+    description: 'Just arrived — ordered the wrong size, returning within the window.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-20',
+    orderId: 'ORD-2009',
+    originalListingImages: ['/catalog/official-nike-af1.jpg'],
+    originalSpecs: { Model: "Air Force 1 '07", Color: 'Black', Size: 'US 10' },
+  },
+  {
+    id: 'own_aarav_stanley',
+    itemId: 'itm_aarav_stanley',
+    ownerId: 'user_aarav',
+    title: 'Stanley Quencher H2.0 Tumbler 40oz',
+    category: 'home',
+    imageUrl: '/catalog/official-stanley-quencher.png', // official Stanley1913.com asset
+    purchaseDate: '2026-07-05',
+    originalPrice: inr(399900), // ₹3,999
+    description: 'Arrived this week — already have one, returning the spare.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-22',
+    orderId: 'ORD-2013',
+    originalListingImages: ['/catalog/official-stanley-quencher.png'],
+    originalSpecs: { Model: 'Quencher H2.0 FlowState 40oz', Color: 'Frost' },
+  },
 
   // --- Meera ---------------------------------------------------------------
   {
@@ -100,6 +148,38 @@ export const ownedItems: UserOwnedItem[] = [
     originalListingImages: ['/catalog/ultraboost.jpg'],
     originalSpecs: { Color: 'Core Black', Size: 'US 9' },
   },
+  {
+    id: 'own_meera_airpods_pro',
+    itemId: 'itm_meera_airpods_pro',
+    ownerId: 'user_meera',
+    title: 'Apple AirPods Pro (2nd Gen)',
+    category: 'electronics',
+    imageUrl: '/catalog/airpods-pro.jpg', // studio product shot
+    purchaseDate: '2026-07-03',
+    originalPrice: inr(2490000), // ₹24,900
+    description: 'Just arrived — the fit isn’t sealing well for me.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-20',
+    orderId: 'ORD-2006',
+    originalListingImages: ['/catalog/airpods-pro.jpg'],
+    originalSpecs: { Model: 'AirPods Pro (2nd Gen)', Color: 'White' },
+  },
+  {
+    id: 'own_meera_nike_hoodie',
+    itemId: 'itm_meera_nike_hoodie',
+    ownerId: 'user_meera',
+    title: 'Nike Sportswear Club Fleece Hoodie',
+    category: 'fashion',
+    imageUrl: '/catalog/official-nike-hoodie.jpg', // official Nike.com asset
+    purchaseDate: '2026-07-04',
+    originalPrice: inr(549500), // ₹5,495
+    description: 'Comfortable, but the fit runs large — returning for a smaller size.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-21',
+    orderId: 'ORD-2010',
+    originalListingImages: ['/catalog/official-nike-hoodie.jpg'],
+    originalSpecs: { Model: 'Sportswear Club Fleece', Color: 'Dark Grey Heather', Size: 'L' },
+  },
 
   // --- Rohan ---------------------------------------------------------------
   {
@@ -132,6 +212,38 @@ export const ownedItems: UserOwnedItem[] = [
     originalListingImages: ['/catalog/galaxy-phone.jpg'],
     originalSpecs: { Model: 'A57', Color: 'Gold', Storage: '128GB' },
   },
+  {
+    id: 'own_rohan_ps5',
+    itemId: 'itm_rohan_ps5',
+    ownerId: 'user_rohan',
+    title: 'Sony PlayStation 5 Console',
+    category: 'toys',
+    imageUrl: '/catalog/ps5-console.png', // studio product shot
+    purchaseDate: '2026-07-01',
+    originalPrice: inr(5499000), // ₹54,990
+    description: 'Bought a second one by mistake — returning this one.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-18',
+    orderId: 'ORD-2007',
+    originalListingImages: ['/catalog/ps5-console.png'],
+    originalSpecs: { Model: 'PS5 (Disc Edition)', Color: 'White' },
+  },
+  {
+    id: 'own_rohan_nike_dunk',
+    itemId: 'itm_rohan_nike_dunk',
+    ownerId: 'user_rohan',
+    title: 'Nike Dunk Low Retro',
+    category: 'sports',
+    imageUrl: '/catalog/official-nike-dunk.jpg', // official Nike.com asset
+    purchaseDate: '2026-07-02',
+    originalPrice: inr(929500), // ₹9,295
+    description: 'Colour looked different online — returning within the window.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-19',
+    orderId: 'ORD-2011',
+    originalListingImages: ['/catalog/official-nike-dunk.jpg'],
+    originalSpecs: { Model: 'Dunk Low Retro', Color: 'White / Armory Navy', Size: 'US 9' },
+  },
 
   // --- Ananya --------------------------------------------------------------
   {
@@ -163,6 +275,174 @@ export const ownedItems: UserOwnedItem[] = [
     orderId: 'ORD-2004',
     originalListingImages: ['/catalog/jbl-headphones.jpg'],
     originalSpecs: { Color: 'Black' },
+  },
+  {
+    id: 'own_ananya_galaxy_s23',
+    itemId: 'itm_ananya_galaxy_s23',
+    ownerId: 'user_ananya',
+    title: 'Samsung Galaxy S23 Ultra',
+    category: 'electronics',
+    imageUrl: '/catalog/galaxy-s23.png', // studio product shot
+    purchaseDate: '2026-07-04',
+    originalPrice: inr(12499900), // ₹1,24,999
+    description: 'Switched my mind on the colour — returning within the window.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-21',
+    orderId: 'ORD-2008',
+    originalListingImages: ['/catalog/galaxy-s23.png'],
+    originalSpecs: { Model: 'Galaxy S23 Ultra', Color: 'Phantom Black', Storage: '256GB' },
+  },
+  {
+    id: 'own_ananya_nike_tee',
+    itemId: 'itm_ananya_nike_tee',
+    ownerId: 'user_ananya',
+    title: 'Nike Sportswear Club T-Shirt',
+    category: 'fashion',
+    imageUrl: '/catalog/official-nike-tee.jpg', // official Nike.com asset
+    purchaseDate: '2026-07-05',
+    originalPrice: inr(219500), // ₹2,195
+    description: 'Nice tee, but I ordered two — returning the extra.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-22',
+    orderId: 'ORD-2012',
+    originalListingImages: ['/catalog/official-nike-tee.jpg'],
+    originalSpecs: { Model: 'Sportswear Club Tee', Color: 'White', Size: 'M' },
+  },
+
+  // --- Kabir (Chennai) -----------------------------------------------------
+  {
+    id: 'own_kabir_airmax90',
+    itemId: 'itm_kabir_airmax90',
+    ownerId: 'user_kabir',
+    title: 'Nike Air Max 90',
+    category: 'sports',
+    imageUrl: '/catalog/official-nike-airmax90.jpg', // official Nike.com asset
+    purchaseDate: '2026-07-04',
+    originalPrice: inr(1099500), // ₹10,995
+    description: 'Just arrived — the fit runs half a size small, returning it.',
+    returnEligible: true,
+    returnByDate: '2026-07-21',
+    orderId: 'ORD-2014',
+    originalListingImages: ['/catalog/official-nike-airmax90.jpg'],
+    originalSpecs: { Model: 'Air Max 90', Color: 'Summit White / Grey', Size: 'US 9' },
+  },
+  {
+    id: 'own_kabir_airpods',
+    itemId: 'itm_kabir_airpods',
+    ownerId: 'user_kabir',
+    title: 'Apple AirPods Pro (2nd Gen)',
+    category: 'electronics',
+    imageUrl: '/catalog/airpods-pro.jpg',
+    purchaseDate: '2026-07-05',
+    originalPrice: inr(2490000), // ₹24,900
+    description: 'Received as a gift — already own a pair, returning this one.',
+    returnEligible: true,
+    returnByDate: '2026-07-22',
+    orderId: 'ORD-2015',
+    originalListingImages: ['/catalog/airpods-pro.jpg'],
+    originalSpecs: { Model: 'AirPods Pro (2nd Gen)', Color: 'White' },
+  },
+
+  // --- Diya (Hyderabad) ----------------------------------------------------
+  {
+    id: 'own_diya_dunk',
+    itemId: 'itm_diya_dunk',
+    ownerId: 'user_diya',
+    title: 'Nike Dunk Low Retro',
+    category: 'sports',
+    imageUrl: '/catalog/official-nike-dunk.jpg', // official Nike.com asset
+    purchaseDate: '2026-07-03',
+    originalPrice: inr(929500), // ₹9,295
+    description: 'Loved the look, but they pinch at the toe — returning.',
+    returnEligible: true,
+    returnByDate: '2026-07-20',
+    orderId: 'ORD-2016',
+    originalListingImages: ['/catalog/official-nike-dunk.jpg'],
+    originalSpecs: { Model: 'Dunk Low Retro', Color: 'White / Black', Size: 'US 7' },
+  },
+  {
+    id: 'own_diya_stanley',
+    itemId: 'itm_diya_stanley',
+    ownerId: 'user_diya',
+    title: 'Stanley Quencher H2.0 Tumbler 40oz',
+    category: 'home',
+    imageUrl: '/catalog/official-stanley-quencher.png', // official Stanley1913.com asset
+    purchaseDate: '2026-07-04',
+    originalPrice: inr(399900), // ₹3,999
+    description: 'Bigger than expected for my bag — sending it back.',
+    returnEligible: true,
+    returnByDate: '2026-07-21',
+    orderId: 'ORD-2017',
+    originalListingImages: ['/catalog/official-stanley-quencher.png'],
+    originalSpecs: { Model: 'Quencher H2.0 FlowState 40oz', Color: 'Frost' },
+  },
+
+  // --- Ishaan (Kolkata) ----------------------------------------------------
+  {
+    id: 'own_ishaan_af1',
+    itemId: 'itm_ishaan_af1',
+    ownerId: 'user_ishaan',
+    title: "Nike Air Force 1 '07",
+    category: 'sports',
+    imageUrl: '/catalog/official-nike-af1.jpg', // official Nike.com asset
+    purchaseDate: '2026-07-02',
+    originalPrice: inr(969500), // ₹9,695
+    description: 'Ordered two colours to compare — returning the black pair.',
+    returnEligible: true,
+    returnByDate: '2026-07-19',
+    orderId: 'ORD-2018',
+    originalListingImages: ['/catalog/official-nike-af1.jpg'],
+    originalSpecs: { Model: "Air Force 1 '07", Color: 'Black', Size: 'US 11' },
+  },
+  {
+    id: 'own_ishaan_ps5',
+    itemId: 'itm_ishaan_ps5',
+    ownerId: 'user_ishaan',
+    title: 'Sony PlayStation 5 Console',
+    category: 'toys',
+    imageUrl: '/catalog/ps5-console.png',
+    purchaseDate: '2026-07-03',
+    originalPrice: inr(5499000), // ₹54,990
+    description: 'Gifted one the same week — returning the duplicate.',
+    returnEligible: true,
+    returnByDate: '2026-07-20',
+    orderId: 'ORD-2019',
+    originalListingImages: ['/catalog/ps5-console.png'],
+    originalSpecs: { Model: 'PS5 (Disc Edition)', Color: 'White' },
+  },
+
+  // --- Priya (Jaipur) ------------------------------------------------------
+  {
+    id: 'own_priya_hoodie',
+    itemId: 'itm_priya_hoodie',
+    ownerId: 'user_priya',
+    title: 'Nike Sportswear Club Fleece Hoodie',
+    category: 'fashion',
+    imageUrl: '/catalog/official-nike-hoodie.jpg', // official Nike.com asset
+    purchaseDate: '2026-07-05',
+    originalPrice: inr(549500), // ₹5,495
+    description: 'Colour was darker than the photo — returning for grey.',
+    returnEligible: true,
+    returnByDate: '2026-07-22',
+    orderId: 'ORD-2020',
+    originalListingImages: ['/catalog/official-nike-hoodie.jpg'],
+    originalSpecs: { Model: 'Sportswear Club Fleece', Color: 'Black', Size: 'M' },
+  },
+  {
+    id: 'own_priya_galaxy',
+    itemId: 'itm_priya_galaxy',
+    ownerId: 'user_priya',
+    title: 'Samsung Galaxy S23 Ultra',
+    category: 'electronics',
+    imageUrl: '/catalog/galaxy-s23.png',
+    purchaseDate: '2026-07-04',
+    originalPrice: inr(12499900), // ₹1,24,999
+    description: 'Sticking with my current phone — returning within the window.',
+    returnEligible: true,
+    returnByDate: '2026-07-21',
+    orderId: 'ORD-2021',
+    originalListingImages: ['/catalog/galaxy-s23.png'],
+    originalSpecs: { Model: 'Galaxy S23 Ultra', Color: 'Phantom Black', Storage: '256GB' },
   },
 ];
 

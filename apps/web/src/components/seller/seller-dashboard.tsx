@@ -1,518 +1,308 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+// Seller Overview — the operations dashboard (ported from the design in
+// newFrontend/src/routes/dashboard.tsx): KPIs, routing distribution, hourly
+// throughput, a live decision feed, and the inventory pipeline. Adapted to the
+// app's design tokens and to ₹ (no $ figures). Data is illustrative demo data.
 
-// ─── Demo data ────────────────────────────────────────────────────────────────
-const DATA = {
-  total: 47,
-  rescued: 28,
-  refurbished: 9,
-  donated: 6,
-  discarded: 4,
-  weightKg: 1.2,
-  co2PerUnit: 2.8,
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRole } from '@/lib/role-context';
+
+// ── Money ─────────────────────────────────────────────────────────────────────
+const inr = (n: number): string => `₹${n.toLocaleString('en-IN')}`;
+
+type RouteType = 'resale' | 'refurb' | 'donate' | 'recycle';
+type Grade = 'A' | 'B+' | 'B' | 'C' | 'D';
+
+interface Row {
+  id: string;
+  item: string;
+  grade: Grade;
+  source: string;
+  route: string;
+  type: RouteType;
+  recovery: number; // ₹
+  time: string;
+}
+
+const ROWS: Row[] = [
+  { id: 'AMZ-9021-KLX', item: 'Kindle Paperwhite', grade: 'A', source: 'Doorstep · Koramangala', route: 'Direct Resale · Buyer 9.2km', type: 'resale', recovery: 10450, time: '2m ago' },
+  { id: 'AMZ-8842-TRV', item: 'Anker PowerCore 26K', grade: 'B+', source: 'Marketplace · Sell', route: 'Buyer Matched · 4.1km', type: 'resale', recovery: 4820, time: '6m ago' },
+  { id: 'AMZ-7712-QPC', item: 'Bose QuietComfort 45', grade: 'B', source: 'Doorstep · Indiranagar', route: 'Refurbish Hub · BLR-4', type: 'refurb', recovery: 18900, time: '11m ago' },
+  { id: 'AMZ-6610-DKR', item: 'Levoit Core 300 Air Purifier', grade: 'C', source: 'Excess Inventory', route: 'Local Donation · Goonj', type: 'donate', recovery: 0, time: '14m ago' },
+  { id: 'AMZ-5519-ZBN', item: 'Ninja Foodi 8-qt', grade: 'A', source: 'Doorstep · Whitefield', route: 'Direct Resale · Buyer 2.7km', type: 'resale', recovery: 14200, time: '18m ago' },
+  { id: 'AMZ-4408-MGT', item: 'Logitech MX Master 3S', grade: 'B+', source: 'Marketplace · Sell', route: 'Buyer Matched · 11.4km', type: 'resale', recovery: 7240, time: '22m ago' },
+  { id: 'AMZ-3392-LWQ', item: 'Dyson V11 Battery Pack', grade: 'D', source: 'Doorstep · HSR Layout', route: 'Materials Recovery · KA-R2', type: 'recycle', recovery: 480, time: '27m ago' },
+  { id: 'AMZ-2287-CRX', item: 'Sony WH-1000XM5', grade: 'A', source: 'Doorstep · Jayanagar', route: 'Direct Resale · Buyer 6.0km', type: 'resale', recovery: 26800, time: '34m ago' },
+];
+
+const FEED = [
+  { t: 'Direct resale matched', s: 'Sony WH-1000XM5 · 6.0km', g: 'A', tone: 'bg-brand' },
+  { t: 'Routed to refurb', s: 'Bose QC45 · BLR-4', g: 'B', tone: 'bg-warning' },
+  { t: 'Marked for donation', s: 'Levoit Core 300 · Goonj', g: 'C', tone: 'bg-success' },
+  { t: 'Direct resale matched', s: 'Kindle Paperwhite · 9.2km', g: 'A', tone: 'bg-brand' },
+  { t: 'Materials recovery', s: 'Dyson V11 battery · KA-R2', g: 'D', tone: 'bg-muted-foreground' },
+];
+
+const THROUGHPUT = [28, 42, 36, 51, 60, 48, 72, 65, 88, 74, 92, 80, 96, 84, 70, 58, 64, 78, 86, 72, 60, 50, 38, 44];
+
+const TABS: Array<'all' | RouteType> = ['all', 'resale', 'refurb', 'donate', 'recycle'];
+
+// ── Small pieces ────────────────────────────────────────────────────────────
+function Kpi({ label, value, delta, trend, accent }: { label: string; value: string; delta: string; trend: 'up' | 'down'; accent?: boolean }) {
+  return (
+    <div className={`rounded-2xl p-5 ring-1 ${accent ? 'bg-brand/10 ring-brand/40' : 'bg-card ring-border'}`}>
+      <div className={`font-mono text-[10px] font-bold uppercase tracking-widest ${accent ? 'text-brand' : 'text-muted-foreground'}`}>
+        {label}
+      </div>
+      <div className="mt-3 font-mono text-3xl font-bold tracking-tighter tabular-nums text-foreground">{value}</div>
+      <div className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold ${trend === 'up' ? 'text-success' : 'text-danger'}`}>
+        <span>{trend === 'up' ? '↑' : '↓'}</span>
+        <span>{delta}</span>
+        <span className="ml-1 font-normal text-muted-foreground">vs yesterday</span>
+      </div>
+    </div>
+  );
+}
+
+function RouteLegend({ dot, label, value, sub }: { dot: string; label: string; value: string; sub: string }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className={`size-2 rounded-full ${dot}`} />
+        <span className="text-xs font-semibold text-foreground">{label}</span>
+      </div>
+      <div className="mt-1 font-mono text-xl font-bold text-foreground">{value}</div>
+      <div className="font-mono text-[10px] text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
+const GRADE_TONE: Record<Grade, string> = {
+  A: 'bg-success/15 text-success ring-success/30',
+  'B+': 'bg-warning/15 text-warning ring-warning/30',
+  B: 'bg-warning/15 text-warning ring-warning/30',
+  C: 'bg-secondary text-muted-foreground ring-border',
+  D: 'bg-danger/15 text-danger ring-danger/30',
 };
 
-const secondLife = DATA.rescued + DATA.refurbished + DATA.donated;
-const co2Saved   = secondLife * DATA.co2PerUnit;
-const landfill   = secondLife * DATA.weightKg;
-const score      = Math.round((secondLife / DATA.total) * 1000) / 10;
-const CIRC       = 2 * Math.PI * 54;
-
-const JOURNEY_STEPS = [
-  { label: 'Return\nInitiated', date: 'Jun 3' },
-  { label: 'AI Graded',        date: 'Jun 3', badge: 'Grade B' },
-  { label: 'Listed\nLocally',  date: 'Jun 4' },
-  { label: 'Buyer\nFound',     date: 'Jun 5' },
-  { label: 'Delivered',        date: 'Jun 6' },
-];
-
-const TIERS = [
-  { name: 'Bronze',   range: '0 – 40',   min: 0,  color: '#A07040' },
-  { name: 'Silver',   range: '41 – 65',  min: 41, color: '#9CA3AF' },
-  { name: 'Gold',     range: '66 – 85',  min: 66, color: '#D4A843' },
-  { name: 'Platinum', range: '86 – 100', min: 86, color: '#94A3B8' },
-];
-
-const ACHIEVEMENTS = [
-  { name: 'First Local Rescue',  desc: 'Rerouted first return to a verified local buyer' },
-  { name: '10 Products Saved',   desc: 'Rescued 10+ products from landfill or warehouse disposal' },
-  { name: 'Zero Discard Week',   desc: 'Completed a full 7-day window with zero products discarded' },
-];
-
-const FATE_ROWS = [
-  { color: '#FF9900', name: 'Rescued locally', n: 28, pct: '59.6%' },
-  { color: '#2DD4BF', name: 'Refurbished',      n: 9,  pct: '19.1%' },
-  { color: '#60A5FA', name: 'Donated',          n: 6,  pct: '12.8%' },
-  { color: '#3D4B61', name: 'Discarded',        n: 4,  pct: '8.5%'  },
-];
-
-// ─── SVG Icons ────────────────────────────────────────────────────────────────
-function IconLoop({ className = '' }: { className?: string }) {
+function GradeBadge({ grade }: { grade: Grade }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
+    <span className={`inline-flex rounded px-2 py-0.5 font-mono text-[11px] font-bold ring-1 ${GRADE_TONE[grade]}`}>
+      {grade}
+    </span>
   );
 }
 
-function IconLeaf({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
-      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
-    </svg>
-  );
-}
+const ROUTE_DOT: Record<RouteType, string> = {
+  resale: 'bg-brand',
+  refurb: 'bg-warning',
+  donate: 'bg-success',
+  recycle: 'bg-muted-foreground',
+};
 
-function IconShield({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  );
-}
-
-function IconCheck({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function IconBarChart({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
-    </svg>
-  );
-}
-
-function IconAward({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
-    </svg>
-  );
-}
-
-// ─── Animated counter ─────────────────────────────────────────────────────────
-function useCounter(target: number, decimals = 0, duration = 1500, delay = 0) {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const start = performance.now();
-      const tick = (now: number) => {
-        const p = Math.min((now - start) / duration, 1);
-        const ease = 1 - Math.pow(1 - p, 3);
-        setVal(ease * target);
-        if (p < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [target, duration, delay]);
-  return decimals > 0 ? val.toFixed(decimals) : Math.round(val).toString();
-}
-
-// ─── Donut chart ──────────────────────────────────────────────────────────────
-function DonutChart() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const CARD_BG = 'oklch(0.21 0.006 285)';
-    async function init() {
-      const { Chart, ArcElement, DoughnutController, Tooltip } = await import('chart.js');
-      Chart.register(ArcElement, DoughnutController, Tooltip);
-      if (!canvasRef.current) return;
-      // Destroy any chart still bound to this canvas (StrictMode double-mount race).
-      Chart.getChart(canvasRef.current)?.destroy();
-      const chart = new Chart(canvasRef.current, {
-        type: 'doughnut',
-        data: {
-          labels: ['Rescued locally', 'Refurbished', 'Donated', 'Discarded'],
-          datasets: [{
-            data: [DATA.rescued, DATA.refurbished, DATA.donated, DATA.discarded],
-            backgroundColor: ['#FF9900', '#2DD4BF', '#60A5FA', '#3D4B61'],
-            borderWidth: 3,
-            borderColor: CARD_BG,
-            hoverOffset: 8,
-          }],
-        },
-        options: {
-          cutout: '72%',
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: 'oklch(0.27 0.006 285)',
-              titleColor: '#FF9900',
-              bodyColor: 'oklch(0.985 0 0)',
-              padding: 10,
-              cornerRadius: 8,
-              callbacks: {
-                label: (ctx) =>
-                  ` ${ctx.label}: ${ctx.parsed as number} (${(((ctx.parsed as number) / DATA.total) * 100).toFixed(1)}%)`,
-              },
-            },
-          },
-          animation: { duration: 1200, easing: 'easeInOutQuart' },
-          responsive: false,
-        },
-      });
-      return chart;
-    }
-    let chartInstance: import('chart.js').Chart | undefined;
-    let cancelled = false;
-    void init().then((c) => {
-      chartInstance = c;
-      if (cancelled) chartInstance?.destroy();
-    });
-    return () => {
-      cancelled = true;
-      chartInstance?.destroy();
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} width={160} height={160} />;
-}
-
-// ─── Progress ring ────────────────────────────────────────────────────────────
-function ProgressRing({ value }: { value: number }) {
-  const ringRef = useRef<SVGCircleElement>(null);
-  const displayed = useCounter(Math.round(value), 0, 2000, 400);
-
-  useEffect(() => {
-    const id = setTimeout(() => {
-      if (ringRef.current) {
-        ringRef.current.style.strokeDashoffset = String(CIRC * (1 - value / 100));
-      }
-    }, 500);
-    return () => clearTimeout(id);
-  }, [value]);
-
-  return (
-    <div className="relative mx-auto w-52 h-52">
-      <svg viewBox="0 0 120 120" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }} aria-hidden="true">
-        <defs>
-          <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#FF9900" /><stop offset="100%" stopColor="#FFD060" />
-          </linearGradient>
-          <filter id="ringGlow">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-        <circle cx="60" cy="60" r="54" fill="none" stroke="oklch(0.27 0.006 285)" strokeWidth="10" />
-        <circle
-          ref={ringRef} cx="60" cy="60" r="54" fill="none"
-          stroke="url(#ringGrad)" strokeWidth="10" strokeLinecap="round"
-          filter="url(#ringGlow)"
-          style={{ strokeDasharray: CIRC, strokeDashoffset: CIRC, transition: 'stroke-dashoffset 2s cubic-bezier(0.25,0.46,0.45,0.94)' }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-5xl font-black tracking-tighter text-foreground tabular-nums leading-none">{displayed}</span>
-        <span className="text-sm font-medium text-muted-foreground mt-1">/100</span>
-        <span className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Score</span>
-      </div>
-    </div>
-  );
-}
-
-// ─── Section header ───────────────────────────────────────────────────────────
-function SectionHeader({
-  eyebrow,
-  title,
-  Icon,
-}: {
-  eyebrow: string;
-  title: string;
-  Icon: ({ className }: { className?: string }) => React.JSX.Element;
-}) {
-  return (
-    <div className="flex items-start justify-between mb-6">
-      <div>
-        <div className="flex items-center gap-2 mb-1.5">
-          <div className="h-3 w-[2px] rounded-full bg-brand" />
-          <span className="font-mono text-[10px] uppercase tracking-widest text-brand">{eyebrow}</span>
-        </div>
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
-      </div>
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary ring-1 ring-border">
-        <Icon className="w-4 h-4 text-muted-foreground" />
-      </div>
-    </div>
-  );
-}
-
-// ─── Main dashboard ───────────────────────────────────────────────────────────
+// ── Dashboard ──────────────────────────────────────────────────────────────
 export function SellerDashboard() {
-  const cA = useCounter(secondLife, 0, 1500, 150);
-  const cB = useCounter(co2Saved,   1, 1800, 280);
-  const cC = useCounter(landfill,   1, 1800, 410);
+  const { account } = useRole();
+  const [tab, setTab] = useState<'all' | RouteType>('all');
 
-  const currentTier = [...TIERS].reverse().find((t) => score >= t.min) ?? TIERS[0]!;
-  const nextTier    = TIERS[TIERS.indexOf(currentTier) + 1];
+  const firstName = account?.name?.split(' ')[0] ?? 'there';
+  const rows = tab === 'all' ? ROWS : ROWS.filter((r) => r.type === tab);
 
   return (
-    <div className="flex flex-col gap-8" style={{ animation: 'fade-up 0.4s ease both' }}>
-
-      {/* Page header */}
-      <div>
-        <span className="font-mono text-xs uppercase tracking-widest text-brand">Seller / Overview</span>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">TechBazaar Pvt Ltd</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Return rescue performance and sustainability metrics at a glance.
-        </p>
+    <div className="flex flex-col gap-6" style={{ animation: 'fade-up 0.4s ease both' }}>
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-brand">
+            Operations · Bengaluru Cluster
+          </span>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Hi, {firstName}.</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Here&apos;s what your routing engine has handled in the last 24 hours.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+          >
+            Export report
+          </button>
+          <Link
+            href="/seller/returns"
+            className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground transition-colors hover:bg-brand-strong"
+          >
+            + New intake
+          </Link>
+        </div>
       </div>
 
-      {/* ══════════ SECTION 1 — IMPACT DASHBOARD ══════════ */}
-      <section
-        className="rounded-2xl border border-border bg-card/40 p-6"
-        style={{ animation: 'fade-up 0.45s ease 0.05s both' }}
-      >
-        <SectionHeader
-          eyebrow="Impact Dashboard · June 2026"
-          title="Product rescue overview"
-          Icon={IconBarChart}
-        />
+      {/* KPI grid */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Kpi label="Recovery · 24h" value={inr(1842100)} delta="+12.4%" trend="up" accent />
+        <Kpi label="Items Routed" value="8,491" delta="+6.1%" trend="up" />
+        <Kpi label="Avg. Grade Time" value="4.2s" delta="-0.3s" trend="up" />
+        <Kpi label="Warehouse Space Saved" value="2,140 ft³" delta="+18%" trend="up" />
+      </div>
 
-        {/* Summary KPIs */}
-        <div className="grid grid-cols-3 overflow-hidden rounded-xl bg-secondary ring-1 ring-border mb-5">
-          {[
-            { val: '47',    label: 'Total Returns',    accent: false },
-            { val: '43',    label: 'Products Rescued', accent: false },
-            { val: '91.5%', label: 'Recovery Rate',    accent: true  },
-          ].map((s, i) => (
-            <div
-              key={s.label}
-              className={`py-5 text-center ${i > 0 ? 'border-l border-border' : ''}`}
-            >
-              <p className={`text-2xl font-bold tracking-tight tabular-nums ${s.accent ? 'text-brand' : 'text-foreground'}`}>
-                {s.val}
-              </p>
-              <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Metric cards + Donut chart */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_auto] mb-5">
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { Icon: IconLoop,   val: cA, unit: '',    label: 'Products got a second life',      delay: '0.05s' },
-              { Icon: IconLeaf,   val: cB, unit: ' kg', label: 'CO₂ saved vs warehouse route',    delay: '0.1s'  },
-              { Icon: IconShield, val: cC, unit: ' kg', label: 'Landfill waste prevented',        delay: '0.15s' },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className="relative overflow-hidden rounded-2xl bg-secondary ring-1 ring-border p-4"
-                style={{ animation: `fade-up 0.5s ease ${s.delay} both` }}
-              >
-                <div className="absolute top-0 left-0 right-0 h-px bg-brand/30" />
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10 ring-1 ring-brand/20">
-                    <s.Icon className="w-3.5 h-3.5 text-brand" />
-                  </div>
-                </div>
-                <p className="text-3xl font-bold tracking-tighter text-foreground tabular-nums leading-none">
-                  {s.val}
-                  <span className="text-base font-normal text-muted-foreground">{s.unit}</span>
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{s.label}</p>
+      {/* Routing distribution + Live feed */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Routing Distribution
               </div>
-            ))}
+              <h3 className="mt-1 text-lg font-bold text-foreground">Where items went today</h3>
+            </div>
+            <select className="rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-foreground">
+              <option>Last 24h</option>
+              <option>Last 7d</option>
+              <option>Last 30d</option>
+            </select>
           </div>
 
-          {/* Donut chart */}
-          <div className="rounded-2xl bg-secondary ring-1 ring-border p-4 flex flex-col justify-center min-w-[260px]">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">
-              Product fate breakdown
-            </p>
-            <div className="flex items-center gap-5">
-              <div className="relative flex-shrink-0">
-                <DonutChart />
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold text-foreground leading-none">43</span>
-                  <span className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Rescued</span>
+          <div className="mt-6">
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-secondary">
+              <div className="bg-brand" style={{ width: '44%' }} />
+              <div className="bg-warning" style={{ width: '26%' }} />
+              <div className="bg-success" style={{ width: '18%' }} />
+              <div className="bg-muted-foreground/40" style={{ width: '12%' }} />
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <RouteLegend dot="bg-brand" label="Resale" value="44%" sub="3,736 items" />
+              <RouteLegend dot="bg-warning" label="Refurbish" value="26%" sub="2,208 items" />
+              <RouteLegend dot="bg-success" label="Donate" value="18%" sub="1,528 items" />
+              <RouteLegend dot="bg-muted-foreground/40" label="Recycle" value="12%" sub="1,019 items" />
+            </div>
+          </div>
+
+          {/* Hourly throughput */}
+          <div className="mt-8 border-t border-border pt-6">
+            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Hourly Throughput
+            </div>
+            <div className="mt-4 flex h-32 items-end gap-1.5">
+              {THROUGHPUT.map((h, i) => (
+                <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                  <div
+                    className={`w-full rounded-t ${i === 12 ? 'bg-brand' : 'bg-brand/30'}`}
+                    style={{ height: `${h}%` }}
+                  />
                 </div>
-              </div>
-              <ul className="flex flex-col gap-2.5">
-                {FATE_ROWS.map((row) => (
-                  <li key={row.name} className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: row.color }} />
-                    <span className="text-xs text-foreground">{row.name}</span>
-                    <span className="ml-auto pl-3 text-xs font-semibold text-foreground tabular-nums">{row.n}</span>
-                    <span className="w-9 text-right text-[10px] text-muted-foreground tabular-nums">{row.pct}</span>
-                  </li>
-                ))}
-              </ul>
+              ))}
+            </div>
+            <div className="mt-2 flex justify-between font-mono text-[10px] text-muted-foreground">
+              <span>00:00</span>
+              <span>06:00</span>
+              <span>12:00</span>
+              <span>18:00</span>
+              <span>now</span>
             </div>
           </div>
         </div>
 
-        {/* Product journey */}
-        <div className="rounded-2xl bg-secondary ring-1 ring-border p-5">
-          <div className="flex items-center justify-between mb-7">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Product journey
-            </p>
-            <span className="rounded-full bg-card px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground ring-1 ring-border">
-              Sample · SKU #B4821
+        {/* Live feed */}
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Live Feed
+              </div>
+              <h3 className="mt-1 text-lg font-bold text-foreground">Recent decisions</h3>
+            </div>
+            <span className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-brand">
+              <span className="size-1.5 animate-pulse rounded-full bg-brand" />
+              Live
             </span>
           </div>
-          <div className="relative flex items-start">
-            {/* Background track */}
-            <div className="pointer-events-none absolute top-[15px] left-[10%] right-[10%] h-px bg-border" />
-            {/* Filled progress */}
-            <div className="pointer-events-none absolute top-[15px] left-[10%] right-[10%] h-px bg-brand/40" />
-            {JOURNEY_STEPS.map((step, i) => (
-              <div key={step.label} className="relative z-10 flex flex-1 flex-col items-center">
-                <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-card ring-1 ring-brand/60 text-[11px] font-semibold text-brand">
-                  {i + 1}
+          <ul className="mt-5 space-y-4">
+            {FEED.map((e, i) => (
+              <li key={i} className="flex items-start gap-3 border-b border-border pb-4 last:border-0 last:pb-0">
+                <span className={`mt-1.5 size-2 shrink-0 rounded-full ${e.tone}`} />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-foreground">{e.t}</div>
+                  <div className="text-xs text-muted-foreground">{e.s}</div>
                 </div>
-                <p className="mt-2.5 text-center text-[10.5px] font-medium text-foreground leading-snug whitespace-pre-line">
-                  {step.label}
-                </p>
-                {step.badge && (
-                  <span className="mt-1 rounded bg-brand/10 px-1.5 py-0.5 text-[9px] font-semibold text-brand ring-1 ring-brand/20">
-                    {step.badge}
-                  </span>
-                )}
-                <p className="mt-0.5 text-[9.5px] text-muted-foreground">{step.date}</p>
-              </div>
+                <span className="font-mono text-[11px] font-bold text-muted-foreground">{e.g}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* Inventory pipeline */}
+      <div className="rounded-2xl border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-6 py-5">
+          <div>
+            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Inventory Pipeline
+            </div>
+            <h3 className="mt-1 text-lg font-bold text-foreground">Items in motion</h3>
+          </div>
+          <div className="flex items-center gap-1 rounded-xl bg-secondary p-1 font-mono text-[10px] font-bold uppercase tracking-widest">
+            {TABS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setTab(k)}
+                className={`rounded-lg px-3 py-1.5 transition-colors ${
+                  tab === k ? 'bg-card text-brand shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {k}
+              </button>
             ))}
           </div>
         </div>
-      </section>
-
-      {/* ══════════ SECTION 2 — SUSTAINABILITY SCORE ══════════ */}
-      <section
-        className="rounded-2xl border border-border bg-card/40 p-6"
-        style={{ animation: 'fade-up 0.45s ease 0.12s both' }}
-      >
-        <SectionHeader
-          eyebrow="Sustainability Score"
-          title="Seller tier &amp; achievements"
-          Icon={IconAward}
-        />
-
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[auto_1fr]">
-
-          {/* Left — Ring + tier badge + formula */}
-          <div className="flex flex-col items-center gap-5 rounded-2xl bg-secondary ring-1 ring-border p-6 min-w-[260px]">
-            <ProgressRing value={score} />
-
-            {/* Tier badge — no emoji, just refined text */}
-            <div
-              className="inline-flex items-center gap-2.5 rounded-full px-6 py-2 text-xs font-bold uppercase tracking-[0.15em]"
-              style={{
-                background: 'linear-gradient(110deg,#E0DEDD 0%,#F2F1EF 30%,#C8C6C4 55%,#EEECEA 80%,#D0CECE 100%)',
-                backgroundSize: '300% 100%',
-                color: '#2A2929',
-                boxShadow: '0 2px 14px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.5)',
-                animation: 'shimmer 3.5s ease infinite',
-              }}
-            >
-              <span
-                className="inline-block h-1.5 w-1.5 rounded-full"
-                style={{ background: currentTier.color, boxShadow: `0 0 6px ${currentTier.color}` }}
-              />
-              {currentTier.name}
-            </div>
-
-            {nextTier ? (
-              <p className="text-xs text-muted-foreground text-center leading-relaxed">
-                Need{' '}
-                <span className="font-semibold text-brand">{nextTier.min - Math.round(score)} more points</span>{' '}
-                to reach {nextTier.name}
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center">
-                Highest tier — <span className="font-semibold text-brand">Elite Seller</span> status
-              </p>
-            )}
-
-            {/* Formula */}
-            <div className="flex items-center gap-1.5 rounded-xl bg-card px-4 py-2.5 ring-1 ring-border w-full justify-center">
-              <span className="font-mono text-xs text-muted-foreground">(28+9+6) ÷ 47 × 100</span>
-              <span className="text-xs text-border">=</span>
-              <span className="font-mono text-sm font-bold text-brand">91.5</span>
-            </div>
-          </div>
-
-          {/* Right — Tier ladder + Achievements */}
-          <div className="flex flex-col gap-4">
-
-            {/* Tier ladder */}
-            <div className="rounded-2xl bg-secondary ring-1 ring-border p-4">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">
-                Tier Ladder
-              </p>
-              <div className="grid grid-cols-4 gap-2">
-                {TIERS.map((tier) => {
-                  const active = tier.name === currentTier.name;
-                  return (
-                    <div
-                      key={tier.name}
-                      className={`rounded-xl p-3 text-center transition-all ${
-                        active ? 'bg-brand/10 ring-1 ring-brand/40' : 'bg-card ring-1 ring-border'
-                      }`}
-                    >
-                      <div
-                        className="mx-auto mb-2.5 h-0.5 w-8 rounded-full"
-                        style={{ background: active ? tier.color : `${tier.color}55` }}
-                      />
-                      <p className={`text-[9px] font-bold uppercase tracking-widest ${
-                        active ? 'text-brand' : 'text-muted-foreground'
-                      }`}>
-                        {tier.name}
-                      </p>
-                      <p className="text-[8.5px] text-muted-foreground mt-0.5 tabular-nums">{tier.range}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Achievements */}
-            <div className="rounded-2xl bg-secondary ring-1 ring-border p-4 flex-1">
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Achievements
-                </p>
-                <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-medium text-brand ring-1 ring-brand/20">
-                  3 Unlocked
-                </span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {ACHIEVEMENTS.map((ach, i) => (
-                  <div
-                    key={ach.name}
-                    className="flex items-center gap-3 rounded-xl bg-card p-3 ring-1 ring-border transition-all hover:ring-brand/30 hover:bg-brand/5"
-                    style={{ animation: `fade-up 0.5s ease ${0.18 + i * 0.06}s both` }}
-                  >
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand/10 ring-1 ring-brand/20">
-                      <IconCheck className="w-3.5 h-3.5 text-brand" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">{ach.name}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground leading-snug">{ach.desc}</p>
-                    </div>
-                    <span className="flex-shrink-0 rounded-md bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand ring-1 ring-brand/20">
-                      Unlocked
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="bg-secondary/60 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <th className="px-6 py-3">Item</th>
+                <th className="px-6 py-3">Grade</th>
+                <th className="px-6 py-3">Source</th>
+                <th className="px-6 py-3">Routing Outcome</th>
+                <th className="px-6 py-3">Logged</th>
+                <th className="px-6 py-3 text-right">Recovery</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {rows.map((r) => (
+                <tr key={r.id} className="transition-colors hover:bg-secondary/40">
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-foreground">{r.item}</div>
+                    <div className="font-mono text-[11px] text-muted-foreground">{r.id}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <GradeBadge grade={r.grade} />
+                  </td>
+                  <td className="px-6 py-4 text-muted-foreground">{r.source}</td>
+                  <td className="px-6 py-4 text-foreground">
+                    <span className="flex items-center gap-2">
+                      <span className={`size-2 rounded-full ${ROUTE_DOT[r.type]}`} />
+                      {r.route}
                     </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
+                  </td>
+                  <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{r.time}</td>
+                  <td className="px-6 py-4 text-right font-mono font-semibold text-foreground">
+                    {r.recovery > 0 ? inr(r.recovery) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex items-center justify-between border-t border-border px-6 py-3 text-xs text-muted-foreground">
+          <span>Showing {rows.length} of 8,491 items</span>
+          <div className="flex gap-2">
+            <button type="button" className="rounded-md border border-border px-3 py-1 hover:bg-secondary">Prev</button>
+            <button type="button" className="rounded-md border border-border px-3 py-1 hover:bg-secondary">Next</button>
           </div>
         </div>
-      </section>
-
+      </div>
     </div>
   );
 }

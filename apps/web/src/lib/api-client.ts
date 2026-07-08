@@ -252,21 +252,24 @@ export function getPricing(returnId: string): Promise<PriceBreakdown> {
 // Bridge, checkpoints, and buyer matching. Distinct from the Sell-flow
 // functions above (gradeItem/priceItem/createHealthCard hit /api/sell/*).
 
-/** Doorstep AI grading for a return. Strips the `data:image/...;base64,`
- *  prefix from each photo — the API expects raw base64, not a data URL. */
+/** Doorstep AI grading for a return. Photos are angle-tagged (spec 025) so the
+ *  grader gets the required angles per category and can flag a missing one for
+ *  in-person review. Strips the `data:image/...;base64,` prefix — the API wants
+ *  raw base64, not a data URL. */
 export function gradeReturnItem(req: {
-  photos: string[];
+  images: { angle: string; imageBase64: string }[];
   reason: ReturnReason;
   sku?: string;
+  category?: string;
 }): Promise<ReturnGradeResponse> {
-  const stripped = req.photos.map((p) => {
-    const idx = p.indexOf(',');
-    return idx === -1 ? p : p.slice(idx + 1);
+  const images = req.images.map(({ angle, imageBase64 }) => {
+    const idx = imageBase64.indexOf(',');
+    return { angle, imageBase64: idx === -1 ? imageBase64 : imageBase64.slice(idx + 1) };
   });
-  return postJson<{ photos: string[]; reason: ReturnReason; sku?: string }, ReturnGradeResponse>(
-    '/api/grade',
-    { ...req, photos: stripped },
-  );
+  return postJson<
+    { images: { angle: string; imageBase64: string }[]; reason: ReturnReason; sku?: string; category?: string },
+    ReturnGradeResponse
+  >('/api/grade', { images, reason: req.reason, sku: req.sku, category: req.category });
 }
 
 /** The Intelligent Bridge — deterministic EV routing engine + narrated

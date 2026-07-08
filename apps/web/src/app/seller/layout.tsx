@@ -13,10 +13,7 @@ const nav = [
   { href: '/seller/local-listings', label: 'Local Listings' },
   { href: '/seller/listings', label: 'Listings' },
   { href: '/seller/rescue', label: 'Rescue' },
-  { href: '/seller/bulk-exchange', label: 'Bulk Exchange' },
-  { href: '/seller/spare-parts', label: 'Spare Parts' },
   { href: '/seller/inventory', label: 'Inventory' },
-  { href: '/seller/insights', label: 'Insights' },
 ];
 
 export default function SellerLayout({ children }: { children: React.ReactNode }) {

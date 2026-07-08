@@ -9,6 +9,7 @@ export * from './pricing.js';
 export * from './pricing/index.js'; // dynamic-pricing engine contracts (spec 014)
 export * from './pricing-engine.js'; // Mongo-backed per-return price breakdown (mongodb branch)
 export * from './return.js';
+export * from './grading-capture.js'; // angle-aware capture spec (spec 025)
 export * from './owned-item.js';
 export * from './prevention.js';
 export * from './mesh.js';
