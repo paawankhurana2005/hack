@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { Notification, NotificationKind, NotificationPreferences, NotificationSeverity } from '@reloop/shared';
 import {
   getNotificationPreferences,
@@ -25,6 +27,19 @@ const KIND_LABEL: Record<NotificationKind, string> = {
 };
 const ALL_KINDS: NotificationKind[] = ['cascade_update', 'sales_agent', 'listing_agent'];
 
+/**
+ * Where a notification takes you when clicked, or null if it isn't actionable.
+ * A return dispatched to local resale is listed on the Open Box page under the
+ * id `lst_ret_<returnId>` (see `openBoxListing` in mock/casual-listings.ts), so
+ * a notification carrying a returnId deep-links straight to that item's page.
+ * Notifications without one (most seller-side cascade updates) stay inert.
+ */
+function notificationHref(n: Notification): string | null {
+  if (n.listingId) return `/app/shop/${n.listingId}`;
+  if (n.returnId) return `/app/shop/lst_ret_${n.returnId}`;
+  return null;
+}
+
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(ms / 60_000);
@@ -43,6 +58,7 @@ export function NotificationBell({ sellerId }: { sellerId: string }) {
   const [showPrefs, setShowPrefs] = useState(false);
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const refresh = useCallback(() => {
     if (!sellerId) return;
@@ -216,14 +232,18 @@ export function NotificationBell({ sellerId }: { sellerId: string }) {
                 <p className="px-4 py-6 text-center text-sm text-muted-foreground">Nothing yet.</p>
               ) : (
                 <ul>
-                  {notifications.map((n) => (
-                    <li
-                      key={n.id}
-                      onClick={() => !n.read && handleMarkRead(n.id)}
-                      className={`cursor-pointer border-b border-border/40 px-4 py-3 last:border-0 hover:bg-secondary/40 ${
-                        n.read ? 'opacity-60' : ''
-                      }`}
-                    >
+                  {notifications.map((n) => {
+                    const href = notificationHref(n);
+                    // Closing the dropdown unmounts the <a> mid-click, which
+                    // cancels Link's navigation — so drive the route ourselves.
+                    const onSelect = (e: React.MouseEvent) => {
+                      if (!n.read) handleMarkRead(n.id);
+                      if (!href) return;
+                      e.preventDefault();
+                      setOpen(false);
+                      router.push(href);
+                    };
+                    const body = (
                       <div className="flex items-start gap-2">
                         <span className={`mt-1.5 size-2 shrink-0 rounded-full ${SEVERITY_DOT[n.severity]}`} />
                         <div className="min-w-0 flex-1">
@@ -234,8 +254,26 @@ export function NotificationBell({ sellerId }: { sellerId: string }) {
                           </p>
                         </div>
                       </div>
-                    </li>
-                  ))}
+                    );
+                    return (
+                      <li
+                        key={n.id}
+                        className={`border-b border-border/40 last:border-0 hover:bg-secondary/40 ${
+                          n.read ? 'opacity-60' : ''
+                        }`}
+                      >
+                        {href ? (
+                          <Link href={href} onClick={onSelect} className="block px-4 py-3">
+                            {body}
+                          </Link>
+                        ) : (
+                          <div onClick={onSelect} className="cursor-pointer px-4 py-3">
+                            {body}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

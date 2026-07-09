@@ -185,6 +185,7 @@ function sendNotification(
   buyer: BuyerDoc,
   product: { category: string; grade: string },
   price: number,
+  returnId: string,
 ): void {
   // TODO: wire to a real SMS/email/push provider (Twilio/SES/FCM). For now this
   // is the entire "notification system" for buyers with no platform account —
@@ -207,6 +208,9 @@ function sendNotification(
       severity: 'info',
       title: 'A nearby return is available',
       body: `A ${product.grade}-grade ${product.category} return near you is available at ₹${price} — first come, first served.`,
+      // Carries the return so the bell can deep-link to the Open Box listing
+      // (`lst_ret_<returnId>`). Without it the notification is a dead end.
+      return_id: returnId,
     }).catch(() => {});
   }
 }
@@ -304,7 +308,7 @@ export async function notifyBuyer(sessionId: string, candidateIndex: number): Pr
       },
     );
 
-    sendNotification(buyer, { category: session.category, grade: session.grade }, session.offered_price);
+    sendNotification(buyer, { category: session.category, grade: session.grade }, session.offered_price, session.return_id);
   } catch (err) {
     const detail = err instanceof Error ? err.message : 'unknown error';
     log('error', 'notifyBuyer failed (continuing)', { sessionId, candidateIndex, detail });

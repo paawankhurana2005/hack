@@ -174,4 +174,25 @@ export const casualListings: CasualListing[] = [
     listingPaise: 450000, // ₹4,500
     listedAt: '2026-06-28',
   }),
+  // The live demo return (apps/api demo:blue-dunk seeds DEMO-BLUE-DUNK-001 in
+  // Mongo and cascades the offer to nearby buyers). Their notification
+  // deep-links here, to `lst_ret_DEMO-BLUE-DUNK-001`. Grade, confidence and
+  // summary are what ai-grading actually returned for these photos
+  // (condition score 0.918 -> like-new); the price is the engine's offer.
+  openBoxListing({
+    returnId: 'DEMO-BLUE-DUNK-001',
+    title: 'Nike Dunk Low Retro — White / Armory Navy',
+    imageUrl: '/catalog/official-nike-dunk.jpg',
+    category: 'sports',
+    grade: 'like-new',
+    sellerId: 'seller_urban',
+    sellerName: 'UrbanThread',
+    confidence: 0.71,
+    summary: 'Condition score 0.92 (like-new). Graded at the doorstep before the item moved.',
+    issues: [],
+    packagingSealed: false,
+    originalPaise: 929500, // ₹9,295
+    listingPaise: 531700, // ₹5,317 — the matching engine's offered price
+    listedAt: '2026-07-09',
+  }),
 ];

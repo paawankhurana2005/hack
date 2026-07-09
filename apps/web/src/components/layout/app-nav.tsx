@@ -23,7 +23,10 @@ export function AppNav() {
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
-    <div className="border-b border-hairline bg-white/80 backdrop-blur-md">
+    // `backdrop-blur` creates a stacking context, so the notification dropdown's
+    // own z-50 is trapped inside this header. Without a z-index here the header
+    // paints under the page content and the dropdown becomes unclickable.
+    <div className="relative z-50 border-b border-hairline bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-6">
           <Link href="/" aria-label="ReLoop home" className="text-lg font-bold tracking-tight text-foreground">
