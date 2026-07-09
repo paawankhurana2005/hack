@@ -244,6 +244,22 @@ export const ownedItems: UserOwnedItem[] = [
     originalListingImages: ['/catalog/official-nike-dunk.jpg'],
     originalSpecs: { Model: 'Dunk Low Retro', Color: 'White / Armory Navy', Size: 'US 9' },
   },
+  {
+    id: 'own_rohan_jordan1',
+    itemId: 'itm_rohan_jordan1',
+    ownerId: 'user_rohan',
+    title: 'Air Jordan 1 Retro High OG "Chicago"',
+    category: 'sports',
+    imageUrl: '/demo/graded/jordan/1.jpg',
+    purchaseDate: '2026-07-03',
+    originalPrice: inr(1699500), // ₹16,995
+    description: 'Grabbed the Chicago colourway — returning within the window.',
+    returnEligible: true, // within the return window → return
+    returnByDate: '2026-07-20',
+    orderId: 'ORD-2022',
+    originalListingImages: ['/demo/graded/jordan/1.jpg', '/demo/graded/jordan/2.jpg', '/demo/graded/jordan/3.jpg'],
+    originalSpecs: { Model: 'Air Jordan 1 Retro High OG', Color: 'Chicago (Red / White / Black)', Size: 'US 9' },
+  },
 
   // --- Ananya --------------------------------------------------------------
   {

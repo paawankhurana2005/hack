@@ -47,6 +47,8 @@ function softenSeverity(s: IssueSeverity): IssueSeverity {
 interface AssessResponse {
   grade: string;
   confidence: number;
+  /** The model's raw 0..1 condition score — its actual output, not a bucket. */
+  score?: number;
   detectedIssues?: string[];
   structuredIssues?: { type: string; severity: string; region: string }[];
   photoQuality?: string;
@@ -87,6 +89,7 @@ export class LocalModelProvider implements VlmProvider {
     return {
       grade: applyLeniency(asGrade(j.grade)),
       confidence: typeof j.confidence === 'number' ? j.confidence : 0.5,
+      ...(typeof j.score === 'number' ? { score: j.score } : {}),
       detectedIssues: j.detectedIssues ?? structuredIssues.map((d) => d.type),
       structuredIssues,
       photoQuality,

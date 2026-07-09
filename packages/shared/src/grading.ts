@@ -61,6 +61,9 @@ export interface GradingResult {
   structuredIssues?: DetectedIssue[];
   /** One-line plain-English condition summary from the model. */
   summary: string;
+  /** The trained grader's raw continuous condition score, 0 (destroyed)..1 (new).
+   *  Only the trained model emits it; the hosted-VLM fallback has no such output. */
+  conditionScore?: number;
   photoUrls: string[];
   /** Diff vs the original listing. Omitted when no reference was provided. */
   referenceComparison?: ReferenceComparison;

@@ -57,6 +57,9 @@ export function aggregate(assessments: VlmAssessment[]): VlmAssessment {
   return {
     grade: worst.grade,
     confidence,
+    // The score comes from the SAME angle the grade does, so the number the user
+    // sees always explains the bucket they were given.
+    ...(typeof worst.score === 'number' ? { score: worst.score } : {}),
     structuredIssues,
     detectedIssues: structuredIssues.map(issueToString),
     photoQuality: worstQuality(assessments.map((a) => a.photoQuality)),
@@ -136,6 +139,7 @@ export class GradingService {
       productId,
       grade: merged.grade,
       confidence: calibratedConfidence,
+      ...(typeof merged.score === 'number' ? { conditionScore: merged.score } : {}),
       detectedIssues: merged.detectedIssues,
       structuredIssues: merged.structuredIssues,
       summary: merged.summary,

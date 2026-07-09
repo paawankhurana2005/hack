@@ -15,6 +15,10 @@
     "aggregate:demand": "tsx src/scripts/runDemandAggregation.ts",
     "seed:buyers": "tsx src/scripts/seedBuyers.ts",
     "demo:notify": "tsx src/scripts/demoBuyerNotification.ts",
+    "demo:jordan": "tsx src/scripts/demoJordanReturn.ts",
+    "demo:blue-dunk": "tsx src/scripts/demoBlueDunkReturn.ts",
+    "inspect:demo": "tsx src/scripts/inspectDemoState.ts",
+    "reset:returns": "tsx src/scripts/resetReturns.ts",
     "demo:seed-notifications": "tsx src/scripts/seedDemoScenario.ts",
     "export:pricing-transactions": "tsx src/scripts/exportPricingTransactions.ts",
     "typecheck": "tsc --noEmit"

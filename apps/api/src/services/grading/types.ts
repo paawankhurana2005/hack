@@ -17,6 +17,9 @@ import type {
 export interface VlmAssessment {
   grade: ConditionGrade;
   confidence: number; // 0..1 (raw, pre-calibration)
+  /** The trained grader's continuous condition score, 0..1. Absent from the
+   *  hosted-VLM provider, which classifies into a grade without scoring. */
+  score?: number;
   detectedIssues: string[];
   /** Structured, localized defects (Phase 1). Flattened into detectedIssues too. */
   structuredIssues: DetectedIssue[];

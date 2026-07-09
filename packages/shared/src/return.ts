@@ -23,6 +23,11 @@ export interface ReturnGradingResult {
   wardrobingFlag: boolean;
   functionallyVerifiable: boolean;
   rawReason: ReturnReason;
+  /** The trained grader's raw continuous condition score, 0 (destroyed)..1 (new).
+   *  Absent when the hosted-VLM fallback graded instead — it emits no score. */
+  conditionScore?: number;
+  /** One-line plain-English condition summary from the model. */
+  summary?: string;
   /** Spec 016: factory seal / packaging intact — gates the restock path. */
   packagingSealed?: boolean;
   // Spec 025: angle-aware capture. A required angle missing (or low confidence)
