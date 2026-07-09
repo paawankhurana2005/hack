@@ -269,7 +269,6 @@ export function ReturnHealthCardDeep({
             <p className="font-mono text-[10px] uppercase leading-relaxed tracking-widest text-muted-foreground">
               Stamped {when(submittedAt)}
               <br />
-              This card travels with the item to its next owner.
             </p>
             <button
               type="button"

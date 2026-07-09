@@ -239,17 +239,14 @@ export default function SalesAgentPage() {
 
   const lastRunAt = account?.id ? getLastRunAt(account.id) : null;
 
-  return (
+  return(
     <div>
       <span className="mb-3 block font-mono text-xs uppercase tracking-widest text-brand">
         Seller / Sales Agent
       </span>
       <h1 className="text-3xl font-semibold tracking-tight text-foreground">Sales Agent</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        Pick a return below and watch its agent work — reprice, widen reach, escalate, or relist —
-        with every factor, model call, price move, and notification laid out as it happens. It
-        never invents its own pricing logic: every move goes through the same reward model,
-        bandit, and guardrails a single listing already uses.
+        Pick a return below and watch its agent work — reprice, widen reach, escalate, or relist 
       </p>
 
       <button

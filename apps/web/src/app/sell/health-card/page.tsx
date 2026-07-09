@@ -214,9 +214,7 @@ export default function SellHealthCardPage() {
               >
                 {copied ? 'Copied ✓' : 'Copy link'}
               </Button>
-              <p className="mt-3 text-xs text-muted-foreground">
-                This card travels with the item to its next owner.
-              </p>
+              
             </div>
           </Card>
         </div>
