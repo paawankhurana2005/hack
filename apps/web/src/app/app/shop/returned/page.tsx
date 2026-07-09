@@ -30,9 +30,9 @@ export default function ReturnedShopPage() {
 
   return (
     <PageShell
-      eyebrow="Shop · returned & verified"
-      title="Returned & Verified"
-      description="Every item here started as a customer return — doorstep-graded, physically re-checked at a local hub, and re-listed only when it earns a real second life. Condition, authenticity, and (where relevant) packaging status are called out on every card, not buried in fine print."
+      eyebrow="Shop · open box"
+      title="Open Box"
+      description="Every item here started as a customer return — doorstep-graded, physically re-checked at a local hub, and re-listed only when it earns a real second life. It's never resold as new; condition, authenticity, and (where relevant) packaging status are called out on every card, not buried in fine print."
     >
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <Link

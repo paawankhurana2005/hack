@@ -185,8 +185,8 @@ export default function LoginPage() {
         />
         <div className="relative flex h-full flex-col justify-between p-12 text-white">
           <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-orange">
-            <span className="size-1.5 animate-pulse rounded-full bg-orange" />
-            Live · Seattle Cluster
+           
+           
           </div>
 
           <div>
@@ -202,7 +202,7 @@ export default function LoginPage() {
 
             <div className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t border-white/10 pt-8">
               <BrandStat label="Couriers" value="1,204" />
-              <BrandStat label="Routed 24h" value="8,491" />
+              <BrandStat label="Routed 24h" value="24,600" />
               <BrandStat label="Success" value="99.8%" accent />
             </div>
           </div>

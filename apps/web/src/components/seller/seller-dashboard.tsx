@@ -47,6 +47,14 @@ const FEED = [
 
 const THROUGHPUT = [28, 42, 36, 51, 60, 48, 72, 65, 88, 74, 92, 80, 96, 84, 70, 58, 64, 78, 86, 72, 60, 50, 38, 44];
 
+const TOTAL_ITEMS_24H = 187; // plausible daily return volume for one D2C seller
+const ROUTING_SPLIT = [
+  { key: 'resale', label: 'Resale', dot: 'bg-brand', pct: 44 },
+  { key: 'refurb', label: 'Refurbish', dot: 'bg-warning', pct: 26 },
+  { key: 'donate', label: 'Donate', dot: 'bg-success', pct: 18 },
+  { key: 'recycle', label: 'Recycle', dot: 'bg-muted-foreground/40', pct: 12 },
+] as const;
+
 const TABS: Array<'all' | RouteType> = ['all', 'resale', 'refurb', 'donate', 'recycle'];
 
 // ── Small pieces ────────────────────────────────────────────────────────────
@@ -116,7 +124,7 @@ export function SellerDashboard() {
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-brand">
-            Operations · Bengaluru Cluster
+           
           </span>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Hi, {firstName}.</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -141,10 +149,10 @@ export function SellerDashboard() {
 
       {/* KPI grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Recovery · 24h" value={inr(1842100)} delta="+12.4%" trend="up" accent />
-        <Kpi label="Items Routed" value="8,491" delta="+6.1%" trend="up" />
+        <Kpi label="Recovery · 24h" value={inr(164800)} delta="+12.4%" trend="up" accent />
+        <Kpi label="Items Routed" value={TOTAL_ITEMS_24H.toLocaleString('en-IN')} delta="+6.1%" trend="up" />
         <Kpi label="Avg. Grade Time" value="4.2s" delta="-0.3s" trend="up" />
-        <Kpi label="Warehouse Space Saved" value="2,140 ft³" delta="+18%" trend="up" />
+        <Kpi label="Warehouse Space Saved" value="112 ft³" delta="+18%" trend="up" />
       </div>
 
       {/* Routing distribution + Live feed */}
@@ -166,16 +174,20 @@ export function SellerDashboard() {
 
           <div className="mt-6">
             <div className="flex h-3 w-full overflow-hidden rounded-full bg-secondary">
-              <div className="bg-brand" style={{ width: '44%' }} />
-              <div className="bg-warning" style={{ width: '26%' }} />
-              <div className="bg-success" style={{ width: '18%' }} />
-              <div className="bg-muted-foreground/40" style={{ width: '12%' }} />
+              {ROUTING_SPLIT.map((r) => (
+                <div key={r.key} className={r.dot} style={{ width: `${r.pct}%` }} />
+              ))}
             </div>
             <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <RouteLegend dot="bg-brand" label="Resale" value="44%" sub="3,736 items" />
-              <RouteLegend dot="bg-warning" label="Refurbish" value="26%" sub="2,208 items" />
-              <RouteLegend dot="bg-success" label="Donate" value="18%" sub="1,528 items" />
-              <RouteLegend dot="bg-muted-foreground/40" label="Recycle" value="12%" sub="1,019 items" />
+              {ROUTING_SPLIT.map((r) => (
+                <RouteLegend
+                  key={r.key}
+                  dot={r.dot}
+                  label={r.label}
+                  value={`${r.pct}%`}
+                  sub={`${Math.round((TOTAL_ITEMS_24H * r.pct) / 100).toLocaleString('en-IN')} items`}
+                />
+              ))}
             </div>
           </div>
 
@@ -186,7 +198,7 @@ export function SellerDashboard() {
             </div>
             <div className="mt-4 flex h-32 items-end gap-1.5">
               {THROUGHPUT.map((h, i) => (
-                <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
                   <div
                     className={`w-full rounded-t ${i === 12 ? 'bg-brand' : 'bg-brand/30'}`}
                     style={{ height: `${h}%` }}
@@ -296,7 +308,7 @@ export function SellerDashboard() {
           </table>
         </div>
         <div className="flex items-center justify-between border-t border-border px-6 py-3 text-xs text-muted-foreground">
-          <span>Showing {rows.length} of 8,491 items</span>
+          <span>Showing {rows.length} of {TOTAL_ITEMS_24H.toLocaleString('en-IN')} items</span>
           <div className="flex gap-2">
             <button type="button" className="rounded-md border border-border px-3 py-1 hover:bg-secondary">Prev</button>
             <button type="button" className="rounded-md border border-border px-3 py-1 hover:bg-secondary">Next</button>

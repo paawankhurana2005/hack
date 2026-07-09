@@ -66,7 +66,7 @@ export const SEEDED_RETURNS: SubmittedReturn[] = [
     submittedAt: new Date(Date.now() - 5 * 3600000).toISOString(),
     agentArrivesAt: new Date(Date.now() - 2 * 3600000).toISOString(),
     status: 'pending_seller_approval',
-    photoUrls: ['/demo/smartphone.jpg'],
+    photoUrls: ['/catalog/fire-tablet.jpg'],
     gradingResult: {
       grade: 'A',
       confidence: 0.92,

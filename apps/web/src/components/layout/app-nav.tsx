@@ -7,6 +7,7 @@ import { NotificationBell } from '@/components/seller/notification-bell';
 
 const tabs = [
   { href: '/app/shop', label: 'Local Shop' },
+  { href: '/app/shop/returned', label: 'Open Box' },
   { href: '/app/items', label: 'My Items' },
   { href: '/app/rewards', label: 'Rewards' },
 ];
@@ -15,6 +16,11 @@ const tabs = [
 export function AppNav() {
   const pathname = usePathname();
   const { logout, account } = useRole();
+  // Longest-href-wins so a nested tab (Open Box under Local Shop) doesn't
+  // also light up its parent.
+  const activeHref = tabs
+    .filter((o) => pathname === o.href || pathname.startsWith(`${o.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
     <div className="border-b border-hairline bg-white/80 backdrop-blur-md">
@@ -26,7 +32,7 @@ export function AppNav() {
           <span className="h-5 w-px bg-hairline" />
           <nav className="flex items-center gap-6">
             {tabs.map((t) => {
-            const active = pathname === t.href || pathname.startsWith(`${t.href}/`);
+            const active = activeHref === t.href;
             return (
               <Link
                 key={t.href}

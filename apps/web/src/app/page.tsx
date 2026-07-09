@@ -15,17 +15,17 @@ function Hero() {
   return (
     <section className="mx-auto max-w-7xl px-6 pb-12 pt-20">
       <div className="max-w-3xl">
-        <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-foreground/60">
+        <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-orange">
           <span className="size-1.5 animate-pulse rounded-full bg-orange" />
-          Amazon-native · Operational
+          Second Life Commerce: AI Powered Returns
         </span>
         <h1 className="text-6xl font-bold leading-[0.9] tracking-tighter sm:text-7xl">
-          Grade at the source. <br />
+          Grade at the doorstep. <br />
           <span className="text-orange">Decide before it moves.</span>
         </h1>
-        <p className="mt-8 max-w-xl text-lg leading-relaxed text-foreground/70">
-          ReLoop intercepts returns and unused inventory at the doorstep. Our AI evaluates
-          condition instantly to determine the most profitable — and most sustainable — next step.
+       
+        <p className="mt-4 max-w-xl text-base italic leading-relaxed text-foreground/50">
+          The smart layer that sits on top of Amazon&apos;s returns, so far less gets wasted.
         </p>
         <div className="mt-10 flex flex-wrap gap-3">
           <Link
@@ -185,9 +185,7 @@ function Dashboard() {
       <div className="rounded-3xl border border-surface bg-white p-8 md:p-12">
         <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
           <div>
-            <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-orange">
-              Live · Bengaluru Cluster
-            </span>
+            
             <h2 className="mt-2 text-4xl font-bold tracking-tighter">Live Routing Engine</h2>
             <p className="mt-2 text-foreground/60">
               Current return operations across your local logistics network.

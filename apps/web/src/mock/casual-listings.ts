@@ -1,11 +1,12 @@
-import type {
-  ConditionGrade,
-  ImpactEstimate,
-  ItemCategory,
-  ItemId,
-  MarketContext,
-  Money,
-  ProductHealthCard,
+import {
+  estimateImpact,
+  type ConditionGrade,
+  type ImpactEstimate,
+  type ItemCategory,
+  type ItemId,
+  type MarketContext,
+  type Money,
+  type ProductHealthCard,
 } from '@reloop/shared';
 
 export type ListingStatus = 'listed' | 'viewed' | 'matched' | 'sold' | 'recycled' | 'donated';
@@ -53,6 +54,124 @@ export interface CasualListing {
   storeProductId?: string;
 }
 
-// No seed listings here — My Listings shows the demo seeds (seed-listings.ts) plus
-// whatever the user lists through the sell flow (persisted via listings-store).
-export const casualListings: CasualListing[] = [];
+const inr = (amountCents: number): Money => ({ amountCents, currency: 'INR' });
+
+interface OpenBoxSeed {
+  returnId: string;
+  title: string;
+  imageUrl: string;
+  category: ItemCategory;
+  grade: ConditionGrade;
+  sellerId: string;
+  sellerName: string;
+  confidence: number;
+  summary: string;
+  issues: string[];
+  packagingSealed: boolean;
+  originalPaise: number;
+  listingPaise: number;
+  listedAt: string; // ISO date
+  storeProductId?: string;
+}
+
+/** Spec 016/023: a return dispatched to local resale — same shape `birthAgentFromReturn`
+ *  produces, laid down as a static seed so the Open Box page has content on first load. */
+function openBoxListing(s: OpenBoxSeed): CasualListing {
+  const itemId: ItemId = `item_ret_${s.returnId}`;
+  const now = `${s.listedAt}T09:01:00.000Z`;
+  const card: ProductHealthCard = {
+    id: `hc_${s.returnId}`,
+    productId: s.storeProductId ?? `prod_${s.returnId}`,
+    itemId,
+    title: s.title,
+    grade: s.grade,
+    confidence: s.confidence,
+    summary: s.summary,
+    detectedIssues: s.issues,
+    authenticityVerified: true,
+    packagingSealed: s.packagingSealed,
+    listingPrice: inr(s.listingPaise),
+    history: [
+      { label: 'Graded at the doorstep', at: `${s.listedAt}T08:10:00.000Z` },
+      { label: 'Driver verified at pickup', at: `${s.listedAt}T08:40:00.000Z` },
+      { label: 'Hub bench verified · ready to list', at: now },
+    ],
+    healthCardUrl: `/card/${itemId}`,
+    issuedAt: now,
+  };
+  return {
+    id: `lst_ret_${s.returnId}`,
+    itemId,
+    title: s.title,
+    imageUrl: s.imageUrl,
+    listedPrice: inr(s.listingPaise),
+    status: 'listed',
+    views: 0,
+    listedAt: now,
+    sellerId: s.sellerId,
+    sellerName: s.sellerName,
+    category: s.category,
+    grade: s.grade,
+    originalPrice: inr(s.originalPaise),
+    retailCents: s.originalPaise,
+    card,
+    impact: estimateImpact(s.category, inr(s.listingPaise)),
+    returnId: s.returnId,
+    storeProductId: s.storeProductId,
+  };
+}
+
+/** Demo Open Box inventory — each reads as a real hub-dispatched return (grade,
+ *  Health Card, packaging status) so /app/shop/returned has content on first load,
+ *  alongside whatever a seller approves live during a demo. */
+export const casualListings: CasualListing[] = [
+  openBoxListing({
+    returnId: 'seed_ret_macbook',
+    title: 'Apple MacBook Air (M2)',
+    imageUrl: '/catalog/macbook-air.jpg',
+    category: 'electronics',
+    grade: 'good',
+    sellerId: 'seller_techbazaar',
+    sellerName: 'TechBazaar',
+    confidence: 0.93,
+    summary: 'Changed-mind return, opened once. Light keyboard-deck marks, battery health 96%.',
+    issues: ['Faint keyboard-deck marks', 'Original box not returned'],
+    packagingSealed: false,
+    originalPaise: 11490000, // ₹1,14,900
+    listingPaise: 8200000, // ₹82,000
+    listedAt: '2026-07-02',
+    storeProductId: 'store_macbookair',
+  }),
+  openBoxListing({
+    returnId: 'seed_ret_dyson',
+    title: 'Dyson V10 Cordless Vacuum',
+    imageUrl: '/catalog/dyson-v10.jpg',
+    category: 'home',
+    grade: 'like-new',
+    sellerId: 'seller_urban',
+    sellerName: 'UrbanThread Store',
+    confidence: 0.95,
+    summary: 'Factory-sealed box, customer changed mind before first use. Doorstep-graded, seal verified.',
+    issues: [],
+    packagingSealed: true,
+    originalPaise: 3490000, // ₹34,900
+    listingPaise: 2490000, // ₹24,900
+    listedAt: '2026-07-05',
+  }),
+  openBoxListing({
+    returnId: 'seed_ret_instantpot',
+    title: 'Instant Pot Duo 7-in-1',
+    imageUrl: '/catalog/instant-pot.jpg',
+    category: 'home',
+    grade: 'fair',
+    sellerId: 'seller_techbazaar',
+    sellerName: 'TechBazaar',
+    confidence: 0.89,
+    summary: 'Functional, tested at the hub bench. Scuffed lid, missing steam rack.',
+    issues: ['Scuffed lid', 'Missing steam rack'],
+    packagingSealed: false,
+    originalPaise: 899900, // ₹8,999
+    listingPaise: 450000, // ₹4,500
+    listedAt: '2026-06-28',
+  }),
+];

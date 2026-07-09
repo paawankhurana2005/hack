@@ -55,7 +55,7 @@ export default function ShopPage() {
         className="mb-6 flex items-center justify-between rounded-2xl border border-orange/30 bg-orange/5 px-5 py-4 transition-colors hover:bg-orange/10"
       >
         <span>
-          <span className="block font-semibold text-foreground">Returned & Verified</span>
+          <span className="block font-semibold text-foreground">Open Box</span>
           <span className="block text-sm text-muted-foreground">
             Hub-checked customer returns, condition and packaging status shown upfront.
           </span>

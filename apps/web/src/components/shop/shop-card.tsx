@@ -44,14 +44,18 @@ export function ShopCard({
               ✓ Verified
             </span>
           )}
-          {item.openBox && !sold && (
-            <span className="absolute bottom-3 left-3 rounded-full bg-brand/90 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-brand-foreground backdrop-blur">
-              Open-box · doorstep graded
-            </span>
-          )}
-          {card.packagingSealed === false && !sold && (
-            <span className="absolute bottom-3 right-3 rounded-full bg-orange/90 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white backdrop-blur">
-              Packaging not included
+          {!sold && (item.openBox || card.packagingSealed === false) && (
+            <span className="absolute inset-x-3 bottom-3 flex flex-col items-start gap-1">
+              {item.openBox && (
+                <span className="rounded-full bg-brand/90 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-brand-foreground backdrop-blur">
+                  Open-box · doorstep graded
+                </span>
+              )}
+              {card.packagingSealed === false && (
+                <span className="rounded-full bg-orange/90 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white backdrop-blur">
+                  Packaging not included
+                </span>
+              )}
             </span>
           )}
           {sold && (
