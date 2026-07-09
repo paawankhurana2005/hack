@@ -126,6 +126,16 @@ export const mockOrders: MockOrder[] = [
     category: 'footwear',
   },
   {
+    orderId: 'ORD-2022',
+    productName: 'Air Jordan 1 Retro High OG "Chicago"',
+    imageUrl: '/demo/graded/jordan/1.jpg',
+    orderDate: '2026-07-03T00:00:00Z',
+    priceCents: 1699500,
+    currency: 'INR',
+    sku: 'B08JORDAN1CHI',
+    category: 'footwear',
+  },
+  {
     orderId: 'ORD-2012',
     productName: 'Nike Sportswear Club T-Shirt',
     imageUrl: '/catalog/official-nike-tee.jpg',

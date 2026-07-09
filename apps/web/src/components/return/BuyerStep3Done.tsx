@@ -14,9 +14,11 @@ function formatPrice(cents: number) {
   return `₹${(cents / 100).toLocaleString('en-IN')}`;
 }
 
+// Pickup is 5–7 days out and the refund lands 5–7 business days after that, so
+// the outer bound is ~14 days — never earlier than the agent actually collects.
 function refundByDate() {
   const d = new Date();
-  d.setDate(d.getDate() + 7);
+  d.setDate(d.getDate() + 14);
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -43,7 +45,7 @@ export function BuyerStep3Done({ productName, priceCents, agentWindow }: Props) 
             <TruckIcon className="h-5 w-5" />
           </span>
           <div>
-            <p className="font-semibold text-foreground">Agent pickup today</p>
+            <p className="font-semibold text-foreground">Agent pickup</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Your Amazon delivery agent will arrive between{' '}
               <span className="font-semibold text-foreground">{agentWindow}</span>.

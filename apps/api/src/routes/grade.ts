@@ -127,6 +127,10 @@ export function createGradeHandler(gradingService: GradingService) {
         wardrobingFlag: false,
         functionallyVerifiable: result.grade !== 'poor' && !defectTags.includes('dead_battery'),
         rawReason: typedReason,
+        // The trained grader's raw score + summary — what the model actually said.
+        // Both absent when the hosted-VLM fallback graded instead.
+        ...(typeof result.conditionScore === 'number' ? { conditionScore: result.conditionScore } : {}),
+        ...(result.summary ? { summary: result.summary } : {}),
         packagingSealed: !defectTags.includes('worn_packaging'),
         needsReview,
         ...(missingLabels.length ? { missingAngles: missingLabels } : {}),
@@ -145,6 +149,7 @@ export function createGradeHandler(gradingService: GradingService) {
         images: images.length,
         grade: gradeResult.grade,
         confidence: Number(gradeResult.confidence.toFixed(3)),
+        conditionScore: gradeResult.conditionScore,
         needsReview,
         missingAngles: missingLabels,
         defects: result.detectedIssues,
