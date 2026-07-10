@@ -35,16 +35,6 @@ export const mockOrders: MockOrder[] = [
     category: 'electronics',
   },
   {
-    orderId: 'ORD-2003',
-    productName: 'Oppo A57',
-    imageUrl: '/catalog/galaxy-phone.jpg',
-    orderDate: '2026-06-04T00:00:00Z',
-    priceCents: 1890000,
-    currency: 'INR',
-    sku: 'B0OPPOA5701',
-    category: 'electronics',
-  },
-  {
     orderId: 'ORD-2004',
     productName: 'Wireless Earbuds',
     imageUrl: '/catalog/earphones.jpg',
@@ -55,16 +45,6 @@ export const mockOrders: MockOrder[] = [
     category: 'electronics',
   },
   {
-    orderId: 'ORD-2005',
-    productName: 'Apple iPhone 15 Pro Max',
-    imageUrl: '/catalog/iphone-15-pro.png',
-    orderDate: '2026-07-02T00:00:00Z',
-    priceCents: 15990000,
-    currency: 'INR',
-    sku: 'B09IPHONE15',
-    category: 'electronics',
-  },
-  {
     orderId: 'ORD-2006',
     productName: 'Apple AirPods Pro (2nd Gen)',
     imageUrl: '/catalog/airpods-pro.jpg',
@@ -72,16 +52,6 @@ export const mockOrders: MockOrder[] = [
     priceCents: 2490000,
     currency: 'INR',
     sku: 'B09AIRPODS2',
-    category: 'electronics',
-  },
-  {
-    orderId: 'ORD-2007',
-    productName: 'Sony PlayStation 5 Console',
-    imageUrl: '/catalog/ps5-console.png',
-    orderDate: '2026-07-01T00:00:00Z',
-    priceCents: 5499000,
-    currency: 'INR',
-    sku: 'B09PS5CON07',
     category: 'electronics',
   },
   {
@@ -96,16 +66,6 @@ export const mockOrders: MockOrder[] = [
   },
   // Official brand assets (downloaded from the products' own websites).
   {
-    orderId: 'ORD-2009',
-    productName: "Nike Air Force 1 '07",
-    imageUrl: '/catalog/official-nike-af1.jpg',
-    orderDate: '2026-07-03T00:00:00Z',
-    priceCents: 969500,
-    currency: 'INR',
-    sku: 'B08NIKEAF107',
-    category: 'footwear',
-  },
-  {
     orderId: 'ORD-2010',
     productName: 'Nike Sportswear Club Fleece Hoodie',
     imageUrl: '/catalog/official-nike-hoodie.jpg',
@@ -118,21 +78,11 @@ export const mockOrders: MockOrder[] = [
   {
     orderId: 'ORD-2011',
     productName: 'Nike Dunk Low Retro',
-    imageUrl: '/catalog/official-nike-dunk.jpg',
+    imageUrl: '/catalog/shopping.jpg',
     orderDate: '2026-07-02T00:00:00Z',
     priceCents: 929500,
     currency: 'INR',
     sku: 'B08NIKEDUNK11',
-    category: 'footwear',
-  },
-  {
-    orderId: 'ORD-2022',
-    productName: 'Air Jordan 1 Retro High OG "Chicago"',
-    imageUrl: '/demo/graded/jordan/1.jpg',
-    orderDate: '2026-07-03T00:00:00Z',
-    priceCents: 1699500,
-    currency: 'INR',
-    sku: 'B08JORDAN1CHI',
     category: 'footwear',
   },
   {
@@ -144,16 +94,6 @@ export const mockOrders: MockOrder[] = [
     currency: 'INR',
     sku: 'B08NIKETEE12',
     category: 'apparel',
-  },
-  {
-    orderId: 'ORD-2013',
-    productName: 'Stanley Quencher H2.0 Tumbler 40oz',
-    imageUrl: '/catalog/official-stanley-quencher.png',
-    orderDate: '2026-07-05T00:00:00Z',
-    priceCents: 399900,
-    currency: 'INR',
-    sku: 'B07STANLEY13',
-    category: 'home',
   },
   // --- New users' returns (Kabir / Diya / Ishaan / Priya) ------------------
   {

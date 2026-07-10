@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ReturnGradingResult, ReturnHealthCard, ReturnItemState, ReturnStateTransition } from '@reloop/shared';
+import { DEMO_CONDITION_SCORE, conditionScoreColor } from '@/lib/demo-grading';
 
 // Same visual chrome as the Sell flow's showpiece card
 // (apps/web/src/components/sell/health-card.tsx) — rotated shadow card, VFD
@@ -53,6 +54,12 @@ function stateLabel(state: ReturnItemState): string {
   return STATE_LABEL[state] ?? state.replace(/_/g, ' ');
 }
 
+// DEMO: a fixed condition blurb for the seller's Health Card. The pitch demos a
+// shoe return, so the copy is written for one. Replace with the grader's own
+// `summary` (ReturnGradingResult.summary) once every return populates it.
+const DEMO_CONDITION_SUMMARY =
+  'The shoes look in perfect condition. No creases found on any part of the shoe.';
+
 function when(iso: string): string {
   return new Date(iso).toLocaleString('en-IN', {
     day: 'numeric',
@@ -60,6 +67,24 @@ function when(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+// The trained grader's raw continuous condition score, alongside AI Confidence.
+function ScoreBar({ value }: { value: number }) {
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+        <span>Condition score</span>
+        <span className="font-mono font-semibold text-foreground">{value.toFixed(3)} / 1.00</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-secondary">
+        <div
+          className={`h-2 rounded-full ${conditionScoreColor(value)} transition-all`}
+          style={{ width: `${Math.round(value * 100)}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function ConfidenceBar({ value }: { value: number }) {
@@ -160,7 +185,16 @@ export function ReturnHealthCardDeep({
                 )}
               </div>
 
-              <div className="mt-4">
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                {DEMO_CONDITION_SUMMARY}
+              </p>
+
+              {/* DEMO: the score is read from the constant, not from
+                  `grading.conditionScore`, so it reads 0.964 even on records
+                  graded before the pin (or by the VLM fallback, which emits
+                  no score at all). */}
+              <div className="mt-4 space-y-4">
+                <ScoreBar value={DEMO_CONDITION_SCORE} />
                 <ConfidenceBar value={grading.confidence} />
               </div>
 

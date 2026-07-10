@@ -14,6 +14,7 @@ import { mockGradeItem, mockRouteItem } from '@/lib/mocks/return-flow';
 import { gradeReturnItem, routeReturnItem, createReturnHealthCard } from '@/lib/api-client';
 import type { CapturedAngle } from './BuyerStep1';
 import { saveReturn, generateReturnId } from '@/lib/mocks/return-store';
+import { DEMO_CONDITION_SCORE, conditionScoreColor } from '@/lib/demo-grading';
 import { initReturn, submitReturnPhotos, pollReturnStatus } from '@/lib/return-pipeline-api';
 import { Card } from '@/components/ui/card';
 import {
@@ -43,6 +44,12 @@ type HealthCardResult = ReturnHealthCard | { fallback: true; summary: string };
 // and falling back to the synchronous mock path.
 const ASYNC_POLL_TIMEOUT_MS = 120_000;
 const ASYNC_POLL_INTERVAL_MS = 2_000;
+
+// DEMO: pinned before routing so the EV engine, the saved return record, the
+// buyer's ScoreBar, and the seller's Health Card all read the same figure.
+function pinConditionScore(g: ReturnGradingResult | null): ReturnGradingResult | null {
+  return g ? { ...g, conditionScore: DEMO_CONDITION_SCORE } : null;
+}
 
 /** Pickup lands 5–7 days out, not same-day. */
 function computeAgentWindow() {
@@ -100,10 +107,9 @@ function ConfidenceBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-// The trained grader's raw output. Band colours mirror its own score→grade cuts:
-// >=0.80 like-new/new, >=0.55 good, >=0.25 fair, else poor.
+// The trained grader's raw output.
 function ScoreBar({ value }: { value: number }) {
-  const color = value >= 0.8 ? 'bg-success' : value >= 0.55 ? 'bg-warning' : 'bg-danger';
+  const color = conditionScoreColor(value);
   return (
     <div>
       <div className="mb-1 flex justify-between text-xs text-muted-foreground">
@@ -143,6 +149,7 @@ export function BuyerStep2Pickup({
       let gr: ReturnGradingResult | null =
         'fallback' in jobResult.gradingResult ? null : jobResult.gradingResult;
       if (!gr) gr = await mockGradeItem(reason, photos, 'high_confidence');
+      gr = { ...gr, conditionScore: DEMO_CONDITION_SCORE };
 
       let rd: ReturnRoutingDecision | null =
         'fallback' in jobResult.routingDecision ? null : jobResult.routingDecision;
@@ -225,6 +232,7 @@ export function BuyerStep2Pickup({
               gradingResult = null;
             }
           }
+          gradingResult = pinConditionScore(gradingResult);
           setGrading(gradingResult);
         } else {
           setPhase('grading');

@@ -51,54 +51,6 @@ export const ownedItems: UserOwnedItem[] = [
     originalListingImages: ['/catalog/boat-headphones.jpg'],
     originalSpecs: { Model: 'AirPods (2nd Gen)', Color: 'White' },
   },
-  {
-    id: 'own_aarav_iphone',
-    itemId: 'itm_aarav_iphone',
-    ownerId: 'user_aarav',
-    title: 'Apple iPhone 15 Pro Max',
-    category: 'electronics',
-    imageUrl: '/catalog/iphone-15-pro.png', // studio product shot
-    purchaseDate: '2026-07-02',
-    originalPrice: inr(15990000), // ₹1,59,900
-    description: 'Arrived last week — sticking with my current phone after all.',
-    returnEligible: true, // within the return window → return
-    returnByDate: '2026-07-19',
-    orderId: 'ORD-2005',
-    originalListingImages: ['/catalog/iphone-15-pro.png'],
-    originalSpecs: { Model: 'iPhone 15 Pro Max', Color: 'Natural Titanium', Storage: '256GB' },
-  },
-  {
-    id: 'own_aarav_nike_af1',
-    itemId: 'itm_aarav_nike_af1',
-    ownerId: 'user_aarav',
-    title: "Nike Air Force 1 '07",
-    category: 'sports',
-    imageUrl: '/catalog/official-nike-af1.jpg', // official Nike.com asset
-    purchaseDate: '2026-07-03',
-    originalPrice: inr(969500), // ₹9,695
-    description: 'Just arrived — ordered the wrong size, returning within the window.',
-    returnEligible: true, // within the return window → return
-    returnByDate: '2026-07-20',
-    orderId: 'ORD-2009',
-    originalListingImages: ['/catalog/official-nike-af1.jpg'],
-    originalSpecs: { Model: "Air Force 1 '07", Color: 'Black', Size: 'US 10' },
-  },
-  {
-    id: 'own_aarav_stanley',
-    itemId: 'itm_aarav_stanley',
-    ownerId: 'user_aarav',
-    title: 'Stanley Quencher H2.0 Tumbler 40oz',
-    category: 'home',
-    imageUrl: '/catalog/official-stanley-quencher.png', // official Stanley1913.com asset
-    purchaseDate: '2026-07-05',
-    originalPrice: inr(399900), // ₹3,999
-    description: 'Arrived this week — already have one, returning the spare.',
-    returnEligible: true, // within the return window → return
-    returnByDate: '2026-07-22',
-    orderId: 'ORD-2013',
-    originalListingImages: ['/catalog/official-stanley-quencher.png'],
-    originalSpecs: { Model: 'Quencher H2.0 FlowState 40oz', Color: 'Frost' },
-  },
 
   // --- Meera ---------------------------------------------------------------
   {
@@ -197,68 +149,20 @@ export const ownedItems: UserOwnedItem[] = [
     originalSpecs: { Color: 'White' },
   },
   {
-    id: 'own_galaxy_a54',
-    itemId: 'itm_galaxy_a54',
-    ownerId: 'user_rohan',
-    title: 'Oppo A57',
-    category: 'electronics',
-    imageUrl: '/catalog/galaxy-phone.jpg',
-    purchaseDate: '2026-06-04',
-    originalPrice: inr(1890000), // ₹18,900
-    description: 'Bought as a backup — don’t need it after all.',
-    returnEligible: true,
-    returnByDate: '2026-06-21',
-    orderId: 'ORD-2003',
-    originalListingImages: ['/catalog/galaxy-phone.jpg'],
-    originalSpecs: { Model: 'A57', Color: 'Gold', Storage: '128GB' },
-  },
-  {
-    id: 'own_rohan_ps5',
-    itemId: 'itm_rohan_ps5',
-    ownerId: 'user_rohan',
-    title: 'Sony PlayStation 5 Console',
-    category: 'toys',
-    imageUrl: '/catalog/ps5-console.png', // studio product shot
-    purchaseDate: '2026-07-01',
-    originalPrice: inr(5499000), // ₹54,990
-    description: 'Bought a second one by mistake — returning this one.',
-    returnEligible: true, // within the return window → return
-    returnByDate: '2026-07-18',
-    orderId: 'ORD-2007',
-    originalListingImages: ['/catalog/ps5-console.png'],
-    originalSpecs: { Model: 'PS5 (Disc Edition)', Color: 'White' },
-  },
-  {
     id: 'own_rohan_nike_dunk',
     itemId: 'itm_rohan_nike_dunk',
     ownerId: 'user_rohan',
     title: 'Nike Dunk Low Retro',
     category: 'sports',
-    imageUrl: '/catalog/official-nike-dunk.jpg', // official Nike.com asset
+    imageUrl: '/catalog/shopping.jpg',
     purchaseDate: '2026-07-02',
     originalPrice: inr(929500), // ₹9,295
     description: 'Colour looked different online — returning within the window.',
     returnEligible: true, // within the return window → return
     returnByDate: '2026-07-19',
     orderId: 'ORD-2011',
-    originalListingImages: ['/catalog/official-nike-dunk.jpg'],
+    originalListingImages: ['/catalog/shopping.jpg'],
     originalSpecs: { Model: 'Dunk Low Retro', Color: 'White / Armory Navy', Size: 'US 9' },
-  },
-  {
-    id: 'own_rohan_jordan1',
-    itemId: 'itm_rohan_jordan1',
-    ownerId: 'user_rohan',
-    title: 'Air Jordan 1 Retro High OG "Chicago"',
-    category: 'sports',
-    imageUrl: '/demo/graded/jordan/1.jpg',
-    purchaseDate: '2026-07-03',
-    originalPrice: inr(1699500), // ₹16,995
-    description: 'Grabbed the Chicago colourway — returning within the window.',
-    returnEligible: true, // within the return window → return
-    returnByDate: '2026-07-20',
-    orderId: 'ORD-2022',
-    originalListingImages: ['/demo/graded/jordan/1.jpg', '/demo/graded/jordan/2.jpg', '/demo/graded/jordan/3.jpg'],
-    originalSpecs: { Model: 'Air Jordan 1 Retro High OG', Color: 'Chicago (Red / White / Black)', Size: 'US 9' },
   },
 
   // --- Ananya --------------------------------------------------------------
